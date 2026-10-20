@@ -52,7 +52,7 @@ jobs:
 
       - name: App icon
         continue-on-error: true
-        run: npx capacitor-assets generate --android --iconBackgroundColor '#FCB040' --iconBackgroundColorDark '#FCB040' --splashBackgroundColor '#ffffff'
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff'
 
       - name: Copy web files into the app
         run: npx cap sync android
