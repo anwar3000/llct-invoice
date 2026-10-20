@@ -291,3 +291,11 @@ table.tbl{width:100%;border-collapse:collapse}
 }
 @media (max-width:480px){ h1{font-size:1.35rem} .g2,.g3,.g4{grid-template-columns:1fr} .kpi .v{font-size:1.1rem} .head .row{width:100%} }
 @media (prefers-reduced-motion:no-preference){ .toast{animation:up .2s ease-out} @keyframes up{from{transform:translate(-50%,10px);opacity:0}} }
+.thanks{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0}
+.thanks .tick{width:64px;height:64px;border-radius:50%;background:var(--good-soft);color:var(--good);display:grid;place-items:center;font-size:2rem;font-weight:700}
+.thanks h2{font-size:1.4rem}
+.thanks p{margin:0;color:var(--muted);line-height:1.5}
+.thanks .from{display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;text-align:left}
+.thanks .from img{width:40px;height:40px;object-fit:contain}
+.thanks .from b{display:block;font-family:var(--f-display)}
+.thanks .from span{font-size:.78rem;color:var(--muted)}

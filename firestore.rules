@@ -304,11 +304,11 @@ service cloud.firestore {
                   || (invOn() && resource.data.createdBy == request.auth.uid)
                   || (invHas('deliver') && resource.data.type == 'delivery');
       allow create: if invHas(request.resource.data.type) && request.resource.data.createdBy == request.auth.uid;
-      // Editors of that document type; delivery staff may only add serials and the signature.
+      // Editors of that document type; delivery staff may only add serials, status, proof photos and the signature.
       allow update: if (invHas(resource.data.type) && request.resource.data.type == resource.data.type
                         && (invHas('viewAll') || resource.data.createdBy == request.auth.uid))
                     || (invHas('deliver') && resource.data.type == 'delivery'
-                        && onlyChanges(['items', 'delivery', 'updatedAt']));
+                        && onlyChanges(['items', 'delivery', 'attachments', 'updatedAt']));
       allow delete: if invHas('delete');
     }
   }

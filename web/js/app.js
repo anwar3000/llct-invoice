@@ -269,7 +269,7 @@ function renderAnnex(d){
   const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
   const c=S.cfg,pages=[];for(let i=0;i<ims.length;i+=2)pages.push(ims.slice(i,i+2));
   return pages.map((pg,k)=>`<div class="sheet annex" style="--b:${h(c.brand)};--c:${h(c.charcoal)};page-break-before:always;break-before:page"><div class="band"></div>
-   <div class="ahd"><div><div class="dt2">Attachments</div><div class="as">${h(TYPE[d.type].t)} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
+   <div class="ahd"><div><div class="dt2">${d.type==='delivery'?'Proof of delivery':'Attachments'}</div><div class="as">${h(TYPE[d.type].t)} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
    ${pg.map((a,j)=>`<figure class="af ${pg.length===1?'one':''}">${img(a.ref)}<figcaption><b>${String(k*2+j+1).padStart(2,'0')}</b>${h(a.caption||a.name||'')}</figcaption></figure>`).join('')}
    ${sheetFoot()}</div>`).join('');
 }
@@ -308,7 +308,7 @@ function renderSheet(d){
     ${d.type==='invoice'&&paid?`<div class="tr"><span>Paid</span><span class="m">${money(paid)}</span></div><div class="tr" style="font-weight:700"><span>Balance due</span><span class="m">${money(t.total-paid)}</span></div>`:''}</div>`
     :`<div class="tot"><div class="tr"><span>Total items</span><span class="m">${(d.items||[]).length}</span></div><div class="tr"><span>Total quantity</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(+i.qty||0),0)}</span></div><div class="tr"><span>Serials recorded</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(i.serials||[]).length,0)}</span></div></div>`;
   const dl=d.delivery||{};
-  const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>Received by: ${h(dl.receiver||'')}</b><br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
+  const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>Received by: ${h(dl.receiver||'')}</b>${dl.signedAt?'<br><i style="color:#2F8A57;font-style:normal">Received in good condition. Thank you for your acceptance.</i>':''}<br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
     :`<div class="sig"><div class="img"></div><div class="ln"><b>${isQ?'Accepted by':'Received by'}</b><br>Name, signature, company stamp & date</div></div>`;
   return `<div class="sheet" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number)}
   <div class="meta"><div class="box"><div class="k">${isDN?'Deliver to':isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
@@ -689,7 +689,7 @@ const clientSnap=c=>({name:c.name,contact:c.contact||'',address:c.address||'',ph
 let DV=null,pad=null;
 VIEWS.deliver=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);if(!d)return '<div class="empty"><b>Delivery note not found</b></div>';
-  if(!DV||DV.id!==d.id)DV={id:d.id,items:clone(d.items||[]).map(i=>({...i,serials:i.serials||[]})),receiver:'',receiverPhone:''};
+  if(!DV||DV.id!==d.id)DV={id:d.id,items:clone(d.items||[]).map(i=>({...i,serials:i.serials||[]})),receiver:'',receiverPhone:'',photos:clone(d.attachments||[])};
   const need=DV.items.reduce((s,i)=>s+(+i.qty||0),0),got=DV.items.reduce((s,i)=>s+i.serials.length,0);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1>Deliver ${h(d.number)}</h1><div class="sub">${h(d.client&&d.client.name||'')}${d.deliveryAddress?' · '+h(d.deliveryAddress):''}</div></div></div></div>
   <div class="card pad grid"><div class="row"><h2 class="grow">1. Items, status & serial numbers</h2><span class="muted num">${got} of ${need} scanned</span></div>
@@ -703,6 +703,8 @@ VIEWS.deliver=()=>{
   </div>
   <div class="card pad grid"><h2>2. Receiver</h2><div class="grid g2"><label class="field"><span>Received by (name)</span><input id="rc-name" value="${h(DV.receiver)}"></label><label class="field"><span>Mobile</span><input id="rc-phone" value="${h(DV.receiverPhone)}" inputmode="tel"></label></div>
    <div class="row"><h3 class="grow">Receiver signature</h3><button class="btn sm" id="sig-clr">Clear</button></div><div class="sigpad" id="sig"></div></div>
+  <div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>3. Proof of delivery photos</h2><div class="muted" style="font-size:.82rem">Optional. Photos print on the delivery note as extra pages.</div></div><button class="btn" id="pod-add" type="button">${I.plus}Take or add photo</button></div>
+   ${DV.photos.length?`<div class="atts">${DV.photos.map((a,k)=>`<div class="att"><div class="ath">${img(a.ref)}</div><div class="atb"><input data-podcap="${k}" value="${h(a.caption||'')}" placeholder="Caption, e.g. Installed at reception" aria-label="Caption"></div><button class="xbtn" type="button" data-podrm="${k}" aria-label="Remove photo">✕</button></div>`).join('')}</div>`:''}</div>
   <div class="row"><span class="grow"></span><button class="btn" id="save-draft">Save without signing</button><button class="btn primary" id="confirm">Confirm delivery</button></div>`;
 };
 VIEWS_AFTER.deliver=()=>{
@@ -719,15 +721,27 @@ VIEWS_AFTER.deliver=()=>{
   $('#sig-clr').onclick=()=>pad.clear();
   $$('[data-st]').forEach(sel=>sel.onchange=()=>{DV.items[+sel.dataset.st].status=sel.value});
   $('#st-all').onchange=e=>{if(!e.target.value)return;keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items.forEach(i=>i.status=e.target.value);render();if(sig)pad.load(sig)};
-  $('#save-draft').onclick=async()=>{keep();if(await save('docs',d.id,{...d,items:DV.items,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
+  const keepSig=fn=>{keep();$$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);const sig=!pad.isEmpty()?pad.toData():null;fn();render();if(sig)pad.load(sig)};
+  $('#pod-add').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.multiple=true;inp.setAttribute('capture','environment');
+    inp.onchange=async()=>{const files=[...inp.files];if(!files.length)return;const added=[];
+      for(const f of files){try{toast('Uploading photo…');added.push({ref:await storeAttachmentImage(f),kind:'image',name:f.name,caption:'',inPdf:true,proof:true})}catch(e){toast('Could not upload '+f.name+': '+(e.message||e.code),true)}}
+      if(added.length)keepSig(()=>DV.photos.push(...added))};inp.click()};
+  $$('[data-podrm]').forEach(b=>b.onclick=()=>keepSig(()=>DV.photos.splice(+b.dataset.podrm,1)));
+  $('#save-draft').onclick=async()=>{keep();$$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);if(await save('docs',d.id,{...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
   $('#confirm').onclick=async()=>{keep();
     if(!DV.receiver.trim()){toast('Enter the receiver\'s name.',true);return}
     if(pad.isEmpty()){toast('Ask the receiver to sign in the box.',true);return}
-    const missing=DV.items.reduce((s,i)=>s+Math.max(0,(+i.qty||0)-i.serials.length),0);
-    if(missing&&!await confirmBox('Some serials are missing',missing+' serial number'+(missing>1?'s are':' is')+' not recorded. Confirm the delivery anyway?','Confirm anyway'))return;
-    const upd={...d,items:DV.items,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:pad.toData(),signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name}};
-    if(await save('docs',d.id,upd,'Delivery confirmed')){DV=null;go('view',{id:d.id})}};
+    $$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);
+    const upd={...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:pad.toData(),signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name}};
+    const btn=$('#confirm');btn.disabled=true;
+    if(await save('docs',d.id,upd)){const who=DV.receiver.trim();DV=null;go('view',{id:d.id});thankYou(upd,who)}else btn.disabled=false};
 };
+function thankYou(d,who){
+  const o=modal('Delivery confirmed',`<div class="thanks"><div class="tick">✓</div><h2>Thank you${who?', '+h(who):''}!</h2>
+   <p>Thank you for accepting the delivery.<br>We appreciate your business.</p><div class="from">${img(S.cfg.logo)}<div><b>${h(S.cfg.name)}</b><span class="num">${h(d.number)} · ${fdt(d.delivery.signedAt)}</span></div></div></div>`,
+   `<button class="btn" id="ty-pdf">${I.pdf}Delivery note PDF</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
+  $('#ty-pdf',o).onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
+}
 /* ----- clients ----- */
 VIEWS.clients=()=>{
   const q=(S.params.q||'').toLowerCase();
