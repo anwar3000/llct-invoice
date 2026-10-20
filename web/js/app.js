@@ -351,7 +351,7 @@ function render(){
   const rs=document.documentElement.style;if(S.cfg.brand)rs.setProperty('--brand',S.cfg.brand);if(S.cfg.charcoal)rs.setProperty('--rail',S.cfg.charcoal);
   const cur=S.view;const nav=navItems();
   const v=VIEWS[cur]?VIEWS[cur]():VIEWS.home();
-  const logo=S.cfg.logo?img(S.cfg.logo):h((S.cfg.name||'L').slice(0,4));
+  const logo='<img src="assets/mark.png" alt="">';
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
     ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
     <div class="who"><div style="color:#fff;font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
@@ -782,7 +782,7 @@ VIEWS_AFTER.settings=()=>{
 function loginScreen(){
   const app=$('#app');
   app.innerHTML=`<div class="loading"><form class="card pad" id="lf" style="width:min(380px,100%);display:flex;flex-direction:column;gap:14px">
-    <div class="brand" style="padding:0"><div class="mark" style="background:#fff"><img src="${h(DEFAULT_CFG.logo)}" alt=""></div><div><b style="color:var(--ink)">${h(DEFAULT_CFG.name)}</b><small class="muted">Invoicing</small></div></div>
+    <div class="brand" style="padding:0"><div class="mark"><img src="assets/mark.png" alt=""></div><div><b style="color:var(--ink)">${h(DEFAULT_CFG.name)}</b><small class="muted">Invoicing</small></div></div>
     <h2>Sign in</h2><p class="muted" style="margin:0">Use your attendance app login.</p>
     <label class="field"><span>Login ID or email</span><input id="lf-id" autocomplete="username" autocapitalize="none" required></label>
     <label class="field"><span>Password</span><input id="lf-pw" type="password" autocomplete="current-password" required></label>
