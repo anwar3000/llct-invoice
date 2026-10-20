@@ -47,7 +47,7 @@ const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airpor
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
-  bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
+  photoSize:'M',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
@@ -261,10 +261,22 @@ function sheetHead(title,number,sub){
   <div class="tbar"><div><div class="dt">${h(title)}</div>${sub?`<div class="dsub">${h(sub)}</div>`:''}</div>
    ${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
 }
-function sheetFoot(){const c=S.cfg;return `<div class="ft"><span>${h(c.name)}${c.website?' · '+h(c.website):''}</span><span>Generated ${fdate(today())}</span></div>`}
+function sheetFoot(){const c=S.cfg;return `<div class="ft"><span>${h(c.name)}${c.taxId?' · '+h(c.taxIdLabel)+' '+h(c.taxId):''}</span><span>This is a computer-generated document</span><span>${h((c.website||'').split('·')[0].trim())}</span></div>`}
+// Photos attached to a document print as extra pages after it.
+function renderAnnex(d){
+  const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
+  const c=S.cfg,pages=[];for(let i=0;i<ims.length;i+=2)pages.push(ims.slice(i,i+2));
+  return pages.map((pg,k)=>`<div class="sheet annex" style="--b:${h(c.brand)};--c:${h(c.charcoal)};page-break-before:always;break-before:page"><div class="band"></div>
+   <div class="ahd"><div><div class="dt2">Attachments</div><div class="as">${h(TYPE[d.type].t)} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
+   ${pg.map((a,j)=>`<figure class="af ${pg.length===1?'one':''}">${img(a.ref)}<figcaption><b>${String(k*2+j+1).padStart(2,'0')}</b>${h(a.caption||a.name||'')}</figcaption></figure>`).join('')}
+   ${sheetFoot()}</div>`).join('');
+}
+const pdfRefs=d=>(d.attachments||[]).filter(a=>a.kind==='pdf'&&a.inPdf!==false).map(a=>a.ref);
 function renderSheet(d){
   const c=S.cfg,t=totals(d),cl=d.client||{},isDN=d.type==='delivery',isQ=d.type==='quotation';
-  const showPrice=!isDN||c.showPricesOnDN;const hasImg=isQ&&(d.items||[]).some(i=>i.photo);
+  const showPrice=!isDN||c.showPricesOnDN;const hasImg=!isDN&&(d.items||[]).some(i=>i.photo);
+  const PX={S:44,M:72,L:112};const psz=i=>PX[i.photoSize||c.photoSize||'M']||72;
+  const imgW=hasImg?Math.max(...(d.items||[]).filter(i=>i.photo).map(psz))+16:0;
   const title=d.type==='invoice'?(+t.rate?'Tax Invoice':'Invoice'):TYPE[d.type].t;
   const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const det=[['Date',fdate(d.date)]];
@@ -274,13 +286,14 @@ function renderSheet(d){
   if(src)det.push([TYPE[src.type].a+' ref',src.number]);
   if(d.salesperson)det.push(['Salesperson',d.salesperson]);
   let rows=(d.items||[]).map((i,n)=>{
-    const sn=(i.serials||[]).length?`<div class="sn">S/N: ${i.serials.map(h).join(', ')}</div>`:'';
-    return `<tr><td class="c m">${n+1}</td>${hasImg?`<td>${i.photo?img(i.photo,'class="pi"'):''}</td>`:''}
+    const sl=(i.serials||[]);
+    const sn=sl.length?`<div class="sn"><b>S/N</b>${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'';
+    return `<tr><td class="c m n">${String(n+1).padStart(2,'0')}</td>${hasImg?`<td>${i.photo?img(i.photo,`class="pi" style="width:${psz(i)}px;height:${psz(i)}px"`):''}</td>`:''}
     <td><div class="it">${h(i.name)}</div>${i.desc?`<div class="idesc">${h(i.desc)}</div>`:''}${isDN?'':sn}</td>
-    <td class="r m">${h(i.qty)}</td><td>${h(i.unit||'')}</td>
-    ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
-    ${isDN?`<td>${sn?sn.replace('S/N: ',''):'<span style="color:#aaa">—</span>'}</td>`:''}</tr>`}).join('');
-  const head=`<tr><th class="c" style="width:28px">#</th>${hasImg?'<th style="width:78px">Image</th>':''}<th>Description</th><th class="r" style="width:54px">Qty</th><th style="width:50px">Unit</th>${showPrice?'<th class="r" style="width:90px">Rate</th><th class="r" style="width:100px">Amount</th>':''}${isDN?'<th style="width:190px">Serial numbers</th>':''}</tr>`;
+    <td class="r m">${h(i.qty)}</td><td class="u">${h(i.unit||'')}</td>
+    ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m b">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
+    ${isDN?`<td>${sl.length?`<div class="sn dn">${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'<span style="color:#b5b7bb">—</span>'}</td>`:''}</tr>`}).join('');
+  const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?'<th class="r" style="width:92px">Unit price</th><th class="r" style="width:104px">Amount</th>':''}${isDN?'<th style="width:200px">Serial numbers</th>':''}</tr>`;
   let stamp='';
   if(d.type==='invoice'){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
   if(isDN&&d.delivery&&d.delivery.signedAt)stamp='<span class="stamp">DELIVERED</span>';
@@ -289,7 +302,7 @@ function renderSheet(d){
     <div class="tr"><span>Subtotal</span><span class="m">${money(t.sub)}</span></div>
     ${t.disc?`<div class="tr"><span>Discount</span><span class="m">− ${money(t.disc)}</span></div>`:''}
     ${+t.rate?`<div class="tr"><span>${h(c.taxLabel)} ${t.rate}%</span><span class="m">${money(t.tax)}</span></div>`:''}
-    <div class="tr gr"><span>Total ${h(c.currency)}</span><span class="m">${money(t.total)}</span></div>
+    <div class="tr gr"><span>Total <small>${h(c.currency)}</small></span><span class="m">${money(t.total)}</span></div>
     ${d.type==='invoice'&&paid?`<div class="tr"><span>Paid</span><span class="m">${money(paid)}</span></div><div class="tr" style="font-weight:700"><span>Balance due</span><span class="m">${money(t.total-paid)}</span></div>`:''}</div>`
     :`<div class="tot"><div class="tr"><span>Total items</span><span class="m">${(d.items||[]).length}</span></div><div class="tr"><span>Total quantity</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(+i.qty||0),0)}</span></div><div class="tr"><span>Serials recorded</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(i.serials||[]).length,0)}</span></div></div>`;
   const dl=d.delivery||{};
@@ -300,13 +313,11 @@ function renderSheet(d){
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
     ${isDN&&d.deliveryAddress?`<div class="k" style="margin-top:8px">Site / address</div><div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}</div>
     <div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div></div>
-  ${d.subject?`<div class="subj">Subject: ${h(d.subject)}</div>`:''}
+  ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
   <table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>
-  <div class="foot"><div style="display:flex;flex-direction:column;gap:10px">${showPrice?`<div class="words">${h(numWords(t.total))}</div>`:''}
-    ${d.notes?`<div><div class="box" style="padding:8px 10px"><div class="k">Notes</div><div class="terms">${h(d.notes)}</div></div></div>`:''}
-    ${d.terms?`<div><div class="k" style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#8a8d93;font-weight:600">Terms & conditions</div><div class="terms">${h(d.terms)}</div></div>`:''}
-    ${d.type!=='delivery'&&c.bank?`<div><div class="k" style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#8a8d93;font-weight:600">Bank details</div><div class="terms">${h(c.bank)}</div></div>`:''}
-    ${stamp?`<div>${stamp}</div>`:''}</div>${totalsHtml}</div>
+  <div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}</div>${totalsHtml}</div>
+  ${showPrice?`<div class="words"><span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:''}
+  ${(d.terms||(d.type!=='delivery'&&c.bank))?`<div class="info">${d.terms?`<div><div class="hh">Terms & conditions</div><div class="terms">${h(d.terms)}</div></div>`:''}${d.type!=='delivery'&&c.bank?`<div><div class="hh">Bank details</div><div class="terms">${h(c.bank)}</div></div>`:''}</div>`:''}
   <div class="sigs"><div class="sig"><div class="img">${c.signature?img(c.signature):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}${isDN&&dl.deliveredBy?' · Delivered by '+h(nameOf(dl.deliveredBy,dl.deliveredByName)):''}</div></div>${right}</div>
   ${sheetFoot()}</div>`;
 }
@@ -328,26 +339,39 @@ function renderSOA(cid,from,to){
 }
 function fitPreview(host){const w=host.clientWidth-24;const k=Math.min(1,w/794);const sc=$('.preview-scale',host);if(!sc)return;sc.style.transform=`scale(${k})`;sc.style.width='794px';host.style.height=(sc.firstElementChild.offsetHeight*k+24)+'px'}
 const isNative=()=>!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
-async function downloadPdf(html,filename){
+function b64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(out)}
+function dataToBytes(du){const bin=atob(du.split(',')[1]||'');const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+async function saveFile(bytes,filename,mime,shareTitle){
+  if(isNative()){const P=window.Capacitor.Plugins;const r=await P.Filesystem.writeFile({path:filename,data:b64(bytes),directory:'CACHE'});await P.Share.share({title:filename,url:r.uri,dialogTitle:shareTitle||'Send or save'});return}
+  const blob=new Blob([bytes],{type:mime});const file=new File([blob],filename,{type:mime});
+  if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:filename});return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast('Downloaded '+filename);
+}
+async function downloadPdf(html,filename,merge=[]){
   if(!window.html2pdf){toast('PDF tool is still loading. Try again in a moment.',true);return}
   toast('Preparing PDF…');
-  const st=document.createElement('div');st.className='pdf-stage';st.innerHTML=html;document.body.appendChild(st);
+  const st=document.createElement('div');st.className='pdf-stage';st.innerHTML=`<div class="pdfdoc">${html}</div>`;document.body.appendChild(st);
   try{
     await Promise.all($$('img[data-ref^="img:"]',st).map(async i=>{i.src=(await loadImg(i.dataset.ref.slice(4)))||BLANK}));
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
-    const w=html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:.96},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
-      jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging']}}).from(st.firstElementChild);
-    if(isNative()){
-      const uri=await w.outputPdf('datauristring');const P=window.Capacitor.Plugins;
-      const r=await P.Filesystem.writeFile({path:filename,data:uri.split(',')[1],directory:'CACHE'});
-      await P.Share.share({title:filename,url:r.uri,dialogTitle:'Send or save PDF'});
-    }else{
-      const blob=await w.outputPdf('blob');const file=new File([blob],filename,{type:'application/pdf'});
-      if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:filename})}
-      else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('PDF downloaded')}
+    const w=html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+      jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging','.words','.info','figure']}}).from(st.firstElementChild);
+    let bytes=new Uint8Array(await w.outputPdf('arraybuffer'));
+    if(merge.length){
+      if(!window.PDFLib)toast('Attached PDFs were skipped: the PDF joiner did not load.',true);
+      else{const out=await PDFLib.PDFDocument.load(bytes);let bad=0;
+        for(const ref of merge){try{const data=await loadImg(ref.split(':')[1]);if(!data){bad++;continue}
+          const src=await PDFLib.PDFDocument.load(dataToBytes(data),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}catch(e){bad++}}
+        bytes=await out.save();if(bad)toast(bad+' attached PDF could not be joined (it may be protected).',true)}
     }
+    await saveFile(bytes,filename,'application/pdf','Send or save PDF');
   }catch(e){if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Could not create the PDF: '+(e.message||e),true)}
   finally{st.remove()}
+}
+async function openAttachment(a){
+  const data=await loadImg(a.ref.split(':')[1]);if(!data){toast('Could not load this attachment.',true);return}
+  if(a.kind==='image'){modal(a.caption||a.name||'Photo',`<img src="${h(data)}" alt="" style="width:100%;border-radius:8px">`,'',true);return}
+  try{await saveFile(dataToBytes(data),a.name||'attachment.pdf','application/pdf','Open attachment')}catch(e){}
 }
 
 /* ================= shell ================= */
@@ -485,6 +509,7 @@ VIEWS.view=()=>{
     ${d.client&&d.clientId&&can('reports')?`<button class="btn" id="soa">Client statement (SOA)</button>`:''}
     ${can('delete')||isAdmin()?`<button class="btn danger" id="del">Delete</button>`:''}
    </div>
+   ${(d.attachments||[]).length?`<div class="card pad"><h3 style="margin-bottom:8px">Attachments</h3><div class="attmini">${d.attachments.map((a,k)=>`<button class="am" data-openatt="${k}" title="${h(a.caption||a.name||'')}">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}<small>${h(a.caption||a.name||'')}</small></button>`).join('')}</div></div>`:''}
    ${pays.length?`<div class="card pad"><h3 style="margin-bottom:6px">Payments</h3>${pays.map(p=>`<div class="kv"><span>${fdate(p.date)} · ${h(p.method||'')}</span><span class="num">${money(p.amount)}</span></div>`).join('')}</div>`:''}
   </aside></div>`;
 };
@@ -492,7 +517,8 @@ VIEWS_AFTER.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:d&&d.type}));
   if(!d)return;
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
-  $('#pdf').onclick=()=>downloadPdf(renderSheet(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
+  $('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d));
+  $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
   $('#ed')&&($('#ed').onclick=()=>go('edit',{id:d.id}));
   $('#dlv')&&($('#dlv').onclick=()=>go('deliver',{id:d.id}));
   $('#pay')&&($('#pay').onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
@@ -516,12 +542,13 @@ VIEWS.edit=()=>{
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
     else{ED=newDraft(p.type);const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
-      if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='delivery'?(i.serials||[]):[]})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
-        if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms}}}
+      if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
+        if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
     ED._key=JSON.stringify(p);
   }
   const d=ED,isQ=d.type==='quotation',isDN=d.type==='delivery';
-  const cls='item'+(isDN?' dn':isQ?'':' noimg');
+  const cls='item'+(isDN?' dn':'');const hasSN=!isQ;ED.attachments=ED.attachments||[];
+  const SZ={S:'Small',M:'Med',L:'Large'};
   const t=totals(d);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="cx">${I.back}Cancel</button><div><h1>${d._new?'New':'Edit'} ${TYPE[d.type].t.replace('Tax ','').toLowerCase()}</h1><div class="sub num">${h(d.number)}</div></div></div><div class="row"><button class="btn primary" id="sv">Save</button></div></div>
   <div class="card pad grid">
@@ -540,8 +567,9 @@ VIEWS.edit=()=>{
   <div class="card pad grid"><div class="row"><h2 class="grow">Items</h2><button class="btn sm" id="scan-add">${I.scan}Scan product</button></div>
    <datalist id="prodlist">${S.products.map(p=>`<option value="${h(p.name)}">`).join('')}</datalist>
    <div class="items">${d.items.map((i,n)=>`<div class="${cls}" data-i="${n}">
-     ${isQ?`<button class="photo" data-photo="${n}" type="button" aria-label="Add product photo">${i.photo?img(i.photo):'+ Photo'}</button>`:''}
-     <div class="desc"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><textarea data-f="desc" rows="1" placeholder="Description, model, specs">${h(i.desc)}</textarea>${isDN&&(i.serials||[]).length?`<div class="serials">${i.serials.map(s=>`<span class="chip">${h(s)}</span>`).join('')}</div>`:''}</div>
+     ${isDN?'':`<div class="phw"><button class="photo" data-photo="${n}" type="button" aria-label="${i.photo?'Change':'Add'} product photo">${i.photo?img(i.photo):'+ Photo'}</button>${i.photo?`<select data-f="photoSize" aria-label="Photo size on document">${Object.entries(SZ).map(([k,l])=>`<option value="${k}" ${(i.photoSize||S.cfg.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="linkbtn" data-unphoto="${n}">Remove</button>`:''}</div>`}
+     <div class="desc"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><textarea data-f="desc" rows="1" placeholder="Description, model, specs">${h(i.desc)}</textarea>
+      ${hasSN?`<div class="snrow"><button class="btn sm ${(i.serials||[]).length?'':'ghost'}" type="button" data-serials="${n}">${I.scan}Serial nos ${(i.serials||[]).length?`· ${i.serials.length}/${h(i.qty||0)}`:''}</button>${(i.serials||[]).slice(0,3).map(x=>`<span class="chip">${h(x)}</span>`).join('')}${(i.serials||[]).length>3?`<span class="muted" style="font-size:.78rem">+${i.serials.length-3} more</span>`:''}</div>`:''}</div>
      <label class="field f-q"><span>Qty</span><input type="number" step="any" min="0" data-f="qty" value="${h(i.qty)}"></label>
      <label class="field f-u"><span>Unit</span><input data-f="unit" value="${h(i.unit)}"></label>
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
@@ -553,6 +581,8 @@ VIEWS.edit=()=>{
     <div class="tr"><span class="muted">${h(S.cfg.taxLabel)}</span><span class="num" id="t-tax">${money(t.tax)}</span></div>
     <div class="tr grand"><span>Total</span><span class="num" id="t-total">${cur(t.total)}</span></div></div>`}
   </div>
+  ${isDN?'':`<div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>Attachments</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. PDF files (up to 700 KB each) are joined at the end.</div></div><button class="btn" id="att-add" type="button">${I.plus}Add photos or PDF</button></div>
+   ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>`<div class="att" data-att="${k}"><div class="ath">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}</div><div class="atb"><input data-af="caption" value="${h(a.caption||'')}" placeholder="${h(a.name||'Caption')}" aria-label="Caption"><label class="check"><input type="checkbox" data-af="inPdf" ${a.inPdf!==false?'checked':''}>Include in PDF</label></div><button class="xbtn" type="button" data-att-rm="${k}" aria-label="Remove attachment">✕</button></div>`).join('')}</div>`:''}</div>`}
   <div class="card pad grid g2"><label class="field"><span>Notes (shown on document)</span><textarea id="e-notes">${h(d.notes)}</textarea></label><label class="field"><span>Terms & conditions</span><textarea id="e-terms" rows="4">${h(d.terms)}</textarea></label></div>
   <div class="row"><span class="grow"></span><button class="btn" id="cx2">Cancel</button><button class="btn primary" id="sv2">Save ${TYPE[d.type].t.replace('Tax ','').toLowerCase()}</button></div>`;
 };
@@ -560,6 +590,49 @@ function readEditor(){
   const d=ED;
   ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
+  $$('[data-att]').forEach(row=>{const a=(d.attachments||[])[+row.dataset.att];if(a)$$('[data-af]',row).forEach(el=>{a[el.dataset.af]=el.type==='checkbox'?el.checked:el.value})});
+}
+// Serial numbers for one line: type, paste a list, or scan with the camera.
+function serialEditor(n){
+  readEditor();const it=ED.items[n];it.serials=it.serials||[];let armed=false;
+  const o=modal('Serial numbers',`<div><b>${h(it.name||'Item '+(n+1))}</b><div class="muted" id="sn-count"></div></div>
+   <div class="scanrow"><input id="sn-in" placeholder="Type or scan, then Enter" autocomplete="off" autocapitalize="characters"><button class="btn" id="sn-add" type="button">Add</button><button class="btn primary" id="sn-cam" type="button">${I.scan}Camera</button></div>
+   <div class="muted" style="font-size:.8rem">Tip: paste a list (one per line) to add many at once. A handheld barcode scanner also works in the box.</div>
+   <div class="serials" id="sn-list"></div>`,`<button class="btn" id="sn-clear" type="button">Clear all</button><button class="btn" id="sn-qty" type="button">Set qty = count</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
+  const draw=()=>{$('#sn-count',o).textContent=`${it.serials.length} of ${it.qty||0} recorded`;
+    $('#sn-list',o).innerHTML=it.serials.map((x,k)=>`<span class="chip">${h(x)}<button type="button" data-k="${k}" aria-label="Remove ${h(x)}">×</button></span>`).join('')||'<span class="muted">No serial numbers yet.</span>';
+    $$('[data-k]',o).forEach(b=>b.onclick=()=>{it.serials.splice(+b.dataset.k,1);draw()})};
+  const add=raw=>{const codes=String(raw||'').split(/[\n\r,;\t]+/).map(x=>x.trim()).filter(Boolean);let added=0;const dup=[];
+    for(const code of codes){if(ED.items.some(x=>(x.serials||[]).includes(code))){dup.push(code);continue}it.serials.push(code);added++}
+    if(dup.length)toast((dup.length===1?dup[0]+' is':dup.length+' serial numbers are')+' already on this document.',true);draw();return added>0};
+  const inp=$('#sn-in',o);
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add(inp.value);inp.value=''}};
+  inp.addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(/[\n,;\t]/.test(t)){e.preventDefault();add(t)}});
+  $('#sn-add',o).onclick=()=>{add(inp.value);inp.value='';inp.focus()};
+  $('#sn-cam',o).onclick=()=>openScanner(code=>add(code),{title:'Scan serials · '+(it.name||''),multi:true});
+  $('#sn-qty',o).onclick=()=>{it.qty=it.serials.length;draw()};
+  $('#sn-clear',o).onclick=e=>{if(!armed){armed=true;e.target.textContent='Tap again to clear';setTimeout(()=>{armed=false;e.target.textContent='Clear all'},2500);return}it.serials=[];armed=false;e.target.textContent='Clear all';draw()};
+  o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-x]'))setTimeout(render,0)});
+  draw();setTimeout(()=>inp.focus(),50);
+}
+async function storeAttachmentImage(file){
+  let data=await compress(file,1600,.82);if(data.length>900000)data=await compress(file,1200,.72);if(data.length>900000)data=await compress(file,900,.65);
+  const id=uid();await Store.put('images',id,{data,name:file.name,mime:'image/jpeg',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;return 'img:'+id;
+}
+function addAttachments(){
+  const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.accept='image/*,application/pdf';
+  inp.onchange=async()=>{const files=[...inp.files];if(!files.length)return;readEditor();let n=0;
+    for(const f of files){try{
+      if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
+        if(f.size>700*1024){toast(f.name+' is larger than 700 KB. Compress it and try again.',true);continue}
+        toast('Uploading '+f.name+'…');const data=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(f)});
+        const id=uid();await Store.put('images',id,{data,name:f.name,mime:'application/pdf',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;
+        ED.attachments.push({ref:'file:'+id,kind:'pdf',name:f.name,caption:'',inPdf:true});n++;
+      }else if(/^image\//.test(f.type)){toast('Uploading '+f.name+'…');ED.attachments.push({ref:await storeAttachmentImage(f),kind:'image',name:f.name,caption:'',inPdf:true});n++}
+      else toast(f.name+' is not a photo or PDF.',true);
+    }catch(e){toast('Could not upload '+f.name+': '+(e.message||e.code),true)}}
+    if(n)toast(n+' attachment'+(n>1?'s':'')+' added');render()};
+  inp.click();
 }
 function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
@@ -572,6 +645,10 @@ VIEWS_AFTER.edit=()=>{
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
+  $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
+  $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
+  $('#att-add')&&($('#att-add').onclick=addAttachments);
+  $$('[data-att-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.attachments.splice(+b.dataset.attRm,1);render()});
   $$('[data-photo]').forEach(b=>b.onclick=async()=>{const f=await pickImage();if(!f)return;readEditor();toast('Uploading photo…');ED.items[+b.dataset.photo].photo=await storeImage(f,800);render()});
   $$('.items input,.items textarea,#e-discount,#e-taxRate').forEach(el=>el.addEventListener('input',updTotals));
   $$('.items [data-f="name"]').forEach(el=>el.addEventListener('change',()=>{const p=S.products.find(x=>x.name===el.value);if(!p)return;readEditor();const it=ED.items[+el.closest('[data-i]').dataset.i];Object.assign(it,{desc:it.desc||p.desc||'',price:+p.price||it.price,unit:p.unit||it.unit,photo:it.photo||p.photo||'',pid:p.id});render()}));
@@ -793,7 +870,8 @@ VIEWS.settings=()=>{
    ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>Next ${TYPE[t].t.replace('Tax ','').toLowerCase()} no. at least</span><input type="number" min="1" id="s-n-${t}" value="${h(Math.max(+(c.seqStart||{})[t]||1,(S.counters[t]||0)+1))}"></label>`).join('')}</div>
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
-  <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label></div>
+  <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
+   <label class="field"><span>Default product photo size</span><select id="s-photoSize">${[['S','Small'],['M','Medium'],['L','Large']].map(([k,l])=>`<option value="${k}" ${(c.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
    ${f('signName','Signatory name & title',c.signName,'text',true)}
    <div class="row"><h3 class="grow">Authorised signature / stamp</h3><button class="btn sm" id="s-sig-up">Upload image</button><button class="btn sm" id="s-sig-clr">Clear</button></div>
    ${c.signature?`<div class="row"><img src="${h(src(c.signature))}" alt="Current signature" style="max-height:70px;background:#fff;border-radius:6px;padding:4px"><span class="muted">Current. Draw below to replace.</span></div>`:''}
@@ -809,7 +887,7 @@ VIEWS_AFTER.settings=()=>{
   $('#s-sig-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.signature=await storeImage(f,600,true);toast('Signature image ready. Save settings to keep it.')};
   $('#s-sig-clr').onclick=()=>{sp.clear();c.signature='';toast('Signature cleared. Save settings to keep the change.')};
   $('#s-save').onclick=async()=>{
-    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal'].forEach(k=>c[k]=$('#s-'+k).value.trim());
+    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
     c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);c.seqStart[t]=Math.max(1,parseInt($('#s-n-'+t).value)||1)});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
