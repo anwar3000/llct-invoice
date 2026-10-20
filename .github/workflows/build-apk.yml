@@ -1,0 +1,99 @@
+name: Build Android app
+
+# Wraps web/ into an Android APK with Capacitor.
+# Download: https://github.com/anwar3000/llct-invoice/releases/latest/download/LLCT-Invoicing.apk
+# Secrets: FIREBASE_WEB_CONFIG (or GOOGLE_SERVICES_JSON) — required.
+#          ANDROID_SIGNING_KEY — optional, same format as the attendance repo. Without it each
+#          build uses a throwaway key and you must uninstall before installing an update.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Write Firebase web config
+        env:
+          FIREBASE_WEB_CONFIG: ${{ secrets.FIREBASE_WEB_CONFIG }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if ! python3 tools/gen_web_config.py web/js/config.js > gen.txt 2>&1; then
+            echo "::error title=Firebase secret missing::Add FIREBASE_WEB_CONFIG (or GOOGLE_SERVICES_JSON) under Settings → Secrets and variables → Actions, then re-run."
+            cat gen.txt; exit 1
+          fi
+          cat gen.txt
+
+      - name: Create Android project
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          # camera for live barcode scanning
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' android/app/src/main/AndroidManifest.xml
+          grep -n "permission\|feature" android/app/src/main/AndroidManifest.xml
+          # version from build number so updates install over older ones
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]+\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -nE "versionCode|versionName" android/app/build.gradle
+
+      - name: App icon
+        continue-on-error: true
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff'
+
+      - name: Copy web files into the app
+        run: npx cap sync android
+
+      - name: Build APK
+        env:
+          ANDROID_SIGNING_KEY: ${{ secrets.ANDROID_SIGNING_KEY }}
+        run: |
+          cd android
+          chmod +x gradlew
+          if [ -n "$ANDROID_SIGNING_KEY" ]; then
+            python3 - <<'PY'
+          import base64, json, os
+          k = json.loads(os.environ["ANDROID_SIGNING_KEY"])
+          open("release.jks", "wb").write(base64.b64decode(k["keystore"]))
+          with open("/tmp/ks.env", "w") as f:
+              f.write(f"export KS_ALIAS={json.dumps(k['alias'])}\nexport KS_PASS={json.dumps(k['password'])}\n")
+          PY
+            source /tmp/ks.env; rm -f /tmp/ks.env
+            ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file="$PWD/release.jks" \
+              -Pandroid.injected.signing.store.password="$KS_PASS" \
+              -Pandroid.injected.signing.key.alias="$KS_ALIAS" \
+              -Pandroid.injected.signing.key.password="$KS_PASS"
+            cp app/build/outputs/apk/release/app-release.apk ../LLCT-Invoicing.apk
+          else
+            echo "::warning title=Not signed with your permanent key::Add ANDROID_SIGNING_KEY (same value as the attendance repo) so updates install over the old app."
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../LLCT-Invoicing.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LLCT-Invoicing-apk
+          path: LLCT-Invoicing.apk
+          retention-days: 30
+
+      - name: Publish as latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete app-latest -y --cleanup-tag 2>/dev/null || true
+          gh release create app-latest LLCT-Invoicing.apk --target "$(git rev-parse HEAD)" --latest \
+            --title "LLCT Invoicing — Android build ${{ github.run_number }}" \
+            --notes "Install on Android: download LLCT-Invoicing.apk and open it (allow installs from this source if asked)."

@@ -1,0 +1,306 @@
+rules_version = '2';
+
+// COMBINED RULES for the shared Firebase project: LLCT Attendance + LLCT Invoicing.
+// Paste the WHOLE file into Firebase Console → Firestore Database → Rules → Publish.
+
+// Security rules for LLCT Attendance (mobile app + web dashboard).
+// Paste into Firebase Console → Firestore Database → Rules → Publish.
+//
+// Roles (users/{uid}.role):
+//   admin    – everything, including accounts (petty cash, budgets) and staff logins
+//   manager  – everything operational, but NO accounts and no staff-login admin
+//   employee – own attendance, own petty entries, site updates, can add a site from the field
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function myDoc() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function me() { return get(myDoc()).data; }
+    function isActive() { return signedIn() && exists(myDoc()) && me().get('active', true) != false; }
+    function role() { return me().get('role', 'employee'); }
+    function isAdmin() { return isActive() && role() == 'admin'; }
+    function isManagement() { return isActive() && (role() == 'admin' || role() == 'manager'); }
+    // Document clerk: uses the Documents Portal only — can view/download IDs and submit changes for admin approval.
+    function isDocs() { return isActive() && role() == 'docs'; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function owns() { return isActive() && resource.data.employeeId == request.auth.uid; }
+    function createsOwn() { return isActive() && request.resource.data.employeeId == request.auth.uid; }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // ---------------------------------------------------------------- users
+    match /users/{uid} {
+      // Staff can see the list of company drivers (to pick one for a ride).
+      allow read: if isSelf(uid) || isManagement() || isDocs() || (isActive() && resource.data.get('isDriver', false) == true);
+      allow create, delete: if isAdmin();
+      // Admins edit profiles; staff may only update their own live location.
+      allow update: if isAdmin() || (isSelf(uid) && isActive() && onlyChanges(['lastLocation']));
+
+      // GPS trail while on duty
+      match /track/{pointId} {
+        allow read: if isSelf(uid) || isManagement();
+        allow create: if isSelf(uid) && isActive();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ---------------------------------------------------------------- projects
+    match /projects/{id} {
+      allow read: if isActive();
+      allow write: if isManagement();
+    }
+
+    // ---------------------------------------------------------------- sites
+    match /sites/{siteId} {
+      allow read: if isActive();
+      // Management creates sites; an employee may add a new site at their location from the field.
+      allow create: if isManagement() || (isActive()
+                      && request.resource.data.createdBy == request.auth.uid
+                      && request.resource.data.addedByEmployee == true
+                      && request.resource.data.approved == false
+                      && request.resource.data.keys().hasOnly(['name', 'address', 'lat', 'lng', 'radius', 'active',
+                           'progress', 'status', 'notes', 'approved', 'createdBy', 'createdByName', 'addedByEmployee', 'createdAt']));
+      // Staff can update progress % from the Site Update tab.
+      allow update: if isManagement() || (isActive() && onlyChanges(['progress', 'progressUpdatedAt']));
+      allow delete: if isManagement();
+    }
+
+    // ------------------------------------------------------------ driver trips
+    // Drivers start/stop trips from the app; GPS route points are stored under each trip.
+    match /trips/{id} {
+      allow read: if isManagement() || owns();
+      // kind: 'driver' (a driver's own paid trip — driver profile only), 'taxi' or 'withDriver' (an employee's ride).
+      allow create: if createsOwn() && request.resource.data.status == 'active'
+                    && (request.resource.data.get('kind', 'driver') in ['taxi', 'withDriver']
+                        || me().get('isDriver', false) == true);
+      allow update: if isManagement() || (owns() && resource.data.status == 'active'
+                      && request.resource.data.employeeId == request.auth.uid
+                      && onlyChanges(['distanceM', 'pointsCount', 'lastLat', 'lastLng', 'lastAt', 'endAt', 'endLat', 'endLng',
+                           'endSiteId', 'endSiteName', 'siteId', 'siteName', 'durationMin', 'ratePerKm', 'cost', 'status',
+                           'note', 'endTz', 'endServer', 'costEntered', 'costEditedAt']))
+                    // A driver can enter / change the cost of their own trip at any time (flagged for admin).
+                    || (owns() && resource.data.get('kind', 'driver') == 'driver'
+                        && request.resource.data.employeeId == request.auth.uid
+                        && onlyChanges(['cost', 'costEntered', 'costEditedAt', 'costNote']));
+      allow delete: if isAdmin();
+      match /points/{pid} {
+        allow read: if isManagement() || (isActive() && get(/databases/$(database)/documents/trips/$(id)).data.employeeId == request.auth.uid);
+        // get = the trip before this write (it was active), getAfter = when created in the same batch as the trip.
+        allow create: if isActive() && (
+                        (getAfter(/databases/$(database)/documents/trips/$(id)).data.employeeId == request.auth.uid
+                          && getAfter(/databases/$(database)/documents/trips/$(id)).data.status == 'active')
+                        || (exists(/databases/$(database)/documents/trips/$(id))
+                          && get(/databases/$(database)/documents/trips/$(id)).data.employeeId == request.auth.uid
+                          && get(/databases/$(database)/documents/trips/$(id)).data.status == 'active'));
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Payments made to drivers (accounts → admin). Each driver sees their own, so the balance tallies.
+    match /driverPayments/{id} {
+      allow read: if isAdmin() || owns();
+      allow write: if isAdmin();
+    }
+
+    // Claims on a place / site name so the same new site can't be added twice (first one wins).
+    match /siteKeys/{key} {
+      allow read: if isActive();
+      allow create, update: if isActive() && request.resource.data.siteId is string;
+      allow delete: if isManagement();
+    }
+
+    // ------------------------------------------------------------ schedules
+    match /schedules/{id} {
+      allow read: if isManagement() || owns();
+      allow write: if isManagement();
+    }
+
+    // ----------------------------------------------------------- attendance
+    match /attendance/{id} {
+      allow read: if isManagement() || owns();
+      allow create: if isAdmin() || (createsOwn() && request.resource.data.status == 'open');
+      // Staff may only close their own open session; management can close forgotten sessions.
+      allow update: if isManagement() || (owns() && resource.data.status == 'open'
+                      && request.resource.data.status == 'closed'
+                      && request.resource.data.employeeId == resource.data.employeeId
+                      && onlyChanges(['checkOut', 'checkOutServer', 'outLat', 'outLng', 'outAccuracy',
+                                      'outDistance', 'outOutside', 'durationMin', 'status', 'mocked', 'note', 'outTz']));
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------ geofence alerts
+    // Raised by the employee's phone when they leave the site while still checked in.
+    match /alerts/{id} {
+      allow read: if isManagement() || owns();
+      allow create: if createsOwn() && request.resource.data.resolved == false;
+      allow update, delete: if isManagement();
+    }
+
+    // --------------------------------------------------------- site updates
+    match /siteUpdates/{id} {
+      allow read: if isActive();
+      allow create: if isManagement() || createsOwn();
+      // The person who posted it can edit or delete it; so can admins/managers.
+      allow update: if isManagement() || (owns() && request.resource.data.employeeId == request.auth.uid
+                      && onlyChanges(['note', 'category', 'progress', 'photos', 'editedAt', 'editedBy']));
+      allow delete: if isManagement() || owns();
+    }
+
+    // ---------------------------------------------------------------- petty (accounts: admin only)
+    match /petty/{id} {
+      allow read: if isAdmin() || owns();
+      // Staff entries always start as pending.
+      allow create: if isAdmin() || (createsOwn() && request.resource.data.status == 'pending');
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (owns() && resource.data.status == 'pending');
+    }
+
+    // ------------------------------------------------------------- off days
+    match /offDays/{id} {
+      allow read: if isManagement() || owns();
+      allow create: if isManagement() || (createsOwn() && request.resource.data.status == 'pending');
+      allow update: if isManagement();
+      allow delete: if isManagement() || (owns() && resource.data.status == 'pending');
+    }
+
+    // ------------------------------------------------- external workers (labour)
+    // Registered by management. Staff only see name / company / trade / phone to pick them at check-in.
+    match /extWorkers/{id} {
+      allow read: if isActive();
+      // Staff can add a worker who isn't on the list yet (management completes the documents later).
+      allow create: if isManagement() || (isActive()
+                      && request.resource.data.createdById == request.auth.uid
+                      && request.resource.data.addedByEmployee == true
+                      && request.resource.data.keys().hasOnly(['name', 'phone', 'company', 'trade', 'active',
+                           'createdAt', 'createdBy', 'createdById', 'addedByEmployee']));
+      allow update, delete: if isManagement();
+    }
+
+    // One lock per worker while they are on a site: stops the same worker being
+    // checked in twice (by two employees, or at two sites) at the same time.
+    match /workerLocks/{workerId} {
+      allow read: if isActive();
+      allow create: if isManagement() || createsOwn();
+      allow update: if isManagement();
+      allow delete: if isManagement() || owns();
+    }
+
+    // Worker attendance — follows the employee's check-in session.
+    match /workerAttendance/{id} {
+      allow read: if isManagement() || owns();
+      allow create: if isManagement() || (createsOwn() && request.resource.data.open == true);
+      allow update: if isManagement() || (owns() && request.resource.data.employeeId == request.auth.uid
+                      && onlyChanges(['checkOut', 'durationMin', 'open']));
+      allow delete: if isManagement();
+    }
+
+    // ------------------------------------------- ID documents
+    // Passport / Emirates ID / SIRA numbers & expiry for staff and external workers.
+    // Management sees everything; each employee can view and update their own.
+    match /idInfo/{ownerId} {
+      allow read: if isManagement() || isDocs() || (isSelf(ownerId) && isActive());
+      allow write: if isManagement() || (isSelf(ownerId) && isActive()
+                      && request.resource.data.ownerType == 'staff'
+                      && request.resource.data.keys().hasOnly(['ownerType', 'name', 'updatedAt', 'nationality',
+                           'passportNo', 'passportExpiry', 'eidNo', 'eidExpiry', 'siraNo', 'siraExpiry',
+                           'visaNo', 'visaExpiry', 'labourCardNo', 'labourCardExpiry', 'idNotes']));
+    }
+    // Scanned copies (max 2 MB each), stored in chunks inside Firestore.
+    function ownsFile(fileId) {
+      return isActive() && get(/databases/$(database)/documents/idFiles/$(fileId)).data.ownerId == request.auth.uid;
+    }
+    // Portal uploads are saved with pending == true and only become official when an admin approves.
+    function pendingByMe(fileId) {
+      return isDocs() && get(/databases/$(database)/documents/idFiles/$(fileId)).data.pending == true
+        && get(/databases/$(database)/documents/idFiles/$(fileId)).data.uploadedById == request.auth.uid;
+    }
+    match /idFiles/{fileId} {
+      allow read: if isManagement() || isDocs() || (isActive() && resource.data.ownerId == request.auth.uid);
+      allow create: if isManagement()
+                    || (isActive() && request.resource.data.ownerId == request.auth.uid
+                        && request.resource.data.ownerType == 'staff' && request.resource.data.size <= 2097152)
+                    || (isDocs() && request.resource.data.pending == true
+                        && request.resource.data.uploadedById == request.auth.uid && request.resource.data.size <= 2097152);
+      allow update: if isManagement();
+      allow delete: if isManagement() || (isActive() && resource.data.ownerId == request.auth.uid)
+                    || (isDocs() && resource.data.pending == true && resource.data.uploadedById == request.auth.uid);
+      match /chunks/{n} {
+        allow read: if isManagement() || isDocs() || ownsFile(fileId);
+        allow create: if isManagement() || (isActive()
+                        && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.ownerId == request.auth.uid)
+                      || (isDocs() && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.uploadedById == request.auth.uid
+                        && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.pending == true);
+        allow update: if isManagement();
+        allow delete: if isManagement() || ownsFile(fileId) || pendingByMe(fileId);
+      }
+    }
+
+    // ------------------------------------------- change requests from the Documents Portal
+    // New people / name & ID changes wait here until an admin approves them.
+    match /changeRequests/{id} {
+      allow read: if isManagement() || (isActive() && resource.data.submittedById == request.auth.uid);
+      allow create: if (isDocs() || isManagement()) && request.resource.data.submittedById == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isActive() && resource.data.submittedById == request.auth.uid && resource.data.status == 'pending');
+    }
+
+    // ------------------------------------------------ settings & pay rates
+    match /settings/{id} {
+      allow read: if isActive();
+      allow write: if isAdmin();
+    }
+    // Daily rate per external worker (accounts → admin only).
+    match /workerRates/{workerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ======================================================== LLCT Invoicing
+    // Attendance admins have full access. Everyone else gets permissions set by an admin
+    // in the invoicing app (inv_access/{uid}: { enabled, perms: { quotation, invoice, delivery,
+    // deliver, payments, clients, reports, viewAll, delete } }).
+    function invAcc() { return /databases/$(database)/documents/inv_access/$(request.auth.uid); }
+    function invOn() { return isAdmin() || (isActive() && exists(invAcc()) && get(invAcc()).data.get('enabled', true) != false); }
+    function invHas(p) { return isAdmin() || (invOn() && get(invAcc()).data.get('perms', {}).get(p, false) == true); }
+
+    match /inv_config/{id} {
+      allow read: if invOn();
+      allow write: if isAdmin();
+    }
+    match /inv_access/{uid} {
+      allow read: if isAdmin() || isSelf(uid);
+      allow write: if isAdmin();
+    }
+    match /inv_clients/{id} {
+      allow read: if invOn();
+      allow create, update: if invHas('clients');
+      allow delete: if isAdmin();
+    }
+    match /inv_products/{id} {
+      allow read: if invOn();
+      allow write: if invHas('clients');
+    }
+    // Product photos (compressed, under 1 MB each)
+    match /inv_images/{id} {
+      allow read: if invOn();
+      allow create: if invOn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    match /inv_payments/{id} {
+      allow read: if invHas('payments') || invHas('reports') || invHas('invoice');
+      allow create, update: if invHas('payments');
+      allow delete: if isAdmin() || (invHas('payments') && invHas('delete'));
+    }
+    match /inv_docs/{id} {
+      allow read: if invHas('viewAll')
+                  || (invOn() && resource.data.createdBy == request.auth.uid)
+                  || (invHas('deliver') && resource.data.type == 'delivery');
+      allow create: if invHas(request.resource.data.type) && request.resource.data.createdBy == request.auth.uid;
+      // Editors of that document type; delivery staff may only add serials and the signature.
+      allow update: if (invHas(resource.data.type) && request.resource.data.type == resource.data.type
+                        && (invHas('viewAll') || resource.data.createdBy == request.auth.uid))
+                    || (invHas('deliver') && resource.data.type == 'delivery'
+                        && onlyChanges(['items', 'delivery', 'updatedAt']));
+      allow delete: if invHas('delete');
+    }
+  }
+}

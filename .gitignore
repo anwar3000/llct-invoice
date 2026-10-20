@@ -1,0 +1,4 @@
+node_modules/
+android/
+web/js/config.js
+*.jks

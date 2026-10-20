@@ -1,0 +1,48 @@
+name: Deploy web app
+
+# Publishes web/ to GitHub Pages → https://anwar3000.github.io/llct-invoice/
+# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+# Needs the same Firebase secret as the attendance repo: FIREBASE_WEB_CONFIG (or GOOGLE_SERVICES_JSON).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['web/**', 'tools/gen_web_config.py', '.github/workflows/deploy-web.yml']
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write Firebase web config
+        env:
+          FIREBASE_WEB_CONFIG: ${{ secrets.FIREBASE_WEB_CONFIG }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if ! python3 tools/gen_web_config.py web/js/config.js > gen.txt 2>&1; then
+            echo "::error title=Firebase secret missing::Add FIREBASE_WEB_CONFIG (or GOOGLE_SERVICES_JSON) under Settings → Secrets and variables → Actions, then re-run."
+            cat gen.txt; exit 1
+          fi
+          cat gen.txt
+          touch web/.nojekyll
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

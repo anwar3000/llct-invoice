@@ -1,0 +1,6 @@
+{
+  "appId": "net.llct.invoice",
+  "appName": "LLCT Invoicing",
+  "webDir": "web",
+  "android": { "allowMixedContent": false }
+}
