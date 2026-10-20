@@ -53,6 +53,8 @@ const PERMS=[
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
   ['reports','View accounts & statements'],['viewAll','See documents made by others'],['delete','Delete documents']];
 const EMP_DEFAULT={delivery:true,deliver:true};
+const DN_STATUS=['Delivered','Delivered & installed','Installed','Partially delivered','Pending'];
+const stClass=x=>/install/i.test(x)?'ins':/partial/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
 const S={counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
@@ -289,11 +291,11 @@ function renderSheet(d){
     const sl=(i.serials||[]);
     const sn=sl.length?`<div class="sn"><b>S/N</b>${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'';
     return `<tr><td class="c m n">${String(n+1).padStart(2,'0')}</td>${hasImg?`<td>${i.photo?img(i.photo,`class="pi" style="width:${psz(i)}px;height:${psz(i)}px"`):''}</td>`:''}
-    <td><div class="it">${h(i.name)}</div>${i.desc?`<div class="idesc">${h(i.desc)}</div>`:''}${isDN?'':sn}</td>
+    <td><div class="it">${h(i.name)}</div>${i.desc?`<div class="idesc">${h(i.desc)}</div>`:''}${sn}</td>
     <td class="r m">${h(i.qty)}</td><td class="u">${h(i.unit||'')}</td>
     ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m b">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
-    ${isDN?`<td>${sl.length?`<div class="sn dn">${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'<span style="color:#b5b7bb">—</span>'}</td>`:''}</tr>`}).join('');
-  const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?'<th class="r" style="width:92px">Unit price</th><th class="r" style="width:104px">Amount</th>':''}${isDN?'<th style="width:200px">Serial numbers</th>':''}</tr>`;
+    ${isDN?`<td class="c"><span class="st ${stClass(i.status||'Delivered')}">${h(i.status||'Delivered')}</span></td>`:''}</tr>`}).join('');
+  const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?'<th class="r" style="width:92px">Unit price</th><th class="r" style="width:104px">Amount</th>':''}${isDN?'<th class="c" style="width:136px">Status</th>':''}</tr>`;
   let stamp='';
   if(d.type==='invoice'){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
   if(isDN&&d.delivery&&d.delivery.signedAt)stamp='<span class="stamp">DELIVERED</span>';
@@ -572,6 +574,7 @@ VIEWS.edit=()=>{
       ${hasSN?`<div class="snrow"><button class="btn sm ${(i.serials||[]).length?'':'ghost'}" type="button" data-serials="${n}">${I.scan}Serial nos ${(i.serials||[]).length?`· ${i.serials.length}/${h(i.qty||0)}`:''}</button>${(i.serials||[]).slice(0,3).map(x=>`<span class="chip">${h(x)}</span>`).join('')}${(i.serials||[]).length>3?`<span class="muted" style="font-size:.78rem">+${i.serials.length-3} more</span>`:''}</div>`:''}</div>
      <label class="field f-q"><span>Qty</span><input type="number" step="any" min="0" data-f="qty" value="${h(i.qty)}"></label>
      <label class="field f-u"><span>Unit</span><input data-f="unit" value="${h(i.unit)}"></label>
+     ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${DN_STATUS.map(x=>`<option ${(i.status||'Delivered')===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
      <button class="xbtn" data-rm="${n}" aria-label="Remove item">✕</button></div>`).join('')}</div>
    <div><button class="btn" id="add-item">${I.plus}Add item</button></div>
@@ -689,16 +692,18 @@ VIEWS.deliver=()=>{
   if(!DV||DV.id!==d.id)DV={id:d.id,items:clone(d.items||[]).map(i=>({...i,serials:i.serials||[]})),receiver:'',receiverPhone:''};
   const need=DV.items.reduce((s,i)=>s+(+i.qty||0),0),got=DV.items.reduce((s,i)=>s+i.serials.length,0);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1>Deliver ${h(d.number)}</h1><div class="sub">${h(d.client&&d.client.name||'')}${d.deliveryAddress?' · '+h(d.deliveryAddress):''}</div></div></div></div>
-  <div class="card pad grid"><div class="row"><h2 class="grow">1. Serial numbers</h2><span class="muted num">${got} of ${need} scanned</span></div>
+  <div class="card pad grid"><div class="row"><h2 class="grow">1. Items, status & serial numbers</h2><span class="muted num">${got} of ${need} scanned</span></div>
    <div class="progress"><i style="width:${need?Math.min(100,got/need*100):0}%"></i></div>
    <p class="muted" style="margin:0">Tap <b>Camera</b> to photograph a barcode, or type it and press Enter. A handheld USB/Bluetooth scanner also works in the box.</p>
+   <label class="field" style="max-width:280px"><span>Mark all items as</span><select id="st-all"><option value="">Choose…</option>${DN_STATUS.map(x=>`<option>${h(x)}</option>`).join('')}</select></label>
    ${DV.items.map((i,n)=>`<div class="dl-item"><div class="row"><div class="grow" style="min-width:0"><b>${h(i.name)}</b><div class="muted" style="font-size:.8rem">${h(i.desc||'')}</div></div><span class="pill ${i.serials.length>=+i.qty?'good':'warn'} num">${i.serials.length}/${h(i.qty)}</span></div>
+     <select data-st="${n}" aria-label="Status for ${h(i.name)}" style="max-width:280px">${DN_STATUS.map(x=>`<option ${(i.status||'Delivered')===x?'selected':''}>${h(x)}</option>`).join('')}</select>
      <div class="scanrow"><input id="sn-${n}" data-sn="${n}" placeholder="Scan or type serial number" autocomplete="off"><button class="btn" data-cam="${n}">${I.scan}Camera</button></div>
      ${i.serials.length?`<div class="serials">${i.serials.map((s,k)=>`<span class="chip">${h(s)}<button data-del="${n}:${k}" aria-label="Remove ${h(s)}">×</button></span>`).join('')}</div>`:''}</div>`).join('')}
   </div>
   <div class="card pad grid"><h2>2. Receiver</h2><div class="grid g2"><label class="field"><span>Received by (name)</span><input id="rc-name" value="${h(DV.receiver)}"></label><label class="field"><span>Mobile</span><input id="rc-phone" value="${h(DV.receiverPhone)}" inputmode="tel"></label></div>
    <div class="row"><h3 class="grow">Receiver signature</h3><button class="btn sm" id="sig-clr">Clear</button></div><div class="sigpad" id="sig"></div></div>
-  <div class="row"><span class="grow"></span><button class="btn" id="save-draft">Save serials only</button><button class="btn primary" id="confirm">Confirm delivery</button></div>`;
+  <div class="row"><span class="grow"></span><button class="btn" id="save-draft">Save without signing</button><button class="btn primary" id="confirm">Confirm delivery</button></div>`;
 };
 VIEWS_AFTER.deliver=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);if(!d)return;
@@ -712,7 +717,9 @@ VIEWS_AFTER.deliver=()=>{
   $$('[data-cam]').forEach(b=>b.onclick=()=>{const n=+b.dataset.cam;openScanner(code=>add(n,code),{title:'Scan serials · '+DV.items[n].name,multi:true})});
   $$('[data-del]').forEach(b=>b.onclick=()=>{const [n,k]=b.dataset.del.split(':').map(Number);keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items[n].serials.splice(k,1);render();if(sig)pad.load(sig)});
   $('#sig-clr').onclick=()=>pad.clear();
-  $('#save-draft').onclick=async()=>{keep();if(await save('docs',d.id,{...d,items:DV.items,updatedAt:new Date().toISOString()},'Serials saved'))go('view',{id:d.id})};
+  $$('[data-st]').forEach(sel=>sel.onchange=()=>{DV.items[+sel.dataset.st].status=sel.value});
+  $('#st-all').onchange=e=>{if(!e.target.value)return;keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items.forEach(i=>i.status=e.target.value);render();if(sig)pad.load(sig)};
+  $('#save-draft').onclick=async()=>{keep();if(await save('docs',d.id,{...d,items:DV.items,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
   $('#confirm').onclick=async()=>{keep();
     if(!DV.receiver.trim()){toast('Enter the receiver\'s name.',true);return}
     if(pad.isEmpty()){toast('Ask the receiver to sign in the box.',true);return}
