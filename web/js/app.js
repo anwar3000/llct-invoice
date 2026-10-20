@@ -43,7 +43,7 @@ function numWords(n){
 /* ================= config & permissions ================= */
 const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
   currency:'AED',currencyName:'dirhams',minorName:'fils',taxLabel:'VAT',taxRate:5,
-  prefix:{quotation:'QUT',invoice:'INV',delivery:'DLN'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
+  prefix:{quotation:'QTN',invoice:'INV',delivery:'DLN'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
@@ -180,8 +180,9 @@ function soaData(cid,from,to){
     if(late<=0)ag.cur+=x.out;else if(late<=30)ag.a30+=x.out;else if(late<=60)ag.a60+=x.out;else if(late<=90)ag.a90+=x.out;else ag.a90p+=x.out}
   return {c,open:r2(open),rows,invd:r2(invd),recd:r2(recd),close:r2(bal),ag,credit:r2(pool)};
 }
-// Number format: PREFIX + DDMMYY + running sequence, e.g. QUT201026662 (sequence never resets).
-const numPrefix=type=>S.cfg.prefix[type]||({quotation:'QUT',invoice:'INV',delivery:'DLN'})[type];
+// Number format: PREFIX + DDMMYY + running sequence, e.g. QTN201026001 (sequence never resets).
+const OLD_PREFIX=['QT-','INV-','DN-','QUT'];
+const numPrefix=type=>{const p=(S.cfg.prefix||{})[type];return p&&!OLD_PREFIX.includes(p)?p:DEFAULT_CFG.prefix[type]};const _np=type=>({quotation:'QTN',invoice:'INV',delivery:'DLN'})[type];
 const ddmmyy=iso=>{const d=(iso||today());return d.slice(8,10)+d.slice(5,7)+d.slice(2,4)};
 const fmtNumber=(type,date,seq)=>numPrefix(type)+ddmmyy(date)+String(seq).padStart(3,'0');
 function seqOf(type,number){const pre=numPrefix(type);if(!number||!number.startsWith(pre))return 0;const m=number.slice(pre.length).match(/^\d{6}(\d+)$/);return m?+m[1]:0}
@@ -787,8 +788,8 @@ VIEWS.settings=()=>{
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
-   </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + running number, e.g. ${h(fmtNumber('quotation',today(),662))}</div><div class="grid g3">
-   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(c.prefix[t])}"></label>`).join('')}
+   </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + running number, e.g. ${h(fmtNumber('quotation',today(),1))}</div><div class="grid g3">
+   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(numPrefix(t))}"></label>`).join('')}
    ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>Next ${TYPE[t].t.replace('Tax ','').toLowerCase()} no. at least</span><input type="number" min="1" id="s-n-${t}" value="${h(Math.max(+(c.seqStart||{})[t]||1,(S.counters[t]||0)+1))}"></label>`).join('')}</div>
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>

@@ -37,6 +37,7 @@ jobs:
             cat gen.txt; exit 1
           fi
           cat gen.txt
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" web/index.html
 
       - name: Create Android project
         run: |

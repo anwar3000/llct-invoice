@@ -37,6 +37,7 @@ jobs:
           fi
           cat gen.txt
           touch web/.nojekyll
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" web/index.html
       - uses: actions/configure-pages@v5
         with:
           enablement: true

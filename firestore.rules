@@ -282,7 +282,7 @@ service cloud.firestore {
       allow create: if invOn() && request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if invHas('clients');
     }
-    // Running document numbers (QUT…, INV…, DLN…). A counter can only move up, never back.
+    // Running document numbers (QTN…, INV…, DLN…). A counter can only move up, never back.
     match /inv_counters/{type} {
       allow read: if invOn();
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
