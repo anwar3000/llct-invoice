@@ -275,9 +275,18 @@ service cloud.firestore {
       allow create, update: if invHas('clients');
       allow delete: if isAdmin();
     }
+    // Anyone using invoicing can add a new product (items typed on documents are saved
+    // automatically); only "clients & products" permission can change or delete them.
     match /inv_products/{id} {
       allow read: if invOn();
-      allow write: if invHas('clients');
+      allow create: if invOn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if invHas('clients');
+    }
+    // Running document numbers (QUT…, INV…, DLN…). A counter can only move up, never back.
+    match /inv_counters/{type} {
+      allow read: if invOn();
+      allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
+      allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
     // Product photos (compressed, under 1 MB each)
     match /inv_images/{id} {

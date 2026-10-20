@@ -2,7 +2,7 @@
 // Uses the same Firebase project and staff logins as LLCT Attendance.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp=initializeApp(firebaseConfig);
@@ -43,7 +43,7 @@ function numWords(n){
 /* ================= config & permissions ================= */
 const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
   currency:'AED',currencyName:'dirhams',minorName:'fils',taxLabel:'VAT',taxRate:5,
-  prefix:{quotation:'QT-',invoice:'INV-',delivery:'DN-'},validDays:15,dueDays:30,
+  prefix:{quotation:'QUT',invoice:'INV',delivery:'DLN'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
@@ -55,13 +55,13 @@ const PERMS=[
 const EMP_DEFAULT={delivery:true,deliver:true};
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -180,10 +180,24 @@ function soaData(cid,from,to){
     if(late<=0)ag.cur+=x.out;else if(late<=30)ag.a30+=x.out;else if(late<=60)ag.a60+=x.out;else if(late<=90)ag.a90+=x.out;else ag.a90p+=x.out}
   return {c,open:r2(open),rows,invd:r2(invd),recd:r2(recd),close:r2(bal),ag,credit:r2(pool)};
 }
-function nextNumber(type,date){
-  const y=(date||today()).slice(0,4);const pre=(S.cfg.prefix[type]||TYPE[type].a+'-')+y+'-';
-  const max=S.docs.filter(d=>d.type===type&&(d.number||'').startsWith(pre)).reduce((m,d)=>Math.max(m,parseInt(d.number.slice(pre.length))||0),0);
-  return pre+String(max+1).padStart(4,'0');
+// Number format: PREFIX + DDMMYY + running sequence, e.g. QUT201026662 (sequence never resets).
+const numPrefix=type=>S.cfg.prefix[type]||({quotation:'QUT',invoice:'INV',delivery:'DLN'})[type];
+const ddmmyy=iso=>{const d=(iso||today());return d.slice(8,10)+d.slice(5,7)+d.slice(2,4)};
+const fmtNumber=(type,date,seq)=>numPrefix(type)+ddmmyy(date)+String(seq).padStart(3,'0');
+function seqOf(type,number){const pre=numPrefix(type);if(!number||!number.startsWith(pre))return 0;const m=number.slice(pre.length).match(/^\d{6}(\d+)$/);return m?+m[1]:0}
+function localNextSeq(type){
+  const seen=S.docs.filter(d=>d.type===type).reduce((m,d)=>Math.max(m,seqOf(type,d.number)),0);
+  return Math.max(seen,(S.counters[type]||0),(+(S.cfg.seqStart||{})[type]||1)-1)+1;
+}
+const nextNumber=(type,date)=>fmtNumber(type,date,localNextSeq(type));
+// Reserve the next sequence safely on the server, so two people never get the same number.
+async function reserveNumber(type,date){
+  const floor=Math.max(localNextSeq(type)-1,0);
+  try{
+    const seq=await runTransaction(fdb,async tx=>{const ref=doc(fdb,COL.counters,type);const sn=await tx.get(ref);
+      const last=Math.max(sn.exists()?(+sn.data().last||0):0,floor);tx.set(ref,{last:last+1,updatedAt:new Date().toISOString()});return last+1});
+    S.counters[type]=seq;return fmtNumber(type,date,seq);
+  }catch(e){console.warn('counter',e);return fmtNumber(type,date,floor+1)}
 }
 const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&can('deliver')&&!(d.delivery&&d.delivery.signedAt)));
 
@@ -237,11 +251,14 @@ function sigPad(host){
 
 /* ================= document sheet (A4) ================= */
 function barcodeData(text){try{const c=document.createElement('canvas');JsBarcode(c,text,{format:'CODE128',displayValue:false,margin:0,height:60,width:2,background:'#ffffff',lineColor:'#1f2226'});return c.toDataURL('image/png')}catch(e){return ''}}
-function sheetHead(title,number){
+function sheetHead(title,number,sub){
   const c=S.cfg;
-  return `<div class="band"></div><div class="hd"><div class="co">${c.logo?img(c.logo,'class="logo"'):''}<div><div class="nm">${h(c.name)}</div>
-  <div class="ad">${h([c.address,[c.phone,c.email].filter(Boolean).join('  ·  '),c.website,c.taxId?`${c.taxIdLabel}: ${c.taxId}`:''].filter(Boolean).join('\n'))}</div></div></div>
-  <div class="ttl"><div class="dt">${h(title)}</div><div class="no">${h(number)}</div>${number?`<img class="bc" src="${barcodeData(number)}" alt="">`:''}</div></div>`;
+  const line=(k,v)=>v?`<div><b>${k}</b>${h(v)}</div>`:'';
+  return `<div class="band"></div>
+  <div class="hd"><div class="co">${c.logo?img(c.logo,'class="logo"'):''}<div class="idn"><div class="nm">${h(c.name)}</div>${c.taxId?`<div class="trn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
+   <div class="ct"><div class="adr">${h(c.address||'')}</div>${line('T',c.phone)}${line('E',c.email)}${line('W',c.website)}</div></div>
+  <div class="tbar"><div><div class="dt">${h(title)}</div>${sub?`<div class="dsub">${h(sub)}</div>`:''}</div>
+   ${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
 }
 function sheetFoot(){const c=S.cfg;return `<div class="ft"><span>${h(c.name)}${c.website?' · '+h(c.website):''}</span><span>Generated ${fdate(today())}</span></div>`}
 function renderSheet(d){
@@ -296,7 +313,7 @@ function renderSOA(cid,from,to){
   const x=soaData(cid,from,to),c=S.cfg,cl=x.c;
   const rows=[`<tr><td class="m">${fdate(from)}</td><td colspan="3"><b>Balance brought forward</b></td><td></td><td></td><td class="r m"><b>${money(x.open)}</b></td></tr>`]
     .concat(x.rows.map(r=>`<tr><td class="m">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="m">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r m">${r.dr?money(r.dr):''}</td><td class="r m">${r.cr?money(r.cr):''}</td><td class="r m">${money(r.bal)}</td></tr>`)).join('');
-  return `<div class="sheet" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Statement of Account','')}
+  return `<div class="sheet" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Statement of Account','',fdate(from)+' – '+fdate(to))}
   <div class="meta"><div class="box"><div class="k">Customer</div><div class="cn">${h(cl.name)}</div><div style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div>
   <div class="box dg"><span>Period</span><span>${fdate(from)} – ${fdate(to)}</span><span>Statement date</span><span>${fdate(today())}</span><span>Currency</span><span>${h(c.currency)}</span>${cl.creditDays?`<span>Credit terms</span><span>${h(cl.creditDays)} days</span>`:''}</div></div>
   <div class="sum4"><div><div class="k">Opening balance</div><div class="v">${money(x.open)}</div></div><div><div class="k">Invoiced</div><div class="v">${money(x.invd)}</div></div><div><div class="k">Received</div><div class="v">${money(x.recd)}</div></div><div class="dk"><div class="k">Balance due</div><div class="v">${money(x.close)}</div></div></div>
@@ -489,7 +506,7 @@ VIEWS_AFTER.view=()=>{
 let ED=null;
 function newDraft(type){
   const date=today();
-  return {id:uid(),type,number:nextNumber(type,date),date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
+  return {id:uid(),type,number:nextNumber(type,date),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
     clientId:'',client:null,ref:'',subject:'',salesperson:'',deliveryAddress:'',items:[{name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''}],discount:0,taxRate:S.cfg.taxRate,
     notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,createdAt:new Date().toISOString(),_new:true};
 }
@@ -548,6 +565,8 @@ function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);c
 VIEWS_AFTER.edit=()=>{
   const cancel=()=>{const d=ED;ED=null;d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
   $('#cx').onclick=cancel;$('#cx2').onclick=cancel;
+  $('#e-number').addEventListener('input',()=>{ED._auto=false});
+  $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date);$('#e-number').value=ED.number}});
   $('#e-client').onchange=e=>{readEditor();ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
@@ -559,12 +578,30 @@ VIEWS_AFTER.edit=()=>{
   const doSave=async()=>{readEditor();const d=clone(ED);
     if(!d.clientId){toast('Choose a client first.',true);return}
     d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length){toast('Add at least one item.',true);return}
-    if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
-    const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
-    delete d._new;delete d._key;d.updatedAt=new Date().toISOString();
-    if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;go('view',{id:d.id})}};
+    const b1=$('#sv'),b2=$('#sv2');b1.disabled=b2.disabled=true;
+    try{
+      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date);
+      if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
+      const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
+      delete d._new;delete d._key;delete d._auto;d.updatedAt=new Date().toISOString();
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;syncProducts(d);go('view',{id:d.id})}
+    }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
+// Every item typed on a document is kept in the product list for next time.
+async function syncProducts(d){
+  const seen=new Set();
+  for(const i of d.items||[]){
+    const name=String(i.name||'').trim();const key=name.toLowerCase();if(!name||seen.has(key))continue;seen.add(key);
+    const p=S.products.find(x=>String(x.name||'').trim().toLowerCase()===key);
+    try{
+      if(!p){const np={name,desc:i.desc||'',unit:i.unit||'pcs',price:d.type==='delivery'?0:(+i.price||0),photo:i.photo||'',barcode:'',createdBy:S.me.id,createdAt:new Date().toISOString(),source:d.number};
+        const id=uid();await Store.put('products',id,np);S.products.push({...np,id})}
+      else if(can('clients')){const upd={};if(!p.photo&&i.photo)upd.photo=i.photo;if(!p.desc&&i.desc)upd.desc=i.desc;if(d.type!=='delivery'&&+i.price&&+i.price!==+p.price)upd.price=+i.price;
+        if(Object.keys(upd).length)await Store.put('products',p.id,{...p,...upd,updatedAt:new Date().toISOString()})}
+    }catch(e){console.warn('product save',e)}
+  }
+}
 const clientSnap=c=>({name:c.name,contact:c.contact||'',address:c.address||'',phone:c.phone||'',email:c.email||'',taxId:c.taxId||''});
 
 /* ----- delivery: scan serials + sign ----- */
@@ -740,7 +777,7 @@ VIEWS_AFTER.staff=()=>{
 VIEWS.settings=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
   const c=S.cfg;const f=(k,l,v=c[k],type='text',span)=>`<label class="field" ${span?'style="grid-column:1/-1"':''}><span>${l}</span><input id="s-${k}" type="${type}" value="${h(v)}"></label>`;
-  const sample={id:'_sample',type:'quotation',number:(c.prefix.quotation||'QT-')+today().slice(0,4)+'-0001',date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
+  const sample={id:'_sample',type:'quotation',number:fmtNumber('quotation',today(),Math.max(1,+(c.seqStart||{}).quotation||1)),date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
     ref:'RFQ-0001',subject:'Example quotation (preview only)',items:[{name:'Example item A',desc:'Shown to preview the layout',qty:2,unit:'pcs',price:450},{name:'Example service',desc:'Installation and testing',qty:1,unit:'lot',price:300}],discount:0,taxRate:c.taxRate,terms:c.terms.quotation};
   return `<div class="head"><div><h1>Company & template</h1><div class="sub">Shown on every quotation, invoice, delivery note and statement</div></div><button class="btn primary" id="s-save">Save settings</button></div>
   <div class="view-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
@@ -750,7 +787,9 @@ VIEWS.settings=()=>{
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
-   <label class="field"><span>Quotation prefix</span><input id="s-pq" value="${h(c.prefix.quotation)}"></label><label class="field"><span>Invoice prefix</span><input id="s-pi" value="${h(c.prefix.invoice)}"></label><label class="field"><span>Delivery note prefix</span><input id="s-pd" value="${h(c.prefix.delivery)}"></label></div>
+   </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + running number, e.g. ${h(fmtNumber('quotation',today(),662))}</div><div class="grid g3">
+   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(c.prefix[t])}"></label>`).join('')}
+   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>Next ${TYPE[t].t.replace('Tax ','').toLowerCase()} no. at least</span><input type="number" min="1" id="s-n-${t}" value="${h(Math.max(+(c.seqStart||{})[t]||1,(S.counters[t]||0)+1))}"></label>`).join('')}</div>
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label></div>
@@ -771,7 +810,7 @@ VIEWS_AFTER.settings=()=>{
   $('#s-save').onclick=async()=>{
     ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
-    c.prefix={quotation:$('#s-pq').value,invoice:$('#s-pi').value,delivery:$('#s-pd').value};
+    c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);c.seqStart[t]=Math.max(1,parseInt($('#s-n-'+t).value)||1)});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
     c.showPricesOnDN=$('#s-dnp').checked;if(!sp.isEmpty())c.signature=sp.toData();
     await save('config','company',c,'Settings saved');
@@ -800,7 +839,8 @@ function messageScreen(title,text,retry){
 const busyViews=['edit','deliver','settings'];
 let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.includes(S.view))render()},80)};
 function startData(){
-  Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
+  Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
+  Store.sub('counters',r=>{S.counters=Object.fromEntries(r.map(x=>[x.id,+x.last||0]))});
   Store.sub('clients',r=>{S.clients=r;soon()});
   Store.sub('products',r=>{S.products=r;soon()});
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
