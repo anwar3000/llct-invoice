@@ -272,7 +272,9 @@ service cloud.firestore {
     }
     match /inv_clients/{id} {
       allow read: if invOn();
-      allow create, update: if invHas('clients');
+      allow create: if invHas('clients');
+      // Anyone using invoicing may record a new place for a client (GPS from a delivery / service report).
+      allow update: if invHas('clients') || (invOn() && onlyChanges(['places', 'updatedAt']));
       allow delete: if isAdmin();
     }
     // Anyone using invoicing can add a new product (items typed on documents are saved

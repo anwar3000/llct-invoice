@@ -299,3 +299,14 @@ table.tbl{width:100%;border-collapse:collapse}
 .thanks .from img{width:40px;height:40px;object-fit:contain}
 .thanks .from b{display:block;font-family:var(--f-display)}
 .thanks .from span{font-size:.78rem;color:var(--muted)}
+.gpsbox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:38px;padding:4px 4px 4px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.gpsbox>span{flex:1;min-width:0}
+.near{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.nchip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 11px;cursor:pointer;min-width:0;max-width:100%}
+.nchip b{font-size:.86rem}
+.nchip span{font-size:.75rem;color:var(--muted)}
+.nchip.on{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.sheet .gps{font-family:var(--f-mono);font-size:9.5px;color:#4f535a;margin-top:3px}
+.sheet .gps b{font-size:8.5px;letter-spacing:.1em;color:var(--b);margin-right:4px}
+.sheet .svc{display:grid;grid-template-columns:1fr 1fr;gap:24px;break-inside:avoid}
+.sheet .svc>div:only-child{grid-column:1/-1}

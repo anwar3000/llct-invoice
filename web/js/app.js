@@ -53,21 +53,30 @@ const PERMS=[
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
   ['reports','View accounts & statements'],['viewAll','See documents made by others'],['delete','Delete documents']];
 const EMP_DEFAULT={delivery:true,deliver:true};
-const DN_STATUS=['Delivered','Delivered & installed','Installed','Partially delivered','Pending'];
-const stClass=x=>/install/i.test(x)?'ins':/partial/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
+// One delivery-note form, three names. Numbering shares one running sequence.
+const REPORT={
+  delivery:{t:'Delivery Note',a:'DN',p:'DLN',who:'Deliver to',sign:'Received by',ok:'Received in good condition. Thank you for your acceptance.',ty:'Thank you for accepting the delivery.',done:'Delivery confirmed',act:'Deliver: scan & sign',photos:'Proof of delivery',
+    st:['Delivered','Delivered & installed','Installed','Partially delivered','Pending']},
+  service:{t:'Service Report',a:'SR',p:'SRV',who:'Customer',sign:'Customer confirmation',ok:'Work completed to satisfaction. Thank you for your acceptance.',ty:'Thank you for confirming our service visit.',done:'Report signed',act:'Sign off: customer signature',photos:'Site photos',
+    st:['Completed','Attended','Repaired','Replaced','Pending parts','Follow-up required']},
+  callout:{t:'Call-out Attendance Report',a:'CO',p:'COR',who:'Customer',sign:'Customer confirmation',ok:'Call-out attended. Thank you for your acceptance.',ty:'Thank you for confirming our call-out attendance.',done:'Report signed',act:'Sign off: customer signature',photos:'Site photos',
+    st:['Attended','Completed','Temporary fix','Pending parts','Follow-up required']}};
+const rep=d=>REPORT[(d&&d.reportType)||'delivery']||REPORT.delivery;
+const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
+const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
-  sub(col,cb,clauses){
+  sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
-    this.unsubs.push(onSnapshot(q,s=>cb(s.docs.map(d=>({...d.data(),id:d.id}))),e=>{console.warn(col,e);toast('Could not load '+col+' ('+(e.code||e.message)+').',true)}));
+    this.unsubs.push(onSnapshot(q,s=>cb(s.docs.map(d=>({...d.data(),id:d.id}))),e=>{console.warn(col,e);if(!quiet)toast('Could not load '+col+' ('+(e.code||e.message)+').',true)}));
   },
   subDoc(col,id,cb){this.unsubs.push(onSnapshot(doc(fdb,COL[col],id),s=>cb(s.exists()?{...s.data(),id:s.id}:null),e=>console.warn(col,e)))},
   stop(){this.unsubs.forEach(u=>{try{u()}catch(e){}});this.unsubs=[]},
@@ -99,6 +108,33 @@ async function storeImage(file,max=900,png=false){
   if(png)return await compress(file,Math.min(max,480),.9,'image/png');
   let data=await compress(file,max,.78);if(data.length>700000)data=await compress(file,600,.65);
   const id=uid();await Store.put('images',id,{data,createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;return 'img:'+id;
+}
+
+/* ================= GPS & location matching ================= */
+function getGPS(){return new Promise(res=>{if(!navigator.geolocation)return res({error:'unavailable'});
+  navigator.geolocation.getCurrentPosition(p=>res({lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy||0),at:new Date().toISOString()}),
+    e=>res({error:e&&e.code===1?'denied':'unavailable'}),{enableHighAccuracy:true,timeout:15000,maximumAge:30000})})}
+const hasGPS=g=>!!g&&typeof g.lat==='number'&&typeof g.lng==='number';
+function distM(a,b){const R=6371000,r=x=>x*Math.PI/180;const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);const q=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
+const fmtGPS=g=>hasGPS(g)?`${(+g.lat).toFixed(6)}, ${(+g.lng).toFixed(6)}`:'';
+const fmtDist=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
+// Clients whose saved places, or whose attendance sites, are at this spot. Closest first.
+function nearby(g){
+  if(!hasGPS(g))return [];const out=[];const slack=Math.min(g.acc||0,100);
+  const byName=n=>{n=String(n||'').trim().toLowerCase();if(n.length<3)return null;return S.clients.find(c=>String(c.name||'').trim().toLowerCase()===n)||S.clients.find(c=>{const cn=String(c.name||'').toLowerCase();return cn.length>2&&(cn.includes(n)||n.includes(cn))})||null};
+  S.clients.forEach(c=>(c.places||[]).forEach(pl=>{if(!hasGPS(pl))return;const dd=distM(g,pl);if(dd<=(+pl.radius||150)+slack)out.push({client:c,site:pl.name||'',address:pl.address||'',dist:dd})}));
+  S.sites.forEach(si=>{if(!hasGPS(si)||si.active===false||si.approved===false)return;const dd=distM(g,si);
+    if(dd<=(+si.radius||200)+slack){const pr=S.projects[si.projectId];out.push({client:byName(pr&&pr.client)||byName(si.name),site:si.name||'',address:si.address||'',dist:dd})}});
+  out.sort((a,b)=>(!!b.client-!!a.client)||a.dist-b.dist);
+  const seen=new Set();return out.filter(x=>{const k=(x.client?x.client.id:'-')+'|'+x.site;if(seen.has(k))return false;seen.add(k);return true}).slice(0,5);
+}
+// Remember where a client was served, so the next report there picks them automatically.
+async function rememberPlace(d){
+  const g=d.gps;if(d.type!=='delivery'||!hasGPS(g)||!d.clientId||(g.acc||0)>300)return;
+  const c=S.clients.find(x=>x.id===d.clientId);if(!c)return;
+  if((c.places||[]).some(pl=>hasGPS(pl)&&distM(pl,g)<=(+pl.radius||150)))return;
+  const places=[...(c.places||[]),{name:(d.deliveryAddress||'Site').slice(0,80),lat:g.lat,lng:g.lng,radius:150,addedAt:new Date().toISOString()}];
+  try{const x={...c,places,updatedAt:new Date().toISOString()};delete x.id;await Store.put('clients',c.id,x)}catch(e){console.warn('place',e)}
 }
 
 /* ================= barcode scanning ================= */
@@ -186,21 +222,23 @@ function soaData(cid,from,to){
 const OLD_PREFIX=['QT-','INV-','DN-','QUT'];
 const numPrefix=type=>{const p=(S.cfg.prefix||{})[type];return p&&!OLD_PREFIX.includes(p)?p:DEFAULT_CFG.prefix[type]};const _np=type=>({quotation:'QTN',invoice:'INV',delivery:'DLN'})[type];
 const ddmmyy=iso=>{const d=(iso||today());return d.slice(8,10)+d.slice(5,7)+d.slice(2,4)};
-const fmtNumber=(type,date,seq)=>numPrefix(type)+ddmmyy(date)+String(seq).padStart(3,'0');
-function seqOf(type,number){const pre=numPrefix(type);if(!number||!number.startsWith(pre))return 0;const m=number.slice(pre.length).match(/^\d{6}(\d+)$/);return m?+m[1]:0}
+const prefixFor=(type,rt)=>type==='delivery'&&rt&&rt!=='delivery'&&REPORT[rt]?REPORT[rt].p:numPrefix(type);
+const fmtNumber=(type,date,seq,rt)=>prefixFor(type,rt)+ddmmyy(date)+String(seq).padStart(3,'0');
+function seqOf(type,number){if(!number)return 0;const pres=type==='delivery'?[numPrefix(type),'SRV','COR']:[numPrefix(type)];
+  for(const pre of pres){if(number.startsWith(pre)){const m=number.slice(pre.length).match(/^\d{6}(\d+)$/);if(m)return +m[1]}}return 0}
 function localNextSeq(type){
   const seen=S.docs.filter(d=>d.type===type).reduce((m,d)=>Math.max(m,seqOf(type,d.number)),0);
   return Math.max(seen,(S.counters[type]||0),(+(S.cfg.seqStart||{})[type]||1)-1)+1;
 }
-const nextNumber=(type,date)=>fmtNumber(type,date,localNextSeq(type));
+const nextNumber=(type,date,rt)=>fmtNumber(type,date,localNextSeq(type),rt);
 // Reserve the next sequence safely on the server, so two people never get the same number.
-async function reserveNumber(type,date){
+async function reserveNumber(type,date,rt){
   const floor=Math.max(localNextSeq(type)-1,0);
   try{
     const seq=await runTransaction(fdb,async tx=>{const ref=doc(fdb,COL.counters,type);const sn=await tx.get(ref);
       const last=Math.max(sn.exists()?(+sn.data().last||0):0,floor);tx.set(ref,{last:last+1,updatedAt:new Date().toISOString()});return last+1});
-    S.counters[type]=seq;return fmtNumber(type,date,seq);
-  }catch(e){console.warn('counter',e);return fmtNumber(type,date,floor+1)}
+    S.counters[type]=seq;return fmtNumber(type,date,seq,rt);
+  }catch(e){console.warn('counter',e);return fmtNumber(type,date,floor+1,rt)}
 }
 const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&can('deliver')&&!(d.delivery&&d.delivery.signedAt)));
 
@@ -269,7 +307,7 @@ function renderAnnex(d){
   const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
   const c=S.cfg,pages=[];for(let i=0;i<ims.length;i+=2)pages.push(ims.slice(i,i+2));
   return pages.map((pg,k)=>`<div class="sheet annex" style="--b:${h(c.brand)};--c:${h(c.charcoal)};page-break-before:always;break-before:page"><div class="band"></div>
-   <div class="ahd"><div><div class="dt2">${d.type==='delivery'?'Proof of delivery':'Attachments'}</div><div class="as">${h(TYPE[d.type].t)} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
+   <div class="ahd"><div><div class="dt2">${d.type==='delivery'?rep(d).photos:'Attachments'}</div><div class="as">${h(docTitle(d))} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
    ${pg.map((a,j)=>`<figure class="af ${pg.length===1?'one':''}">${img(a.ref)}<figcaption><b>${String(k*2+j+1).padStart(2,'0')}</b>${h(a.caption||a.name||'')}</figcaption></figure>`).join('')}
    ${sheetFoot()}</div>`).join('');
 }
@@ -279,7 +317,7 @@ function renderSheet(d){
   const showPrice=!isDN||c.showPricesOnDN;const hasImg=!isDN&&(d.items||[]).some(i=>i.photo);
   const PX={S:44,M:72,L:112};const psz=i=>PX[i.photoSize||c.photoSize||'M']||72;
   const imgW=hasImg?Math.max(...(d.items||[]).filter(i=>i.photo).map(psz))+16:0;
-  const title=d.type==='invoice'?(+t.rate?'Tax Invoice':'Invoice'):TYPE[d.type].t;
+  const title=d.type==='invoice'?(+t.rate?'Tax Invoice':'Invoice'):docTitle(d);const R=rep(d);const isSvc=isDN&&(d.reportType||'delivery')!=='delivery';
   const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const det=[['Date',fdate(d.date)]];
   if(d.type==='invoice'&&d.dueDate)det.push(['Due date',fdate(d.dueDate)]);
@@ -287,6 +325,8 @@ function renderSheet(d){
   if(d.ref)det.push([isQ?'Your ref':'LPO / Ref',d.ref]);
   if(src)det.push([TYPE[src.type].a+' ref',src.number]);
   if(d.salesperson)det.push(['Salesperson',d.salesperson]);
+  if(isSvc&&d.technician)det.push(['Technician',d.technician]);
+  if(isSvc&&(d.timeIn||d.timeOut))det.push(['Time in / out',[d.timeIn||'—',d.timeOut||'—'].join(' – ')]);
   let rows=(d.items||[]).map((i,n)=>{
     const sl=(i.serials||[]);
     const sn=sl.length?`<div class="sn"><b>S/N</b>${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'';
@@ -294,11 +334,11 @@ function renderSheet(d){
     <td><div class="it">${h(i.name)}</div>${i.desc?`<div class="idesc">${h(i.desc)}</div>`:''}${sn}</td>
     <td class="r m">${h(i.qty)}</td><td class="u">${h(i.unit||'')}</td>
     ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m b">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
-    ${isDN?`<td class="c"><span class="st ${stClass(i.status||'Delivered')}">${h(i.status||'Delivered')}</span></td>`:''}</tr>`}).join('');
+    ${isDN?`<td class="c"><span class="st ${stClass(i.status||rep(d).st[0])}">${h(i.status||rep(d).st[0])}</span></td>`:''}</tr>`}).join('');
   const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?'<th class="r" style="width:92px">Unit price</th><th class="r" style="width:104px">Amount</th>':''}${isDN?'<th class="c" style="width:136px">Status</th>':''}</tr>`;
   let stamp='';
   if(d.type==='invoice'){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
-  if(isDN&&d.delivery&&d.delivery.signedAt)stamp='<span class="stamp">DELIVERED</span>';
+  if(isDN&&d.delivery&&d.delivery.signedAt)stamp=`<span class="stamp">${isSvc?'SIGNED OFF':'DELIVERED'}</span>`;
   const paid=d.type==='invoice'?paidOn(d.id):0;
   const totalsHtml=showPrice?`<div class="tot">
     <div class="tr"><span>Subtotal</span><span class="m">${money(t.sub)}</span></div>
@@ -306,17 +346,18 @@ function renderSheet(d){
     ${+t.rate?`<div class="tr"><span>${h(c.taxLabel)} ${t.rate}%</span><span class="m">${money(t.tax)}</span></div>`:''}
     <div class="tr gr"><span>Total <small>${h(c.currency)}</small></span><span class="m">${money(t.total)}</span></div>
     ${d.type==='invoice'&&paid?`<div class="tr"><span>Paid</span><span class="m">${money(paid)}</span></div><div class="tr" style="font-weight:700"><span>Balance due</span><span class="m">${money(t.total-paid)}</span></div>`:''}</div>`
-    :`<div class="tot"><div class="tr"><span>Total items</span><span class="m">${(d.items||[]).length}</span></div><div class="tr"><span>Total quantity</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(+i.qty||0),0)}</span></div><div class="tr"><span>Serials recorded</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(i.serials||[]).length,0)}</span></div></div>`;
+    :!(d.items||[]).length?'':`<div class="tot"><div class="tr"><span>Total items</span><span class="m">${(d.items||[]).length}</span></div><div class="tr"><span>Total quantity</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(+i.qty||0),0)}</span></div><div class="tr"><span>Serials recorded</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(i.serials||[]).length,0)}</span></div></div>`;
   const dl=d.delivery||{};
-  const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>Received by: ${h(dl.receiver||'')}</b>${dl.signedAt?'<br><i style="color:#2F8A57;font-style:normal">Received in good condition. Thank you for your acceptance.</i>':''}<br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
+  const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>${h(R.sign)}: ${h(dl.receiver||'')}</b>${dl.signedAt?`<br><i style="color:#2F8A57;font-style:normal">${h(R.ok)}</i>`:''}${hasGPS(dl.gps)?`<br><span class="m" style="font-size:9px">Signed at GPS ${fmtGPS(dl.gps)}</span>`:''}<br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
     :`<div class="sig"><div class="img"></div><div class="ln"><b>${isQ?'Accepted by':'Received by'}</b><br>Name, signature, company stamp & date</div></div>`;
   return `<div class="sheet" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number)}
-  <div class="meta"><div class="box"><div class="k">${isDN?'Deliver to':isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
+  <div class="meta"><div class="box"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
-    ${isDN&&d.deliveryAddress?`<div class="k" style="margin-top:8px">Site / address</div><div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}</div>
+    ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div>
     <div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div></div>
   ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
-  <table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>
+  ${isSvc&&(d.complaint||d.workDone)?`<div class="svc">${d.complaint?`<div><div class="hh">Complaint / request</div><div class="terms">${h(d.complaint)}</div></div>`:''}${d.workDone?`<div><div class="hh">Work carried out</div><div class="terms">${h(d.workDone)}</div></div>`:''}</div>`:''}
+  ${rows||!isSvc?`<table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>`:''}
   <div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}</div>${totalsHtml}</div>
   ${showPrice?`<div class="words"><span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:''}
   ${(d.terms||(d.type!=='delivery'&&c.bank))?`<div class="info">${d.terms?`<div><div class="hh">Terms & conditions</div><div class="terms">${h(d.terms)}</div></div>`:''}${d.type!=='delivery'&&c.bank?`<div><div class="hh">Bank details</div><div class="terms">${h(c.bank)}</div></div>`:''}</div>`:''}
@@ -436,7 +477,7 @@ function newMenu(){
 const VIEWS={},VIEWS_AFTER={};
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
-  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.ref?' · '+h(d.ref):''}</div></span>
+  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.ref?' · '+h(d.ref):''}</div></span>
   <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span></span></button>`;
 }
 VIEWS.home=()=>{
@@ -489,7 +530,7 @@ VIEWS.view=()=>{
   const [s,k]=docStatus(d);const t=totals(d);const canEdit=can(d.type)&&!(d.type==='delivery'&&d.delivery&&d.delivery.signedAt&&!isAdmin());
   const paid=d.type==='invoice'?paidOn(d.id):0;const kids=S.docs.filter(x=>x.sourceId===d.id);const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const pays=S.payments.filter(p=>p.invoiceId===d.id);
-  return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1 class="num" style="font-family:var(--f-display)">${h(d.number)}</h1><div class="sub">${TYPE[d.type].t} · ${h(d.client&&d.client.name||'')}</div></div></div>
+  return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1 class="num" style="font-family:var(--f-display)">${h(d.number)}</h1><div class="sub">${h(docTitle(d))} · ${h(d.client&&d.client.name||'')}</div></div></div>
    <div class="row"><button class="btn primary" id="pdf">${I.pdf}Download PDF</button>${canEdit?`<button class="btn" id="ed">${I.pen}Edit</button>`:''}</div></div>
   <div class="view-grid"><div class="card preview-wrap"><div class="preview-scale">${renderSheet(d)}</div></div>
   <aside class="side">
@@ -502,7 +543,7 @@ VIEWS.view=()=>{
     ${kids.map(x=>`<div class="kv"><span class="muted">${TYPE[x.type].t}</span><a href="#" data-open="${x.id}">${h(x.number)}</a></div>`).join('')}
    </div>
    <div class="card pad" style="display:flex;flex-direction:column;gap:8px"><h3>Actions</h3>
-    ${d.type==='delivery'&&!(d.delivery&&d.delivery.signedAt)&&can('deliver')?`<button class="btn primary" id="dlv">${I.scan}Deliver: scan & sign</button>`:''}
+    ${d.type==='delivery'&&!(d.delivery&&d.delivery.signedAt)&&can('deliver')?`<button class="btn primary" id="dlv">${I.scan}${h(rep(d).act)}</button>`:''}
     ${d.type==='invoice'&&can('payments')&&paid<t.total?`<button class="btn primary" id="pay">${I.cash}Record payment</button>`:''}
     ${d.type==='quotation'&&can('quotation')?`<select id="qs" aria-label="Quotation status">${['draft','sent','accepted','rejected'].map(x=>`<option ${(d.status||'draft')===x?'selected':''} value="${x}">Mark as ${x}</option>`).join('')}</select>`:''}
     ${d.type==='quotation'&&can('invoice')?`<button class="btn" data-conv="invoice">Convert to invoice</button>`:''}
@@ -552,7 +593,13 @@ VIEWS.edit=()=>{
   const cls='item'+(isDN?' dn':'');const hasSN=!isQ;ED.attachments=ED.attachments||[];
   const SZ={S:'Small',M:'Med',L:'Large'};
   const t=totals(d);
-  return `<div class="head"><div class="row"><button class="btn ghost sm" id="cx">${I.back}Cancel</button><div><h1>${d._new?'New':'Edit'} ${TYPE[d.type].t.replace('Tax ','').toLowerCase()}</h1><div class="sub num">${h(d.number)}</div></div></div><div class="row"><button class="btn primary" id="sv">Save</button></div></div>
+  return `<div class="head"><div class="row"><button class="btn ghost sm" id="cx">${I.back}Cancel</button><div><h1>${d._new?'New':'Edit'} ${docTitle(d).replace('Tax ','').toLowerCase()}</h1><div class="sub num">${h(d.number)}</div></div></div><div class="row"><button class="btn primary" id="sv">Save</button></div></div>
+  ${isDN?`<div class="card pad grid locard">
+   <div class="grid g3"><label class="field"><span>Report type</span><select id="e-reportType">${Object.entries(REPORT).map(([k,r])=>`<option value="${k}" ${(d.reportType||'delivery')===k?'selected':''}>${h(r.t)}</option>`).join('')}</select></label>
+    <div class="field" style="grid-column:span 2"><span>Location (GPS)</span><div class="gpsbox"><span id="gps-txt">${ED._gpsBusy?'Getting your location…':hasGPS(d.gps)?`<b class="num">${fmtGPS(d.gps)}</b> <span class="muted">±${h(d.gps.acc||0)} m</span>`:ED._gpsErr==='denied'?'<span style="color:var(--bad)">Location blocked. Allow location for this app, then tap Get location.</span>':ED._gpsErr?'<span style="color:var(--bad)">Location not available. Move outside or turn on GPS.</span>':'<span class="muted">Not captured yet</span>'}</span><button class="btn sm" id="gps-go" type="button">${hasGPS(d.gps)?'Refresh':'Get location'}</button></div></div></div>
+   ${hasGPS(d.gps)?((ED._near||[]).length?`<div class="near"><span class="label">Nearby</span>${ED._near.map((m,k)=>`<button type="button" class="nchip ${ED._picked===k?'on':''}" data-near="${k}"><b>${h(m.client?m.client.name:'Site not linked to a client')}</b><span>${h(m.site||'Saved place')} · ${fmtDist(m.dist)}</span></button>`).join('')}</div>`
+     :`<div class="muted" style="font-size:.84rem">No saved client at this spot. Pick a client below or add a new one. This place will be remembered for them.</div>`):''}
+  </div>`:''}
   <div class="card pad grid">
    <div class="grid g4">
     <label class="field" style="grid-column:span 2"><span>Client</span><div class="row" style="flex-wrap:nowrap"><select id="e-client"><option value="">Choose a client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===d.clientId?'selected':''}>${h(c.name)}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-nc" title="Add client">${I.plus}</button>`:''}</div></label>
@@ -563,7 +610,9 @@ VIEWS.edit=()=>{
     <label class="field"><span>${isQ?'Client reference':'LPO / reference'}</span><input id="e-ref" value="${h(d.ref)}"></label>
     <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
     <label class="field" style="grid-column:span ${isDN?1:2}"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="e.g. Supply of CCTV equipment"></label>
-    ${isDN?`<label class="field" style="grid-column:span 2"><span>Delivery site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>`:''}
+    ${isDN?`<label class="field" style="grid-column:span 2"><span>Site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>`:''}
+    ${isDN&&(d.reportType||'delivery')!=='delivery'?`<label class="field"><span>Technician</span><input id="e-technician" value="${h(d.technician||S.me.name||'')}"></label><label class="field"><span>Time in</span><input type="time" id="e-timeIn" value="${h(d.timeIn||'')}"></label><label class="field"><span>Time out</span><input type="time" id="e-timeOut" value="${h(d.timeOut||'')}"></label>
+     <label class="field" style="grid-column:1/-1"><span>Complaint / request</span><textarea id="e-complaint" rows="2">${h(d.complaint||'')}</textarea></label><label class="field" style="grid-column:1/-1"><span>Work carried out</span><textarea id="e-workDone" rows="3">${h(d.workDone||'')}</textarea></label>`:''}
    </div>
   </div>
   <div class="card pad grid"><div class="row"><h2 class="grow">Items</h2><button class="btn sm" id="scan-add">${I.scan}Scan product</button></div>
@@ -574,7 +623,7 @@ VIEWS.edit=()=>{
       ${hasSN?`<div class="snrow"><button class="btn sm ${(i.serials||[]).length?'':'ghost'}" type="button" data-serials="${n}">${I.scan}Serial nos ${(i.serials||[]).length?`· ${i.serials.length}/${h(i.qty||0)}`:''}</button>${(i.serials||[]).slice(0,3).map(x=>`<span class="chip">${h(x)}</span>`).join('')}${(i.serials||[]).length>3?`<span class="muted" style="font-size:.78rem">+${i.serials.length-3} more</span>`:''}</div>`:''}</div>
      <label class="field f-q"><span>Qty</span><input type="number" step="any" min="0" data-f="qty" value="${h(i.qty)}"></label>
      <label class="field f-u"><span>Unit</span><input data-f="unit" value="${h(i.unit)}"></label>
-     ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${DN_STATUS.map(x=>`<option ${(i.status||'Delivered')===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
+     ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${rep(d).st.map(x=>`<option ${(i.status||rep(d).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
      <button class="xbtn" data-rm="${n}" aria-label="Remove item">✕</button></div>`).join('')}</div>
    <div><button class="btn" id="add-item">${I.plus}Add item</button></div>
@@ -587,11 +636,11 @@ VIEWS.edit=()=>{
   ${isDN?'':`<div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>Attachments</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. PDF files (up to 700 KB each) are joined at the end.</div></div><button class="btn" id="att-add" type="button">${I.plus}Add photos or PDF</button></div>
    ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>`<div class="att" data-att="${k}"><div class="ath">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}</div><div class="atb"><input data-af="caption" value="${h(a.caption||'')}" placeholder="${h(a.name||'Caption')}" aria-label="Caption"><label class="check"><input type="checkbox" data-af="inPdf" ${a.inPdf!==false?'checked':''}>Include in PDF</label></div><button class="xbtn" type="button" data-att-rm="${k}" aria-label="Remove attachment">✕</button></div>`).join('')}</div>`:''}</div>`}
   <div class="card pad grid g2"><label class="field"><span>Notes (shown on document)</span><textarea id="e-notes">${h(d.notes)}</textarea></label><label class="field"><span>Terms & conditions</span><textarea id="e-terms" rows="4">${h(d.terms)}</textarea></label></div>
-  <div class="row"><span class="grow"></span><button class="btn" id="cx2">Cancel</button><button class="btn primary" id="sv2">Save ${TYPE[d.type].t.replace('Tax ','').toLowerCase()}</button></div>`;
+  <div class="row"><span class="grow"></span><button class="btn" id="cx2">Cancel</button><button class="btn primary" id="sv2">Save ${docTitle(d).replace('Tax ','').toLowerCase()}</button></div>`;
 };
 function readEditor(){
   const d=ED;
-  ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
+  ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   $$('[data-att]').forEach(row=>{const a=(d.attachments||[])[+row.dataset.att];if(a)$$('[data-af]',row).forEach(el=>{a[el.dataset.af]=el.type==='checkbox'?el.checked:el.value})});
 }
@@ -643,7 +692,26 @@ VIEWS_AFTER.edit=()=>{
   const cancel=()=>{const d=ED;ED=null;d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
   $('#cx').onclick=cancel;$('#cx2').onclick=cancel;
   $('#e-number').addEventListener('input',()=>{ED._auto=false});
-  $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date);$('#e-number').value=ED.number}});
+  $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date,ED.reportType);$('#e-number').value=ED.number}});
+  if(ED.type==='delivery'){
+    const applyNear=(k,auto)=>{const m=(ED._near||[])[k];if(!m)return;readEditor();ED._picked=k;
+      if(m.client){ED.clientId=m.client.id;ED.client=clientSnap(m.client)}
+      const place=[m.site,m.address].filter(Boolean).join(', ');if(place&&(!auto||!ED.deliveryAddress))ED.deliveryAddress=place;
+      render();if(m.client)toast((auto?'Client picked from your location: ':'Client set: ')+m.client.name)};
+    const locate=async()=>{readEditor();ED._gpsBusy=true;ED._gpsErr='';const tx=$('#gps-txt');if(tx)tx.textContent='Getting your location…';
+      const g=await getGPS();if(!ED||ED.type!=='delivery'||!$('#e-reportType'))return;readEditor();ED._gpsBusy=false;
+      if(!hasGPS(g)){ED._gpsErr=(g&&g.error)||'unavailable';render();return}
+      ED.gps=g;ED._near=nearby(g);ED._picked=-1;
+      const k=ED._near.findIndex(m=>m.client);
+      if(!ED.clientId&&k>=0){applyNear(k,true);return}
+      if(!ED.deliveryAddress&&ED._near[0]&&ED._near[0].site)ED.deliveryAddress=ED._near[0].site;
+      render()};
+    $('#gps-go').onclick=locate;
+    $$('[data-near]').forEach(b=>b.onclick=()=>applyNear(+b.dataset.near));
+    $('#e-reportType').onchange=()=>{readEditor();const st=rep(ED).st;ED.items.forEach(i=>{if(i.status&&!st.includes(i.status))i.status=st[0]});
+      if(ED._new&&ED._auto)ED.number=nextNumber(ED.type,ED.date,ED.reportType);render()};
+    if(ED._new&&!ED.gps&&!ED._gpsTried){ED._gpsTried=true;locate()}
+  }
   $('#e-client').onchange=e=>{readEditor();ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
@@ -658,14 +726,14 @@ VIEWS_AFTER.edit=()=>{
   $('#scan-add').onclick=()=>openScanner(code=>{const p=S.products.find(x=>x.barcode===code||x.sku===code);if(p){addProduct(p);toast('Added '+p.name)}else{readEditor();ED.items.push({name:code,desc:'',qty:1,unit:'pcs',price:0});render();toast('Code '+code+' is not in your product list. Added as a new line.')}},{title:'Scan product'});
   const doSave=async()=>{readEditor();const d=clone(ED);
     if(!d.clientId){toast('Choose a client first.',true);return}
-    d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length){toast('Add at least one item.',true);return}
+    d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length&&!(d.type==='delivery'&&(d.reportType||'delivery')!=='delivery')){toast('Add at least one item.',true);return}
     const b1=$('#sv'),b2=$('#sv2');b1.disabled=b2.disabled=true;
     try{
-      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date);
+      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
-      delete d._new;delete d._key;delete d._auto;d.updatedAt=new Date().toISOString();
-      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;syncProducts(d);go('view',{id:d.id})}
+      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
@@ -691,13 +759,13 @@ VIEWS.deliver=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);if(!d)return '<div class="empty"><b>Delivery note not found</b></div>';
   if(!DV||DV.id!==d.id)DV={id:d.id,items:clone(d.items||[]).map(i=>({...i,serials:i.serials||[]})),receiver:'',receiverPhone:'',photos:clone(d.attachments||[])};
   const need=DV.items.reduce((s,i)=>s+(+i.qty||0),0),got=DV.items.reduce((s,i)=>s+i.serials.length,0);
-  return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1>Deliver ${h(d.number)}</h1><div class="sub">${h(d.client&&d.client.name||'')}${d.deliveryAddress?' · '+h(d.deliveryAddress):''}</div></div></div></div>
+  return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1>${(d.reportType||'delivery')==='delivery'?'Deliver':'Sign off'} ${h(d.number)}</h1><div class="sub">${h(d.client&&d.client.name||'')}${d.deliveryAddress?' · '+h(d.deliveryAddress):''}</div><div class="sub" id="dv-gps" style="font-size:.8rem">${hasGPS(DV.gps)?'Location '+fmtGPS(DV.gps)+' ±'+DV.gps.acc+' m':'Getting location…'}</div></div></div></div>
   <div class="card pad grid"><div class="row"><h2 class="grow">1. Items, status & serial numbers</h2><span class="muted num">${got} of ${need} scanned</span></div>
    <div class="progress"><i style="width:${need?Math.min(100,got/need*100):0}%"></i></div>
    <p class="muted" style="margin:0">Tap <b>Camera</b> to photograph a barcode, or type it and press Enter. A handheld USB/Bluetooth scanner also works in the box.</p>
-   <label class="field" style="max-width:280px"><span>Mark all items as</span><select id="st-all"><option value="">Choose…</option>${DN_STATUS.map(x=>`<option>${h(x)}</option>`).join('')}</select></label>
+   <label class="field" style="max-width:280px"><span>Mark all items as</span><select id="st-all"><option value="">Choose…</option>${rep(d).st.map(x=>`<option>${h(x)}</option>`).join('')}</select></label>
    ${DV.items.map((i,n)=>`<div class="dl-item"><div class="row"><div class="grow" style="min-width:0"><b>${h(i.name)}</b><div class="muted" style="font-size:.8rem">${h(i.desc||'')}</div></div><span class="pill ${i.serials.length>=+i.qty?'good':'warn'} num">${i.serials.length}/${h(i.qty)}</span></div>
-     <select data-st="${n}" aria-label="Status for ${h(i.name)}" style="max-width:280px">${DN_STATUS.map(x=>`<option ${(i.status||'Delivered')===x?'selected':''}>${h(x)}</option>`).join('')}</select>
+     <select data-st="${n}" aria-label="Status for ${h(i.name)}" style="max-width:280px">${rep(d).st.map(x=>`<option ${(i.status||rep(d).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select>
      <div class="scanrow"><input id="sn-${n}" data-sn="${n}" placeholder="Scan or type serial number" autocomplete="off"><button class="btn" data-cam="${n}">${I.scan}Camera</button></div>
      ${i.serials.length?`<div class="serials">${i.serials.map((s,k)=>`<span class="chip">${h(s)}<button data-del="${n}:${k}" aria-label="Remove ${h(s)}">×</button></span>`).join('')}</div>`:''}</div>`).join('')}
   </div>
@@ -719,6 +787,7 @@ VIEWS_AFTER.deliver=()=>{
   $$('[data-cam]').forEach(b=>b.onclick=()=>{const n=+b.dataset.cam;openScanner(code=>add(n,code),{title:'Scan serials · '+DV.items[n].name,multi:true})});
   $$('[data-del]').forEach(b=>b.onclick=()=>{const [n,k]=b.dataset.del.split(':').map(Number);keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items[n].serials.splice(k,1);render();if(sig)pad.load(sig)});
   $('#sig-clr').onclick=()=>pad.clear();
+  if(!DV.gps&&!DV._gpsTried){DV._gpsTried=true;getGPS().then(g=>{if(!DV||DV.id!==d.id)return;const el=$('#dv-gps');if(hasGPS(g)){DV.gps=g;if(el)el.textContent='Location '+fmtGPS(g)+' ±'+g.acc+' m'}else if(el)el.textContent=g&&g.error==='denied'?'Location blocked. Allow location access to record where this was signed.':'Location not available.'})}
   $$('[data-st]').forEach(sel=>sel.onchange=()=>{DV.items[+sel.dataset.st].status=sel.value});
   $('#st-all').onchange=e=>{if(!e.target.value)return;keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items.forEach(i=>i.status=e.target.value);render();if(sig)pad.load(sig)};
   const keepSig=fn=>{keep();$$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);const sig=!pad.isEmpty()?pad.toData():null;fn();render();if(sig)pad.load(sig)};
@@ -732,14 +801,17 @@ VIEWS_AFTER.deliver=()=>{
     if(!DV.receiver.trim()){toast('Enter the receiver\'s name.',true);return}
     if(pad.isEmpty()){toast('Ask the receiver to sign in the box.',true);return}
     $$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);
-    const upd={...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:pad.toData(),signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name}};
+    const sigData=pad.toData();
+    if(!DV.gps){toast('Recording location…');const g=await getGPS();if(hasGPS(g))DV.gps=g}
+    const upd={...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:sigData,signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name,gps:DV.gps||null}};
+    if(!hasGPS(d.gps)&&DV.gps)upd.gps=DV.gps;
     const btn=$('#confirm');btn.disabled=true;
     if(await save('docs',d.id,upd)){const who=DV.receiver.trim();DV=null;go('view',{id:d.id});thankYou(upd,who)}else btn.disabled=false};
 };
 function thankYou(d,who){
-  const o=modal('Delivery confirmed',`<div class="thanks"><div class="tick">✓</div><h2>Thank you${who?', '+h(who):''}!</h2>
-   <p>Thank you for accepting the delivery.<br>We appreciate your business.</p><div class="from">${img(S.cfg.logo)}<div><b>${h(S.cfg.name)}</b><span class="num">${h(d.number)} · ${fdt(d.delivery.signedAt)}</span></div></div></div>`,
-   `<button class="btn" id="ty-pdf">${I.pdf}Delivery note PDF</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
+  const R=rep(d);const o=modal(R.done,`<div class="thanks"><div class="tick">✓</div><h2>Thank you${who?', '+h(who):''}!</h2>
+   <p>${h(R.ty)}<br>We appreciate your business.</p><div class="from">${img(S.cfg.logo)}<div><b>${h(S.cfg.name)}</b><span class="num">${h(d.number)} · ${fdt(d.delivery.signedAt)}</span></div></div></div>`,
+   `<button class="btn" id="ty-pdf">${I.pdf}${h(R.t)} PDF</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
   $('#ty-pdf',o).onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
 }
 /* ----- clients ----- */
@@ -790,9 +862,17 @@ function clientForm(c,after){
    <label class="field" style="grid-column:1/-1"><span>Address</span><textarea id="c-address">${h(e.address)}</textarea></label>
    <label class="field"><span>Credit days</span><input type="number" id="c-creditDays" value="${h(e.creditDays??S.cfg.dueDays)}"></label><span></span>
    <label class="field"><span>Old balance (before using this app)</span><input type="number" step="any" id="c-openingBalance" value="${h(e.openingBalance||'')}" placeholder="0.00"></label>
-   <label class="field"><span>Old balance as of</span><input type="date" id="c-openingDate" value="${h(e.openingDate||today())}"></label></div>`,
+   <label class="field"><span>Old balance as of</span><input type="date" id="c-openingDate" value="${h(e.openingDate||today())}"></label>
+   <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px"><b>Saved locations</b><div class="muted" style="font-size:.8rem">Delivery notes and reports made at these places pick this client automatically.</div>
+    <div id="c-places"></div><div class="scanrow"><input id="c-pname" placeholder="Place name, e.g. Head office"><button class="btn" id="c-here" type="button">Add my current location</button></div></div></div>`,
    `${c&&isAdmin()?'<button class="btn danger" id="c-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="c-save">Save client</button>`);
-  $('#c-save',o).onclick=async()=>{const d={...e};['name','contact','phone','email','taxId','address','openingDate'].forEach(k=>d[k]=$('#c-'+k,o).value.trim());d.creditDays=+$('#c-creditDays',o).value||0;d.openingBalance=+$('#c-openingBalance',o).value||0;
+  let places=clone(e.places||[]);
+  const drawPl=()=>{$('#c-places',o).innerHTML=places.length?places.map((pl,k)=>`<div class="kv"><span>${h(pl.name||'Place')} <span class="muted num" style="font-size:.78rem">${fmtGPS(pl)}</span></span><button class="btn ghost sm" type="button" data-plrm="${k}">Remove</button></div>`).join(''):'<span class="muted" style="font-size:.84rem">None yet.</span>';
+    $$('[data-plrm]',o).forEach(b=>b.onclick=()=>{places.splice(+b.dataset.plrm,1);drawPl()})};drawPl();
+  $('#c-here',o).onclick=async()=>{const b=$('#c-here',o);b.disabled=true;b.textContent='Getting location…';const g=await getGPS();b.disabled=false;b.textContent='Add my current location';
+    if(!hasGPS(g)){toast(g&&g.error==='denied'?'Location is blocked. Allow location access and try again.':'Location not available.',true);return}
+    places.push({name:$('#c-pname',o).value.trim()||'Site '+(places.length+1),lat:g.lat,lng:g.lng,radius:150,addedAt:new Date().toISOString()});$('#c-pname',o).value='';drawPl()};
+  $('#c-save',o).onclick=async()=>{const d={...e,places};['name','contact','phone','email','taxId','address','openingDate'].forEach(k=>d[k]=$('#c-'+k,o).value.trim());d.creditDays=+$('#c-creditDays',o).value||0;d.openingBalance=+$('#c-openingBalance',o).value||0;
     if(!d.name){toast('Enter the client name.',true);return}const id=e.id||uid();d.updatedAt=new Date().toISOString();
     if(await save('clients',id,d,'Client saved')){closeModal();d.id=id;if(after)after(d)}};
   $('#c-del',o)&&($('#c-del',o).onclick=async()=>{if(S.docs.some(x=>x.clientId===e.id)){toast('This client has documents. Delete those first.',true);return}if(!await confirmBox('Delete client?',e.name+' will be removed.'))return;await Store.remove('clients',e.id);go('clients')});
@@ -941,6 +1021,8 @@ let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.include
 function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
   Store.sub('counters',r=>{S.counters=Object.fromEntries(r.map(x=>[x.id,+x.last||0]))});
+  Store.sub('sites',r=>{S.sites=r},null,true);
+  Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
   Store.sub('clients',r=>{S.clients=r;soon()});
   Store.sub('products',r=>{S.products=r;soon()});
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
@@ -951,7 +1033,7 @@ function startData(){
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
 onAuthStateChanged(auth,async u=>{
-  Store.stop();S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
+  Store.stop();S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
   if(!u){S.me={id:null,role:'login',perms:{}};loginScreen();return}
   S.me={id:u.uid,role:'loading',perms:{},name:''};render();
   try{
