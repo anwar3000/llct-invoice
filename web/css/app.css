@@ -194,7 +194,8 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet td.n{color:#9a9da3;font-size:10px}
 .sheet td.u{color:#5d6168}
 .sheet td.b{font-weight:600;color:var(--c)}
-.sheet td img.pi{object-fit:cover;border-radius:4px;border:1px solid #ecebe8;display:block;max-width:none}
+.sheet .pib{display:flex;align-items:center;justify-content:center;border:1px solid #ecebe8;border-radius:4px;background:#fff;overflow:hidden}
+.sheet .pib img.pi{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
 .sheet .it{font-weight:600;color:var(--c);font-size:11.5px} .sheet .idesc{color:#62666d;white-space:pre-line;font-size:10.5px;margin-top:2px}
 .sheet .sn{display:flex;flex-wrap:wrap;gap:3px 4px;margin-top:6px;align-items:center}
 .sheet .sn b{font-size:8.5px;letter-spacing:.1em;color:var(--b);margin-right:3px}
@@ -232,9 +233,6 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .dt2{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.16em;text-transform:uppercase;color:var(--c)}
 .sheet .as{font-size:10px;color:#6c6f75;margin-top:3px;font-family:var(--f-mono)}
 .sheet .pg{font-family:var(--f-mono);font-size:10px;color:#9a9da3}
-.sheet .af{margin:0;display:flex;flex-direction:column;gap:8px;break-inside:avoid}
-.sheet .af img{width:100%;height:420px;object-fit:contain;background:#f6f6f4;border:1px solid #ecebe8;border-radius:6px;max-width:none}
-.sheet .af.one img{height:820px}
 .sheet .af figcaption{font-size:10.5px;color:#2b2e33;display:flex;gap:8px}
 .sheet .af figcaption b{font-family:var(--f-mono);color:var(--b)}
 .sheet .stamp{display:inline-block;border:2px solid #2F8A57;color:#2F8A57;font-family:var(--f-display);font-weight:800;letter-spacing:.1em;padding:3px 10px;border-radius:4px;transform:rotate(-6deg);font-size:13px}
@@ -310,3 +308,13 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .gps b{font-size:8.5px;letter-spacing:.1em;color:var(--b);margin-right:4px}
 .sheet .svc{display:grid;grid-template-columns:1fr 1fr;gap:24px;break-inside:avoid}
 .sheet .svc>div:only-child{grid-column:1/-1}
+.sheet .agrid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:440px;grid-auto-flow:row dense;gap:14px 16px}
+.sheet .af{margin:0;display:flex;flex-direction:column;gap:7px;min-width:0;break-inside:avoid}
+.sheet .af.sz-S{grid-column:span 1}
+.sheet .af.sz-M{grid-column:span 2}
+.sheet .af.sz-L{grid-column:span 2;grid-row:span 2}
+.sheet .abox{height:405px;display:flex;align-items:center;justify-content:center;background:#f6f6f4;border:1px solid #ecebe8;border-radius:6px;overflow:hidden}
+.sheet .af.sz-L .abox{height:859px}
+.sheet .abox img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
+.atc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.atc select{width:auto;min-height:30px;padding:3px 6px;font-size:.78rem}

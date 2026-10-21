@@ -72,7 +72,7 @@ const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.p
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -224,21 +224,21 @@ const numPrefix=type=>{const p=(S.cfg.prefix||{})[type];return p&&!OLD_PREFIX.in
 const ddmmyy=iso=>{const d=(iso||today());return d.slice(8,10)+d.slice(5,7)+d.slice(2,4)};
 const prefixFor=(type,rt)=>type==='delivery'&&rt&&rt!=='delivery'&&REPORT[rt]?REPORT[rt].p:numPrefix(type);
 const fmtNumber=(type,date,seq,rt)=>prefixFor(type,rt)+ddmmyy(date)+String(seq).padStart(3,'0');
-function seqOf(type,number){if(!number)return 0;const pres=type==='delivery'?[numPrefix(type),'SRV','COR']:[numPrefix(type)];
-  for(const pre of pres){if(number.startsWith(pre)){const m=number.slice(pre.length).match(/^\d{6}(\d+)$/);if(m)return +m[1]}}return 0}
-function localNextSeq(type){
-  const seen=S.docs.filter(d=>d.type===type).reduce((m,d)=>Math.max(m,seqOf(type,d.number)),0);
-  return Math.max(seen,(S.counters[type]||0),(+(S.cfg.seqStart||{})[type]||1)-1)+1;
-}
-const nextNumber=(type,date,rt)=>fmtNumber(type,date,localNextSeq(type),rt);
-// Reserve the next sequence safely on the server, so two people never get the same number.
-async function reserveNumber(type,date,rt){
-  const floor=Math.max(localNextSeq(type)-1,0);
-  try{
-    const seq=await runTransaction(fdb,async tx=>{const ref=doc(fdb,COL.counters,type);const sn=await tx.get(ref);
-      const last=Math.max(sn.exists()?(+sn.data().last||0):0,floor);tx.set(ref,{last:last+1,updatedAt:new Date().toISOString()});return last+1});
-    S.counters[type]=seq;return fmtNumber(type,date,seq,rt);
-  }catch(e){console.warn('counter',e);return fmtNumber(type,date,floor+1,rt)}
+const rand3=()=>String(1+Math.floor(Math.random()*999)).padStart(3,'0');
+function nextNumber(type,date,rt){const pre=prefixFor(type,rt)+ddmmyy(date);const used=new Set(S.docs.map(d=>d.number));
+  for(let i=0;i<60;i++){const n=pre+rand3();if(!used.has(n))return n}return pre+rand3()}
+// Claim the number on the server (inv_numbers/{number}) so no two documents ever share one.
+async function reserveNumber(type,date,rt,preferred){
+  const pre=prefixFor(type,rt)+ddmmyy(date);const used=new Set(S.docs.map(d=>d.number));
+  let cand=preferred&&preferred.startsWith(pre)&&!used.has(preferred)?preferred:null;
+  for(let i=0;i<30;i++){
+    let n=cand;cand=null;if(!n){for(let k=0;k<60;k++){n=pre+rand3();if(!used.has(n))break}}
+    try{const ok=await runTransaction(fdb,async tx=>{const ref=doc(fdb,COL.numbers,n);const sn=await tx.get(ref);if(sn.exists())return false;
+        tx.set(ref,{type,by:S.me.id,at:new Date().toISOString()});return true});
+      if(ok)return n;used.add(n)}
+    catch(e){console.warn('number',e);return n}
+  }
+  return pre+rand3();
 }
 const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&can('deliver')&&!(d.delivery&&d.delivery.signedAt)));
 
@@ -305,10 +305,12 @@ function sheetFoot(){const c=S.cfg;return `<div class="ft"><span>${h(c.name)}${c
 // Photos attached to a document print as extra pages after it.
 function renderAnnex(d){
   const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
-  const c=S.cfg,pages=[];for(let i=0;i<ims.length;i+=2)pages.push(ims.slice(i,i+2));
+  const U={S:1,M:2,L:4},c=S.cfg,pages=[];let cur=[],used=0;
+  for(const a of ims){const u=U[a.size||'M']||2;if(used+u>4&&cur.length){pages.push(cur);cur=[];used=0}cur.push(a);used+=u}
+  if(cur.length)pages.push(cur);let no=0;
   return pages.map((pg,k)=>`<div class="sheet annex" style="--b:${h(c.brand)};--c:${h(c.charcoal)};page-break-before:always;break-before:page"><div class="band"></div>
    <div class="ahd"><div><div class="dt2">${d.type==='delivery'?rep(d).photos:'Attachments'}</div><div class="as">${h(docTitle(d))} ${h(d.number)}${d.client&&d.client.name?' · '+h(d.client.name):''}</div></div><div class="pg">${k+1} / ${pages.length}</div></div>
-   ${pg.map((a,j)=>`<figure class="af ${pg.length===1?'one':''}">${img(a.ref)}<figcaption><b>${String(k*2+j+1).padStart(2,'0')}</b>${h(a.caption||a.name||'')}</figcaption></figure>`).join('')}
+   <div class="agrid">${pg.map(a=>{no++;const z=a.size||'M';return `<figure class="af sz-${z}"><div class="abox">${img(a.ref)}</div><figcaption><b>${String(no).padStart(2,'0')}</b>${h(a.caption||'')}</figcaption></figure>`}).join('')}</div>
    ${sheetFoot()}</div>`).join('');
 }
 const pdfRefs=d=>(d.attachments||[]).filter(a=>a.kind==='pdf'&&a.inPdf!==false).map(a=>a.ref);
@@ -330,7 +332,7 @@ function renderSheet(d){
   let rows=(d.items||[]).map((i,n)=>{
     const sl=(i.serials||[]);
     const sn=sl.length?`<div class="sn"><b>S/N</b>${sl.map(x=>`<span>${h(x)}</span>`).join('')}</div>`:'';
-    return `<tr><td class="c m n">${String(n+1).padStart(2,'0')}</td>${hasImg?`<td>${i.photo?img(i.photo,`class="pi" style="width:${psz(i)}px;height:${psz(i)}px"`):''}</td>`:''}
+    return `<tr><td class="c m n">${String(n+1).padStart(2,'0')}</td>${hasImg?`<td>${i.photo?`<span class="pib" style="width:${psz(i)}px;height:${psz(i)}px">${img(i.photo,'class="pi"')}</span>`:''}</td>`:''}
     <td><div class="it">${h(i.name)}</div>${i.desc?`<div class="idesc">${h(i.desc)}</div>`:''}${sn}</td>
     <td class="r m">${h(i.qty)}</td><td class="u">${h(i.unit||'')}</td>
     ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m b">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
@@ -633,8 +635,9 @@ VIEWS.edit=()=>{
     <div class="tr"><span class="muted">${h(S.cfg.taxLabel)}</span><span class="num" id="t-tax">${money(t.tax)}</span></div>
     <div class="tr grand"><span>Total</span><span class="num" id="t-total">${cur(t.total)}</span></div></div>`}
   </div>
-  ${isDN?'':`<div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>Attachments</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. PDF files (up to 700 KB each) are joined at the end.</div></div><button class="btn" id="att-add" type="button">${I.plus}Add photos or PDF</button></div>
-   ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>`<div class="att" data-att="${k}"><div class="ath">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}</div><div class="atb"><input data-af="caption" value="${h(a.caption||'')}" placeholder="${h(a.name||'Caption')}" aria-label="Caption"><label class="check"><input type="checkbox" data-af="inPdf" ${a.inPdf!==false?'checked':''}>Include in PDF</label></div><button class="xbtn" type="button" data-att-rm="${k}" aria-label="Remove attachment">✕</button></div>`).join('')}</div>`:''}</div>`}
+  <div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>${isDN?h(rep(d).photos)+' photos':'Attachments'}</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. Pick a size for each.${isDN?'':' PDF files (up to 700 KB each) are joined at the end.'}</div></div>
+    <div class="row"><button class="btn" id="att-cam" type="button">${I.scan}Take photo</button><button class="btn" id="att-add" type="button">${I.plus}Upload${isDN?' photo':' photo or PDF'}</button></div></div>
+   ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>attRow(a,k,'att',{inPdf:true})).join('')}</div>`:''}</div>
   <div class="card pad grid g2"><label class="field"><span>Notes (shown on document)</span><textarea id="e-notes">${h(d.notes)}</textarea></label><label class="field"><span>Terms & conditions</span><textarea id="e-terms" rows="4">${h(d.terms)}</textarea></label></div>
   <div class="row"><span class="grow"></span><button class="btn" id="cx2">Cancel</button><button class="btn primary" id="sv2">Save ${docTitle(d).replace('Tax ','').toLowerCase()}</button></div>`;
 };
@@ -642,7 +645,7 @@ function readEditor(){
   const d=ED;
   ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
-  $$('[data-att]').forEach(row=>{const a=(d.attachments||[])[+row.dataset.att];if(a)$$('[data-af]',row).forEach(el=>{a[el.dataset.af]=el.type==='checkbox'?el.checked:el.value})});
+  readAtts(d.attachments||[],'att');
 }
 // Serial numbers for one line: type, paste a list, or scan with the camera.
 function serialEditor(n){
@@ -667,24 +670,39 @@ function serialEditor(n){
   o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-x]'))setTimeout(render,0)});
   draw();setTimeout(()=>inp.focus(),50);
 }
+const PSZ=[['S','Small · 4 per page'],['M','Medium · 2 per page'],['L','Large · full page']];
+function attRow(a,k,px,opts={}){
+  return `<div class="att" data-${px}="${k}"><div class="ath">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}</div><div class="atb">
+   <input data-${px}f="caption" value="${h(a.caption||'')}" placeholder="${h(opts.ph||a.name||'Caption')}" aria-label="Caption">
+   <div class="atc">${a.kind==='image'?`<select data-${px}f="size" aria-label="Size on the PDF">${PSZ.map(([v,l])=>`<option value="${v}" ${(a.size||'M')===v?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="btn sm" data-${px}-rep="${k}">Replace</button>`:''}
+   ${opts.inPdf?`<label class="check"><input type="checkbox" data-${px}f="inPdf" ${a.inPdf!==false?'checked':''}>In PDF</label>`:''}</div></div>
+   <button class="xbtn" type="button" data-${px}-rm="${k}" aria-label="Delete">✕</button></div>`;
+}
+function readAtts(list,px){$$(`[data-${px}]`).forEach(row=>{const a=list[+row.dataset[px]];if(a)$$(`[data-${px}f]`,row).forEach(el=>{a[el.dataset[px+'f']]=el.type==='checkbox'?el.checked:el.value})})}
+function pickFiles({accept='image/*',multiple=true,camera=false}={}){return new Promise(res=>{const inp=document.createElement('input');inp.type='file';inp.accept=accept;inp.multiple=multiple;if(camera)inp.setAttribute('capture','environment');
+  inp.onchange=()=>res([...inp.files]);inp.click()})}
+async function uploadFiles(files,{proof=false}={}){const out=[];
+  for(const f of files){try{
+    if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
+      if(f.size>700*1024){toast(f.name+' is larger than 700 KB. Compress it and try again.',true);continue}
+      toast('Uploading '+f.name+'…');const data=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(f)});
+      const id=uid();await Store.put('images',id,{data,name:f.name,mime:'application/pdf',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;
+      out.push({ref:'file:'+id,kind:'pdf',name:f.name,caption:'',inPdf:true});
+    }else if(/^image\//.test(f.type)){toast('Uploading photo…');out.push({ref:await storeAttachmentImage(f),kind:'image',name:f.name,caption:'',inPdf:true,size:'M',...(proof?{proof:true}:{})})}
+    else toast(f.name+' is not a photo or PDF.',true);
+  }catch(e){toast('Could not upload '+f.name+': '+(e.message||e.code),true)}}
+  if(out.length)toast(out.length+(out.length>1?' files':' file')+' added');return out;
+}
+async function replacePhoto(a){const [f]=await pickFiles({multiple:false});if(!f)return false;
+  try{toast('Uploading photo…');const old=a.ref;a.ref=await storeAttachmentImage(f);a.name=f.name;if(isAdmin()&&old&&old.startsWith('img:'))Store.remove('images',old.slice(4)).catch(()=>{});toast('Photo replaced');return true}
+  catch(e){toast('Could not upload: '+(e.message||e.code),true);return false}}
 async function storeAttachmentImage(file){
   let data=await compress(file,1600,.82);if(data.length>900000)data=await compress(file,1200,.72);if(data.length>900000)data=await compress(file,900,.65);
   const id=uid();await Store.put('images',id,{data,name:file.name,mime:'image/jpeg',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;return 'img:'+id;
 }
-function addAttachments(){
-  const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.accept='image/*,application/pdf';
-  inp.onchange=async()=>{const files=[...inp.files];if(!files.length)return;readEditor();let n=0;
-    for(const f of files){try{
-      if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
-        if(f.size>700*1024){toast(f.name+' is larger than 700 KB. Compress it and try again.',true);continue}
-        toast('Uploading '+f.name+'…');const data=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(f)});
-        const id=uid();await Store.put('images',id,{data,name:f.name,mime:'application/pdf',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;
-        ED.attachments.push({ref:'file:'+id,kind:'pdf',name:f.name,caption:'',inPdf:true});n++;
-      }else if(/^image\//.test(f.type)){toast('Uploading '+f.name+'…');ED.attachments.push({ref:await storeAttachmentImage(f),kind:'image',name:f.name,caption:'',inPdf:true});n++}
-      else toast(f.name+' is not a photo or PDF.',true);
-    }catch(e){toast('Could not upload '+f.name+': '+(e.message||e.code),true)}}
-    if(n)toast(n+' attachment'+(n>1?'s':'')+' added');render()};
-  inp.click();
+async function addAttachments(camera){
+  const files=await pickFiles({accept:camera||ED.type==='delivery'?'image/*':'image/*,application/pdf',camera});if(!files.length)return;
+  readEditor();const added=await uploadFiles(files,{proof:ED.type==='delivery'});if(!ED)return;readEditor();ED.attachments.push(...added);render();
 }
 function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
@@ -718,7 +736,8 @@ VIEWS_AFTER.edit=()=>{
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
   $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
-  $('#att-add')&&($('#att-add').onclick=addAttachments);
+  $('#att-add').onclick=()=>addAttachments(false);$('#att-cam').onclick=()=>addAttachments(true);
+  $$('[data-att-rep]').forEach(b=>b.onclick=async()=>{readEditor();if(await replacePhoto(ED.attachments[+b.dataset.attRep]))render()});
   $$('[data-att-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.attachments.splice(+b.dataset.attRm,1);render()});
   $$('[data-photo]').forEach(b=>b.onclick=async()=>{const f=await pickImage();if(!f)return;readEditor();toast('Uploading photo…');ED.items[+b.dataset.photo].photo=await storeImage(f,800);render()});
   $$('.items input,.items textarea,#e-discount,#e-taxRate').forEach(el=>el.addEventListener('input',updTotals));
@@ -729,7 +748,7 @@ VIEWS_AFTER.edit=()=>{
     d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length&&!(d.type==='delivery'&&(d.reportType||'delivery')!=='delivery')){toast('Add at least one item.',true);return}
     const b1=$('#sv'),b2=$('#sv2');b1.disabled=b2.disabled=true;
     try{
-      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType);
+      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
       delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();
@@ -771,8 +790,8 @@ VIEWS.deliver=()=>{
   </div>
   <div class="card pad grid"><h2>2. Receiver</h2><div class="grid g2"><label class="field"><span>Received by (name)</span><input id="rc-name" value="${h(DV.receiver)}"></label><label class="field"><span>Mobile</span><input id="rc-phone" value="${h(DV.receiverPhone)}" inputmode="tel"></label></div>
    <div class="row"><h3 class="grow">Receiver signature</h3><button class="btn sm" id="sig-clr">Clear</button></div><div class="sigpad" id="sig"></div></div>
-  <div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>3. Proof of delivery photos</h2><div class="muted" style="font-size:.82rem">Optional. Photos print on the delivery note as extra pages.</div></div><button class="btn" id="pod-add" type="button">${I.plus}Take or add photo</button></div>
-   ${DV.photos.length?`<div class="atts">${DV.photos.map((a,k)=>`<div class="att"><div class="ath">${img(a.ref)}</div><div class="atb"><input data-podcap="${k}" value="${h(a.caption||'')}" placeholder="Caption, e.g. Installed at reception" aria-label="Caption"></div><button class="xbtn" type="button" data-podrm="${k}" aria-label="Remove photo">✕</button></div>`).join('')}</div>`:''}</div>
+  <div class="card pad grid"><div class="row"><div class="grow" style="min-width:0"><h2>3. ${h(rep(d).photos)} photos</h2><div class="muted" style="font-size:.82rem">Optional. Photos print on the delivery note as extra pages.</div></div><div class="row"><button class="btn primary" id="pod-cam" type="button">${I.scan}Take photo</button><button class="btn" id="pod-up" type="button">${I.plus}Upload</button></div></div>
+   ${DV.photos.length?`<div class="atts">${DV.photos.map((a,k)=>attRow(a,k,'pod',{ph:'Caption, e.g. Installed at reception'})).join('')}</div>`:''}</div>
   <div class="row"><span class="grow"></span><button class="btn" id="save-draft">Save without signing</button><button class="btn primary" id="confirm">Confirm delivery</button></div>`;
 };
 VIEWS_AFTER.deliver=()=>{
@@ -790,17 +809,16 @@ VIEWS_AFTER.deliver=()=>{
   if(!DV.gps&&!DV._gpsTried){DV._gpsTried=true;getGPS().then(g=>{if(!DV||DV.id!==d.id)return;const el=$('#dv-gps');if(hasGPS(g)){DV.gps=g;if(el)el.textContent='Location '+fmtGPS(g)+' ±'+g.acc+' m'}else if(el)el.textContent=g&&g.error==='denied'?'Location blocked. Allow location access to record where this was signed.':'Location not available.'})}
   $$('[data-st]').forEach(sel=>sel.onchange=()=>{DV.items[+sel.dataset.st].status=sel.value});
   $('#st-all').onchange=e=>{if(!e.target.value)return;keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items.forEach(i=>i.status=e.target.value);render();if(sig)pad.load(sig)};
-  const keepSig=fn=>{keep();$$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);const sig=!pad.isEmpty()?pad.toData():null;fn();render();if(sig)pad.load(sig)};
-  $('#pod-add').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.multiple=true;inp.setAttribute('capture','environment');
-    inp.onchange=async()=>{const files=[...inp.files];if(!files.length)return;const added=[];
-      for(const f of files){try{toast('Uploading photo…');added.push({ref:await storeAttachmentImage(f),kind:'image',name:f.name,caption:'',inPdf:true,proof:true})}catch(e){toast('Could not upload '+f.name+': '+(e.message||e.code),true)}}
-      if(added.length)keepSig(()=>DV.photos.push(...added))};inp.click()};
-  $$('[data-podrm]').forEach(b=>b.onclick=()=>keepSig(()=>DV.photos.splice(+b.dataset.podrm,1)));
-  $('#save-draft').onclick=async()=>{keep();$$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);if(await save('docs',d.id,{...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
+  const keepSig=fn=>{keep();readAtts(DV.photos,'pod');const sig=!pad.isEmpty()?pad.toData():null;fn();render();if(sig)pad.load(sig)};
+  const podAdd=async camera=>{const files=await pickFiles({camera});if(!files.length)return;const added=await uploadFiles(files,{proof:true});if(added.length&&DV)keepSig(()=>DV.photos.push(...added))};
+  $('#pod-cam').onclick=()=>podAdd(true);$('#pod-up').onclick=()=>podAdd(false);
+  $$('[data-pod-rep]').forEach(b=>b.onclick=async()=>{readAtts(DV.photos,'pod');const a=DV.photos[+b.dataset.podRep];if(await replacePhoto(a))keepSig(()=>{})});
+  $$('[data-pod-rm]').forEach(b=>b.onclick=()=>keepSig(()=>DV.photos.splice(+b.dataset.podRm,1)));
+  $('#save-draft').onclick=async()=>{keep();readAtts(DV.photos,'pod');if(await save('docs',d.id,{...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
   $('#confirm').onclick=async()=>{keep();
     if(!DV.receiver.trim()){toast('Enter the receiver\'s name.',true);return}
     if(pad.isEmpty()){toast('Ask the receiver to sign in the box.',true);return}
-    $$('[data-podcap]').forEach(i=>DV.photos[+i.dataset.podcap].caption=i.value);
+    readAtts(DV.photos,'pod');
     const sigData=pad.toData();
     if(!DV.gps){toast('Recording location…');const g=await getGPS();if(hasGPS(g))DV.gps=g}
     const upd={...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:sigData,signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name,gps:DV.gps||null}};
@@ -956,7 +974,7 @@ VIEWS_AFTER.staff=()=>{
 VIEWS.settings=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
   const c=S.cfg;const f=(k,l,v=c[k],type='text',span)=>`<label class="field" ${span?'style="grid-column:1/-1"':''}><span>${l}</span><input id="s-${k}" type="${type}" value="${h(v)}"></label>`;
-  const sample={id:'_sample',type:'quotation',number:fmtNumber('quotation',today(),Math.max(1,+(c.seqStart||{}).quotation||1)),date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
+  const sample={id:'_sample',type:'quotation',number:nextNumber('quotation',today()),date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
     ref:'RFQ-0001',subject:'Example quotation (preview only)',items:[{name:'Example item A',desc:'Shown to preview the layout',qty:2,unit:'pcs',price:450},{name:'Example service',desc:'Installation and testing',qty:1,unit:'lot',price:300}],discount:0,taxRate:c.taxRate,terms:c.terms.quotation};
   return `<div class="head"><div><h1>Company & template</h1><div class="sub">Shown on every quotation, invoice, delivery note and statement</div></div><button class="btn primary" id="s-save">Save settings</button></div>
   <div class="view-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
@@ -966,9 +984,9 @@ VIEWS.settings=()=>{
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
-   </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + running number, e.g. ${h(fmtNumber('quotation',today(),1))}</div><div class="grid g3">
+   </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + 3-digit random number, never repeated, e.g. ${h(nextNumber('quotation',today()))}</div><div class="grid g3">
    ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(numPrefix(t))}"></label>`).join('')}
-   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>Next ${TYPE[t].t.replace('Tax ','').toLowerCase()} no. at least</span><input type="number" min="1" id="s-n-${t}" value="${h(Math.max(+(c.seqStart||{})[t]||1,(S.counters[t]||0)+1))}"></label>`).join('')}</div>
+</div>
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
@@ -990,7 +1008,7 @@ VIEWS_AFTER.settings=()=>{
   $('#s-save').onclick=async()=>{
     ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
-    c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);c.seqStart[t]=Math.max(1,parseInt($('#s-n-'+t).value)||1)});
+    c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
     c.showPricesOnDN=$('#s-dnp').checked;if(!sp.isEmpty())c.signature=sp.toData();
     await save('config','company',c,'Settings saved');
@@ -1020,7 +1038,6 @@ const busyViews=['edit','deliver','settings'];
 let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.includes(S.view))render()},80)};
 function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
-  Store.sub('counters',r=>{S.counters=Object.fromEntries(r.map(x=>[x.id,+x.last||0]))});
   Store.sub('sites',r=>{S.sites=r},null,true);
   Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
   Store.sub('clients',r=>{S.clients=r;soon()});

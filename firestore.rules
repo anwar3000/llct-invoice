@@ -290,6 +290,11 @@ service cloud.firestore {
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
       allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
+    // Document numbers already used (QTN…/INV…/DLN… + date + 3 random digits). Claimed once, never changed.
+    match /inv_numbers/{number} {
+      allow read: if invOn();
+      allow create: if invOn() && request.resource.data.by == request.auth.uid;
+    }
     // Product photos (compressed, under 1 MB each)
     match /inv_images/{id} {
       allow read: if invOn();
