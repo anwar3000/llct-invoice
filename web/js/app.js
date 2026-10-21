@@ -47,7 +47,7 @@ const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airpor
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
-  photoSize:'M',docStyle:'clean',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
+  photoSize:'M',docStyle:'clean',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
@@ -295,6 +295,14 @@ function sigPad(host){
 function barcodeData(text){try{const c=document.createElement('canvas');JsBarcode(c,text,{format:'CODE128',displayValue:false,margin:0,height:60,width:2,background:'#ffffff',lineColor:'#1f2226'});return c.toDataURL('image/png')}catch(e){return ''}}
 function sheetHead(title,number,sub){
   const c=S.cfg;
+  if(isPrem()){
+    const w=String(c.name||'').trim().split(/\s+/);const n1=w.length>=3?w.slice(0,-2).join(' '):c.name,n2=w.length>=3?w.slice(-2).join(' '):'';
+    const row=(k,txt,i)=>txt?`<div class="pc"><span class="pci ${i%2?'n':''}">${ico(k,'#ffffff')}</span><span>${h(txt)}</span></div>`:'';
+    return `<div class="pdeco"></div><div class="ph"><div class="ph-l">${c.logo?img(c.logo,'class="plogo"'):''}<div class="pnm"><div class="pn1">${h(n1)}</div>${n2?`<div class="pn2">${h(n2)}</div>`:''}${c.tagline?`<div class="ptag">${h(c.tagline)}</div>`:''}${c.taxId?`<div class="ptrn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
+     <div class="ph-r">${row('pin',c.address,0)}${row('phone',c.phone,1)}${row('mail',c.email,2)}${row('globe',c.website,3)}</div></div>
+     <div class="pband"><i></i><i></i><i></i></div>
+     <div class="ptbar"><div><div class="pdt">${h(title)}</div><div class="pul"></div>${sub?`<div class="psub">${h(sub)}</div>`:''}</div>${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
+  }
   const line=(k,v)=>v?`<div><b>${k}</b>${h(v)}</div>`:'';
   return `<div class="band"></div>
   <div class="hd"><div class="co">${c.logo?img(c.logo,'class="logo"'):''}<div class="idn"><div class="nm">${h(c.name)}</div>${c.taxId?`<div class="trn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
@@ -302,7 +310,9 @@ function sheetHead(title,number,sub){
   <div class="tbar"><div><div class="dt">${h(title)}</div>${sub?`<div class="dsub">${h(sub)}</div>`:''}</div>
    ${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
 }
-function sheetFoot(){const c=S.cfg;return `<div class="ft"><span>${h(c.name)}${c.taxId?' · '+h(c.taxIdLabel)+' '+h(c.taxId):''}</span><span>This is a computer-generated document</span><span>${h((c.website||'').split('·')[0].trim())}</span></div>`}
+function sheetFoot(){const c=S.cfg;
+  if(isPrem())return `<div class="pft"><div class="pfl">${c.website?`<span>${ico('globe','#ffffff')}${h(c.website)}</span>`:''}${c.email?`<span>${ico('mail','#ffffff')}${h(c.email)}</span>`:''}${c.phone?`<span>${ico('phone','#ffffff')}${h(c.phone)}</span>`:''}</div><div class="pfr">${h(c.tagline||'')}</div></div>`;
+  return `<div class="ft"><span>${h(c.name)}${c.taxId?' · '+h(c.taxIdLabel)+' '+h(c.taxId):''}</span><span>This is a computer-generated document</span><span>${h((c.website||'').split('·')[0].trim())}</span></div>`}
 // Photos attached to a document print as extra pages after it.
 function renderAnnex(d){
   const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
@@ -314,7 +324,31 @@ function renderAnnex(d){
    <div class="agrid">${pg.map(a=>{no++;const z=a.size||'M';return `<figure class="af sz-${z}"><div class="abox">${img(a.ref)}</div><figcaption><b>${String(no).padStart(2,'0')}</b>${h(a.caption||'')}</figcaption></figure>`}).join('')}</div>
    ${sheetFoot()}</div>`).join('');
 }
-const docCls=()=>S.cfg.docStyle==='classic'?'':' clean';
+const docCls=()=>S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean';
+const isPrem=()=>S.cfg.docStyle==='premium';
+// Small line icons for the Premium style (as images, so they print into the PDF).
+const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5 0 110 5a2.5 2.5 0 110-5z',
+  phone:'M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
+  mail:'M3 6h18v12H3z M3 7l9 6 9-6',globe:'M12 3a9 9 0 110 18a9 9 0 110-18z M3 12h18 M12 3c3 3.5 3 14.5 0 18 M12 3c-3 3.5-3 14.5 0 18',
+  building:'M4 21V5l8-2v18 M12 8h8v13 M7 8h2 M7 12h2 M7 16h2 M15 12h2 M15 16h2 M2 21h20',
+  cal:'M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4',calchk:'M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4 M9 15.5l2 2 4-4',
+  doc:'M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h5',user:'M12 12a4 4 0 110-8a4 4 0 110 8z M4 21c1-4 4-6 8-6s7 2 8 6',
+  clock:'M12 3a9 9 0 110 18a9 9 0 110-18z M12 7v5l3 2'};
+const ico=(n,color)=>`<img class="ic" alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${color||'#17375F'}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='${ICO[n]||ICO.doc}'/></svg>`)}">`;
+const icoFor=k=>/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
+const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
+function detHtml(det){
+  if(!isPrem())return `<div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div>`;
+  return `<div class="box pdet">${det.map(([k,v],i)=>`<div class="pr"><span class="pico ${i%2?'pk2':''}">${ico(icoFor(k),i%2?S.cfg.brand:S.cfg.charcoal)}</span><span class="pk">${h(k)}</span><span class="pv">${h(v)}</span></div>`).join('')}</div>`;
+}
+function termsHtml(t){
+  if(!isPrem())return `<div class="terms">${h(t)}</div>`;
+  return `<div class="tlist">${String(t).split(/\n+/).map(x=>x.trim()).filter(Boolean).map((x,i)=>`<div class="tl"><i>${i+1}</i><span>${h(x)}</span></div>`).join('')}</div>`;
+}
+function bankHtml(b){
+  if(!isPrem())return `<div class="terms">${h(b)}</div>`;
+  return `<div class="bk">${String(b).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^([^:]{2,22}):\s*(.+)$/);return m?`<span>${h(m[1])}</span><b>${h(m[2])}</b>`:`<b class="full">${h(x)}</b>`}).join('')}</div>`;
+}
 const pdfRefs=d=>(d.attachments||[]).filter(a=>a.kind==='pdf'&&a.inPdf!==false).map(a=>a.ref);
 function renderSheet(d){
   const c=S.cfg,t=totals(d),cl=d.client||{},isDN=d.type==='delivery',isQ=d.type==='quotation';
@@ -339,7 +373,7 @@ function renderSheet(d){
     <td class="r m">${h(i.qty)}</td><td class="u">${h(i.unit||'')}</td>
     ${showPrice?`<td class="r m">${money(i.price)}</td><td class="r m b">${money((+i.qty||0)*(+i.price||0))}</td>`:''}
     ${isDN?`<td class="c"><span class="st ${stClass(i.status||rep(d).st[0])}">${h(i.status||rep(d).st[0])}</span></td>`:''}</tr>`}).join('');
-  const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?'<th class="r" style="width:92px">Unit price</th><th class="r" style="width:104px">Amount</th>':''}${isDN?'<th class="c" style="width:136px">Status</th>':''}</tr>`;
+  const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?`<th class="r" style="width:96px">Unit price${isPrem()?` <small>(${h(c.currency)})</small>`:''}</th><th class="r" style="width:108px">Amount${isPrem()?` <small>(${h(c.currency)})</small>`:''}</th>`:''}${isDN?'<th class="c" style="width:136px">Status</th>':''}</tr>`;
   let stamp='';
   if(d.type==='invoice'){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
   if(isDN&&d.delivery&&d.delivery.signedAt)stamp=`<span class="stamp">${isSvc?'SIGNED OFF':'DELIVERED'}</span>`;
@@ -354,18 +388,18 @@ function renderSheet(d){
   const dl=d.delivery||{};
   const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>${h(R.sign)}: ${h(dl.receiver||'')}</b>${dl.signedAt?`<br><i style="color:#2F8A57;font-style:normal">${h(R.ok)}</i>`:''}${hasGPS(dl.gps)?`<br><span class="m" style="font-size:9px">Signed at GPS ${fmtGPS(dl.gps)}</span>`:''}<br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
     :`<div class="sig"><div class="img"></div><div class="ln"><b>${isQ?'Accepted by':'Received by'}</b><br>Name, signature, company stamp & date</div></div>`;
-  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number)}
-  <div class="meta"><div class="box"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
+  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number,isPrem()?subFor(d):'')}
+  <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
-    ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div>
-    <div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div></div>
+    ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div></div>
+    ${detHtml(det)}</div>
   ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
   ${isSvc&&(d.complaint||d.workDone)?`<div class="svc">${d.complaint?`<div><div class="hh">Complaint / request</div><div class="terms">${h(d.complaint)}</div></div>`:''}${d.workDone?`<div><div class="hh">Work carried out</div><div class="terms">${h(d.workDone)}</div></div>`:''}</div>`:''}
   ${rows||!isSvc?`<table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>`:''}
-  <div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}</div>${totalsHtml}</div>
-  ${showPrice?`<div class="words"><span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:''}
-  ${(d.terms||(d.type!=='delivery'&&c.bank))?`<div class="info">${d.terms?`<div><div class="hh">Terms & conditions</div><div class="terms">${h(d.terms)}</div></div>`:''}${d.type!=='delivery'&&c.bank?`<div><div class="hh">Bank details</div><div class="terms">${h(c.bank)}</div></div>`:''}</div>`:''}
-  <div class="sigs"><div class="sig"><div class="img">${c.signature?img(c.signature):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}${isDN&&dl.deliveredBy?' · Delivered by '+h(nameOf(dl.deliveredBy,dl.deliveredByName)):''}</div></div>${right}</div>
+  ${(()=>{const words=showPrice?`<div class="words">${isPrem()?`<span class="wico">${ico('doc',c.charcoal)}</span>`:''}<span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:'';
+    return `<div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}${isPrem()?words:''}</div>${totalsHtml}</div>${isPrem()?'':words}`})()}
+  ${(d.terms||(d.type!=='delivery'&&c.bank))?`<div class="info">${d.terms?`<div><div class="hh">Terms & conditions</div>${termsHtml(d.terms)}</div>`:''}${d.type!=='delivery'&&c.bank?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}</div>`:''}
+  <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}${isDN&&dl.deliveredBy?' · Delivered by '+h(nameOf(dl.deliveredBy,dl.deliveredByName)):''}</div></div>${right}</div>
   ${sheetFoot()}</div>`;
 }
 function renderSOA(cid,from,to){
@@ -379,9 +413,9 @@ function renderSOA(cid,from,to){
   <table><thead><tr><th style="width:84px">Date</th><th>Transaction</th><th style="width:110px">Number</th><th>Reference</th><th class="r" style="width:86px">Debit</th><th class="r" style="width:86px">Credit</th><th class="r" style="width:96px">Balance</th></tr></thead><tbody>${rows}</tbody></table>
   <div><div class="hh">Ageing of balance as of ${fdate(to)}</div>
   <div class="aging">${[['Current',x.ag.cur],['1–30 days',x.ag.a30],['31–60 days',x.ag.a60],['61–90 days',x.ag.a90],['Over 90',x.ag.a90p],['Total due',x.close]].map(([k,v])=>`<div><div class="k">${k}</div><div class="m">${money(v)}</div></div>`).join('')}</div></div>
-  ${c.bank?`<div><div class="hh">Bank details</div><div class="terms">${h(c.bank)}</div></div>`:''}
+  ${c.bank?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}
   <div class="terms">Please review this statement and report any differences within 7 days. Thank you for your business.</div>
-  <div class="sigs"><div class="sig"><div class="img">${c.signature?img(c.signature):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Accounts department')}</div></div><div class="sig"><div class="img"></div><div class="ln"><b>Confirmed by customer</b><br>Signature & stamp</div></div></div>
+  <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Accounts department')}</div></div><div class="sig"><div class="img"></div><div class="ln"><b>Confirmed by customer</b><br>Signature & stamp</div></div></div>
   ${sheetFoot()}</div>`;
 }
 function fitPreview(host){const w=host.clientWidth-24;const k=Math.min(1,w/794);const sc=$('.preview-scale',host);if(!sc)return;sc.style.transform=`scale(${k})`;sc.style.width='794px';host.style.height=(sc.firstElementChild.offsetHeight*k+24)+'px'}
@@ -1050,13 +1084,13 @@ VIEWS_AFTER.staff=()=>{
 VIEWS.settings=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
   const c=S.cfg;const f=(k,l,v=c[k],type='text',span)=>`<label class="field" ${span?'style="grid-column:1/-1"':''}><span>${l}</span><input id="s-${k}" type="${type}" value="${h(v)}"></label>`;
-  const sample={id:'_sample',type:'quotation',number:nextNumber('quotation',today()),date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
+  const sample=window.__sample={id:'_sample',type:'quotation',number:nextNumber('quotation',today()),date:today(),validUntil:addDays(today(),c.validDays),client:{name:'Example Client LLC',contact:'Attn: Purchasing',address:'Office 12, Example Tower',phone:'+000 000 0000'},
     ref:'RFQ-0001',subject:'Example quotation (preview only)',items:[{name:'Example item A',desc:'Shown to preview the layout',qty:2,unit:'pcs',price:450},{name:'Example service',desc:'Installation and testing',qty:1,unit:'lot',price:300}],discount:0,taxRate:c.taxRate,terms:c.terms.quotation};
   return `<div class="head"><div><h1>Company & template</h1><div class="sub">Shown on every quotation, invoice, delivery note and statement</div></div><button class="btn primary" id="s-save">Save settings</button></div>
   <div class="view-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
   <div class="card pad grid"><h2>Company</h2>
    <div class="row" style="align-items:flex-start"><div class="field"><span style="font-size:.75rem;font-weight:600;color:var(--muted)">Logo</span><button class="logo-box" id="s-logo" type="button">${c.logo?img(c.logo):'Upload logo'}</button>${c.logo?'<button class="btn ghost sm" id="s-logo-x">Remove</button>':''}</div>
-    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}</div></div>
+    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}${f('tagline','Tagline (Premium style)',c.tagline,'text',true)}</div></div>
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
@@ -1066,10 +1100,12 @@ VIEWS.settings=()=>{
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
-   <label class="field"><span>Document style</span><select id="s-docStyle"><option value="clean" ${(c.docStyle||'clean')==='clean'?'selected':''}>Clean · black & white, minimal</option><option value="classic" ${c.docStyle==='classic'?'selected':''}>Classic · logo colours</option></select></label>
+   <label class="field"><span>Document style</span><select id="s-docStyle"><option value="clean" ${(c.docStyle||'clean')==='clean'?'selected':''}>Clean · black & white, minimal</option><option value="classic" ${c.docStyle==='classic'?'selected':''}>Classic · logo colours</option><option value="premium" ${c.docStyle==='premium'?'selected':''}>Premium · corporate, full colour</option></select></label>
    <label class="field"><span>Default product photo size</span><select id="s-photoSize">${[['S','Small'],['M','Medium'],['L','Large']].map(([k,l])=>`<option value="${k}" ${(c.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
    ${f('signName','Signatory name & title',c.signName,'text',true)}
-   <div class="row"><h3 class="grow">Authorised signature / stamp</h3><button class="btn sm" id="s-sig-up">Upload image</button><button class="btn sm" id="s-sig-clr">Clear</button></div>
+   <div class="row"><h3 class="grow">Company stamp</h3><button class="btn sm" id="s-stamp-up">Upload stamp</button><button class="btn sm" id="s-stamp-clr">Remove</button></div>
+   <div id="s-stamp-pv">${c.stamp?`<img src="${h(src(c.stamp))}" alt="Company stamp" style="max-height:80px;background:#fff;border-radius:6px;padding:4px">`:'<span class="muted">No stamp. Upload a photo or scan of the round stamp (PNG with clear background looks best).</span>'}</div>
+   <div class="row"><h3 class="grow">Authorised signature</h3><button class="btn sm" id="s-sig-up">Upload image</button><button class="btn sm" id="s-sig-clr">Clear</button></div>
    ${c.signature?`<div class="row"><img src="${h(src(c.signature))}" alt="Current signature" style="max-height:70px;background:#fff;border-radius:6px;padding:4px"><span class="muted">Current. Draw below to replace.</span></div>`:''}
    <div class="sigpad" id="s-sig"></div></div>
   </div>
@@ -1078,13 +1114,15 @@ VIEWS.settings=()=>{
 VIEWS_AFTER.settings=()=>{
   if(!isAdmin())return;
   const sp=sigPad($('#s-sig'));
-  $('#s-docStyle').onchange=e=>{$$('.preview-scale .sheet').forEach(x=>x.classList.toggle('clean',e.target.value!=='classic'));$$('.preview-wrap').forEach(fitPreview)};const c=clone(S.cfg);
+  $('#s-docStyle').onchange=e=>{const keep=S.cfg.docStyle;S.cfg.docStyle=e.target.value;$$('.preview-scale').forEach(x=>x.innerHTML=renderSheet(window.__sample));S.cfg.docStyle=keep;$$('.preview-wrap').forEach(fitPreview)};const c=clone(S.cfg);
   $('#s-logo').onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading logo…');c.logo=await storeImage(f,600,true);$('#s-logo').innerHTML=img(c.logo)};
   $('#s-logo-x')&&($('#s-logo-x').onclick=()=>{c.logo='';$('#s-logo').innerHTML='Upload logo'});
   $('#s-sig-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.signature=await storeImage(f,600,true);toast('Signature image ready. Save settings to keep it.')};
+  $('#s-stamp-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.stamp=await storeImage(f,500,true);$('#s-stamp-pv').innerHTML=`<img src="${h(src(c.stamp))}" alt="Company stamp" style="max-height:80px;background:#fff;border-radius:6px;padding:4px">`;toast('Stamp ready. Save settings to keep it.')};
+  $('#s-stamp-clr').onclick=()=>{c.stamp='';$('#s-stamp-pv').innerHTML='<span class="muted">No stamp.</span>';toast('Stamp removed. Save settings to keep the change.')};
   $('#s-sig-clr').onclick=()=>{sp.clear();c.signature='';toast('Signature cleared. Save settings to keep the change.')};
   $('#s-save').onclick=async()=>{
-    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle'].forEach(k=>c[k]=$('#s-'+k).value.trim());
+    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','tagline'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
     c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
