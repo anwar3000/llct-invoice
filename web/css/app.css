@@ -547,3 +547,17 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .sig .img{height:78px}
 .sheet .sig .img img.stampimg{max-height:78px}
 .sheet.premium .pft{min-height:46px}
+
+/* ===== Document fonts ===== */
+.sheet.f-modern{--f-body:"Source Sans 3","Segoe UI",Roboto,Arial,sans-serif;--f-display:"Montserrat","Segoe UI",Arial,sans-serif;--f-mono:"Source Sans 3","Segoe UI",Roboto,Arial,sans-serif;font-variant-numeric:tabular-nums;font-size:11.5px}
+.sheet.f-neutral{--f-body:"Inter","Segoe UI",Roboto,Arial,sans-serif;--f-display:"Inter","Segoe UI",Arial,sans-serif;--f-mono:"Inter","Segoe UI",Roboto,Arial,sans-serif;font-variant-numeric:tabular-nums;font-size:10.5px}
+.sheet.f-modern .nb .no,.sheet.f-neutral .nb .no{letter-spacing:.1em;font-weight:600}
+.sheet.clean.f-modern .tbar .dt{font-family:var(--f-display);font-weight:700;font-size:21px}
+.sheet.clean.f-modern .co .nm{font-family:var(--f-display);font-weight:700;font-size:12.5px}
+.sheet.f-modern .it,.sheet.f-neutral .it{font-weight:600}
+.sheet.premium.f-modern .pn1{font-size:30px;letter-spacing:-.01em}
+.sheet.premium.f-modern .pn2{font-family:var(--f-display);font-weight:600;letter-spacing:.3em;font-size:13.5px}
+.sheet.premium.f-modern .pdt{font-size:40px;letter-spacing:-.01em}
+.sheet.premium.f-modern .tot .gr{font-family:var(--f-display);font-size:18px}
+.sheet.premium .pdt.long{font-size:32px}
+.sheet.premium .pdt.xl{font-size:24px;line-height:1.1}

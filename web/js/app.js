@@ -47,7 +47,7 @@ const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airpor
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
-  photoSize:'M',docStyle:'clean',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
+  photoSize:'M',docStyle:'clean',docFont:'modern',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
@@ -301,7 +301,7 @@ function sheetHead(title,number,sub){
     return `<div class="pdeco"></div><div class="ph"><div class="ph-l">${c.logo?img(c.logo,'class="plogo"'):''}<div class="pnm"><div class="pn1">${h(n1)}</div>${n2?`<div class="pn2">${h(n2)}</div>`:''}${c.tagline?`<div class="ptag">${h(c.tagline)}</div>`:''}${c.taxId?`<div class="ptrn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
      <div class="ph-r">${row('pin',c.address,0)}${row('phone',c.phone,1)}${row('mail',c.email,2)}${row('globe',c.website,3)}</div></div>
      <div class="pband"><i></i><i></i><i></i></div>
-     <div class="ptbar"><div><div class="pdt">${h(title)}</div><div class="pul"></div>${sub?`<div class="psub">${h(sub)}</div>`:''}</div>${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
+     <div class="ptbar"><div><div class="pdt${String(title).length>20?' xl':String(title).length>13?' long':''}">${h(title)}</div><div class="pul"></div>${sub?`<div class="psub">${h(sub)}</div>`:''}</div>${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
   }
   const line=(k,v)=>v?`<div><b>${k}</b>${h(v)}</div>`:'';
   return `<div class="band"></div>
@@ -324,7 +324,7 @@ function renderAnnex(d){
    <div class="agrid">${pg.map(a=>{no++;const z=a.size||'M';return `<figure class="af sz-${z}"><div class="abox">${img(a.ref)}</div><figcaption><b>${String(no).padStart(2,'0')}</b>${h(a.caption||'')}</figcaption></figure>`}).join('')}</div>
    ${sheetFoot()}</div>`).join('');
 }
-const docCls=()=>S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean';
+const docCls=()=>(S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean')+' f-'+(S.cfg.docFont||'modern');
 const isPrem=()=>S.cfg.docStyle==='premium';
 // Small line icons for the Premium style (as images, so they print into the PDF).
 const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5 0 110 5a2.5 2.5 0 110-5z',
@@ -1101,6 +1101,7 @@ VIEWS.settings=()=>{
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
    <label class="field"><span>Document style</span><select id="s-docStyle"><option value="clean" ${(c.docStyle||'clean')==='clean'?'selected':''}>Clean · black & white, minimal</option><option value="classic" ${c.docStyle==='classic'?'selected':''}>Classic · logo colours</option><option value="premium" ${c.docStyle==='premium'?'selected':''}>Premium · corporate, full colour</option></select></label>
+   <label class="field"><span>Document font</span><select id="s-docFont">${[['modern','Montserrat + Source Sans · professional'],['neutral','Inter · neutral, compact'],['plex','Archivo + IBM Plex · technical']].map(([k,l])=>`<option value="${k}" ${(c.docFont||'modern')===k?'selected':''}>${l}</option>`).join('')}</select></label>
    <label class="field"><span>Default product photo size</span><select id="s-photoSize">${[['S','Small'],['M','Medium'],['L','Large']].map(([k,l])=>`<option value="${k}" ${(c.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
    ${f('signName','Signatory name & title',c.signName,'text',true)}
    <div class="row"><h3 class="grow">Company stamp</h3><button class="btn sm" id="s-stamp-up">Upload stamp</button><button class="btn sm" id="s-stamp-clr">Remove</button></div>
@@ -1114,7 +1115,8 @@ VIEWS.settings=()=>{
 VIEWS_AFTER.settings=()=>{
   if(!isAdmin())return;
   const sp=sigPad($('#s-sig'));
-  $('#s-docStyle').onchange=e=>{const keep=S.cfg.docStyle;S.cfg.docStyle=e.target.value;$$('.preview-scale').forEach(x=>x.innerHTML=renderSheet(window.__sample));S.cfg.docStyle=keep;$$('.preview-wrap').forEach(fitPreview)};const c=clone(S.cfg);
+  const pv=()=>{const k1=S.cfg.docStyle,k2=S.cfg.docFont;S.cfg.docStyle=$('#s-docStyle').value;S.cfg.docFont=$('#s-docFont').value;$$('.preview-scale').forEach(x=>x.innerHTML=renderSheet(window.__sample));S.cfg.docStyle=k1;S.cfg.docFont=k2;setTimeout(()=>$$('.preview-wrap').forEach(fitPreview),50)};
+  $('#s-docStyle').onchange=pv;$('#s-docFont').onchange=pv;const c=clone(S.cfg);
   $('#s-logo').onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading logo…');c.logo=await storeImage(f,600,true);$('#s-logo').innerHTML=img(c.logo)};
   $('#s-logo-x')&&($('#s-logo-x').onclick=()=>{c.logo='';$('#s-logo').innerHTML='Upload logo'});
   $('#s-sig-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.signature=await storeImage(f,600,true);toast('Signature image ready. Save settings to keep it.')};
@@ -1122,7 +1124,7 @@ VIEWS_AFTER.settings=()=>{
   $('#s-stamp-clr').onclick=()=>{c.stamp='';$('#s-stamp-pv').innerHTML='<span class="muted">No stamp.</span>';toast('Stamp removed. Save settings to keep the change.')};
   $('#s-sig-clr').onclick=()=>{sp.clear();c.signature='';toast('Signature cleared. Save settings to keep the change.')};
   $('#s-save').onclick=async()=>{
-    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','tagline'].forEach(k=>c[k]=$('#s-'+k).value.trim());
+    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
     c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
