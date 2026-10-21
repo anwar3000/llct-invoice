@@ -47,7 +47,7 @@ const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airpor
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
-  photoSize:'M',docStyle:'clean',docFont:'modern',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
+  photoSize:'M',docStyle:'clean',docFont:'gothic',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
@@ -324,7 +324,7 @@ function renderAnnex(d){
    <div class="agrid">${pg.map(a=>{no++;const z=a.size||'M';return `<figure class="af sz-${z}"><div class="abox">${img(a.ref)}</div><figcaption><b>${String(no).padStart(2,'0')}</b>${h(a.caption||'')}</figcaption></figure>`}).join('')}</div>
    ${sheetFoot()}</div>`).join('');
 }
-const docCls=()=>(S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean')+' f-'+(S.cfg.docFont||'modern');
+const docCls=()=>(S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean')+' f-'+(S.cfg.docFont||'gothic');
 const isPrem=()=>S.cfg.docStyle==='premium';
 // Small line icons for the Premium style (as images, so they print into the PDF).
 const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5 0 110 5a2.5 2.5 0 110-5z',
@@ -406,7 +406,7 @@ function renderSOA(cid,from,to){
   const x=soaData(cid,from,to),c=S.cfg,cl=x.c;
   const rows=[`<tr><td class="m">${fdate(from)}</td><td colspan="3"><b>Balance brought forward</b></td><td></td><td></td><td class="r m"><b>${money(x.open)}</b></td></tr>`]
     .concat(x.rows.map(r=>`<tr><td class="m">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="m">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r m">${r.dr?money(r.dr):''}</td><td class="r m">${r.cr?money(r.cr):''}</td><td class="r m">${money(r.bal)}</td></tr>`)).join('');
-  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Statement of Account','SOA'+ddmmyy(to)+String(cid).replace(/[^A-Za-z0-9]/g,'').slice(-4).toUpperCase(),fdate(from)+' – '+fdate(to))}
+  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('SOA','SOA'+ddmmyy(to)+String(cid).replace(/[^A-Za-z0-9]/g,'').slice(-4).toUpperCase(),'Statement of account · '+fdate(from)+' – '+fdate(to))}
   <div class="meta"><div class="box"><div class="k">Customer</div><div class="cn">${h(cl.name)}</div><div style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div>
   <div class="box dg"><span>Period</span><span>${fdate(from)} – ${fdate(to)}</span><span>Statement date</span><span>${fdate(today())}</span><span>Currency</span><span>${h(c.currency)}</span>${cl.creditDays?`<span>Credit terms</span><span>${h(cl.creditDays)} days</span>`:''}</div></div>
   <div class="sum4"><div><div class="k">Opening balance</div><div class="v">${money(x.open)}</div></div><div><div class="k">Invoiced</div><div class="v">${money(x.invd)}</div></div><div><div class="k">Received</div><div class="v">${money(x.recd)}</div></div><div class="dk"><div class="k">Balance due</div><div class="v">${money(x.close)}</div></div></div>
@@ -1101,7 +1101,7 @@ VIEWS.settings=()=>{
   <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
    <label class="field"><span>Document style</span><select id="s-docStyle"><option value="clean" ${(c.docStyle||'clean')==='clean'?'selected':''}>Clean · black & white, minimal</option><option value="classic" ${c.docStyle==='classic'?'selected':''}>Classic · logo colours</option><option value="premium" ${c.docStyle==='premium'?'selected':''}>Premium · corporate, full colour</option></select></label>
-   <label class="field"><span>Document font</span><select id="s-docFont">${[['modern','Montserrat + Source Sans · professional'],['neutral','Inter · neutral, compact'],['plex','Archivo + IBM Plex · technical']].map(([k,l])=>`<option value="${k}" ${(c.docFont||'modern')===k?'selected':''}>${l}</option>`).join('')}</select></label>
+   <label class="field"><span>Document font</span><select id="s-docFont">${[['gothic','Century Gothic style · clean, geometric'],['modern','Montserrat + Source Sans · professional'],['neutral','Inter · neutral, compact'],['plex','Archivo + IBM Plex · technical']].map(([k,l])=>`<option value="${k}" ${(c.docFont||'gothic')===k?'selected':''}>${l}</option>`).join('')}</select></label>
    <label class="field"><span>Default product photo size</span><select id="s-photoSize">${[['S','Small'],['M','Medium'],['L','Large']].map(([k,l])=>`<option value="${k}" ${(c.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
    ${f('signName','Signatory name & title',c.signName,'text',true)}
    <div class="row"><h3 class="grow">Company stamp</h3><button class="btn sm" id="s-stamp-up">Upload stamp</button><button class="btn sm" id="s-stamp-clr">Remove</button></div>

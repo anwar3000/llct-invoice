@@ -1,3 +1,5 @@
+@font-face{font-family:"LL Gothic";src:local("Century Gothic"),local("CenturyGothic"),url(../assets/fonts/adventor-regular.woff) format("woff");font-weight:400 500;font-style:normal;font-display:swap}
+@font-face{font-family:"LL Gothic";src:local("Century Gothic Bold"),local("CenturyGothic-Bold"),url(../assets/fonts/adventor-bold.woff) format("woff");font-weight:600 900;font-style:normal;font-display:swap}
 /* Layout: charcoal side rail (desktop) / bottom tab bar (phone), work surface on a warm neutral ground; documents render as true A4 sheets */
 :root{
   --bg:#F5F3F0; --surface:#FFFFFF; --sunk:#EEEBE6; --ink:#24262A; --muted:#6C6F75; --line:#E3DFD8;
@@ -512,8 +514,10 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .pfl .ic{width:14px;height:14px}
 .sheet.premium .pfr{margin-left:auto;width:190px;padding:0 24px 0 34px;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;line-height:1.7}
 .sheet.premium .sum4{gap:10px}
-.sheet.premium .sum4 div{background:#f4f5f7;border:0;border-radius:6px}
-.sheet.premium .sum4 div.dk{background:var(--c)}
+.sheet.premium .sum4>div{background:#f4f5f7;border:0;border-radius:6px}
+.sheet.premium .sum4>div.dk{background:var(--c);color:#fff}
+.sheet.premium .sum4>div.dk .k{color:#fff;opacity:.75}
+.sheet.premium .meta>.box:first-child:not(.cbox){background:#f4f5f7;border-radius:7px;padding:15px 18px;border-left:3px solid var(--b)}
 .sheet.premium .aging{border-color:#e3e6eb;border-radius:7px}
 .sheet.premium.annex .band{display:block;position:absolute;left:0;right:0;top:0;height:8px;background:linear-gradient(90deg,var(--c) 0 72%,var(--b) 72% 87%,#9aa0ab 87%)}
 .sheet.premium.annex .band:after{display:none}
@@ -561,3 +565,35 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium.f-modern .tot .gr{font-family:var(--f-display);font-size:18px}
 .sheet.premium .pdt.long{font-size:32px}
 .sheet.premium .pdt.xl{font-size:24px;line-height:1.1}
+
+/* Century Gothic style: geometric and wide, so everything is set a little smaller */
+.sheet.f-gothic{--f-body:"LL Gothic","Century Gothic","URW Gothic",Futura,"Segoe UI",Arial,sans-serif;--f-display:var(--f-body);--f-mono:var(--f-body);font-size:10px;line-height:1.5;font-variant-numeric:tabular-nums}
+.sheet.f-gothic .nb .no{letter-spacing:.06em;font-weight:700}
+.sheet.f-gothic .it{font-weight:700}
+.sheet.f-gothic .idesc,.sheet.f-gothic .terms,.sheet.f-gothic .tl{font-size:9px}
+.sheet.f-gothic thead th{font-size:8.5px}
+.sheet.clean.f-gothic .tbar .dt{font-size:20px;font-weight:700}
+.sheet.clean.f-gothic .co .nm{font-size:12px}
+.sheet.classic.f-gothic .ttl .dt,.sheet.f-gothic .tbar .dt{font-size:20px}
+.sheet.f-gothic .co .nm{font-size:16px}
+.sheet.premium.f-gothic .pn1{font-size:26px;letter-spacing:0}
+.sheet.premium.f-gothic .pn2{font-size:12px;letter-spacing:.3em;font-weight:400}
+.sheet.premium.f-gothic .ptag{font-size:7.5px}
+.sheet.premium.f-gothic .ph-r{font-size:9.5px}
+.sheet.premium.f-gothic .pdt{font-size:34px;letter-spacing:0}
+.sheet.premium.f-gothic .pdt.long{font-size:26px}
+.sheet.premium.f-gothic .pdt.xl{font-size:20px}
+.sheet.premium.f-gothic .psub{font-size:9px}
+.sheet.premium.f-gothic .nb .no{font-size:14px}
+.sheet.premium.f-gothic .box .cn{font-size:12.5px}
+.sheet.premium.f-gothic .box .ad{font-size:10px}
+.sheet.premium.f-gothic .pv{font-size:11px}
+.sheet.premium.f-gothic .it{font-size:10.5px}
+.sheet.premium.f-gothic td.b{font-size:10.5px}
+.sheet.premium.f-gothic .subj{font-size:11px}
+.sheet.premium.f-gothic .tot .gr{font-size:17px}
+.sheet.premium.f-gothic .words{font-size:10px}
+.sheet.premium.f-gothic .pfl{font-size:9px}
+.sheet.premium.f-gothic .pfr{font-size:7.5px}
+.sheet.premium .sum4>div>div{border:0;padding:0;background:none;border-radius:0}
+.sheet.premium .sum4>div{padding:11px 14px}
