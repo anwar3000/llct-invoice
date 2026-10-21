@@ -318,3 +318,9 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .abox img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
 .atc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .atc select{width:auto;min-height:30px;padding:3px 6px;font-size:.78rem}
+.soarow{cursor:pointer}
+.soarow:hover td,.soarow:focus td{background:var(--sunk)}
+.soarow:focus{outline:none}
+.lgt td{padding:5px 4px;border-bottom:0}
+.lgt input{min-width:96px}
+.lgt td:first-child input{min-width:120px}

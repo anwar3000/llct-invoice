@@ -171,6 +171,7 @@ function openScanner(onCode,{title='Scan barcode',multi=false}={}){
 
 /* ================= totals & accounts ================= */
 function totals(d){
+  if(d.legacy){const total=r2(d.amount),tax=r2(d.vat||0);return {sub:r2(total-tax),disc:0,taxable:r2(total-tax),rate:0,tax,total}}
   const sub=r2((d.items||[]).reduce((s,i)=>s+(+i.qty||0)*(+i.price||0),0));
   const disc=r2(d.discount||0);const taxable=r2(sub-disc);const rate=d.taxRate??S.cfg.taxRate;
   const tax=r2(taxable*(+rate||0)/100);return {sub,disc,taxable,rate,tax,total:r2(taxable+tax)};
@@ -197,9 +198,9 @@ function clientBalance(cid){
 function soaData(cid,from,to){
   const c=S.clients.find(x=>x.id===cid)||{};
   const tx=[];
-  if(+c.openingBalance) tx.push({date:c.openingDate||'2000-01-01',kind:'Opening balance',no:'',ref:'',dr:+c.openingBalance,cr:0});
-  S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:'Invoice',no:d.number,ref:d.ref||'',dr:totals(d).total,cr:0,id:d.id,due:d.dueDate}));
-  S.payments.filter(p=>p.clientId===cid).forEach(p=>{const inv=S.docs.find(d=>d.id===p.invoiceId);tx.push({date:p.date,kind:'Payment · '+(p.method||''),no:p.ref||'',ref:inv?'Against '+inv.number:'',dr:0,cr:+p.amount||0})});
+  if(+c.openingBalance) tx.push({date:c.openingDate||'2000-01-01',kind:'Opening balance',no:'',ref:'',dr:+c.openingBalance,cr:0,open:true});
+  S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:d.legacy?'Invoice (previous)':'Invoice',no:d.number,ref:d.ref||'',dr:totals(d).total,cr:0,id:d.id,due:d.dueDate,legacy:!!d.legacy}));
+  S.payments.filter(p=>p.clientId===cid).forEach(p=>{const inv=S.docs.find(d=>d.id===p.invoiceId);tx.push({date:p.date,kind:(/credit|adjust/i.test(p.method||'')?'':'Payment · ')+(p.method||''),no:p.ref||'',ref:inv?'Against '+inv.number:(p.note||''),dr:0,cr:+p.amount||0,pid:p.id})});
   tx.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(b.dr-a.dr));
   let open=0;const rows=[];let bal;
   for(const t of tx){ if(t.date<from) open+=t.dr-t.cr; }
@@ -479,7 +480,7 @@ function newMenu(){
 const VIEWS={},VIEWS_AFTER={};
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
-  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.ref?' · '+h(d.ref):''}</div></span>
+  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
   <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span></span></button>`;
 }
 VIEWS.home=()=>{
@@ -533,8 +534,11 @@ VIEWS.view=()=>{
   const paid=d.type==='invoice'?paidOn(d.id):0;const kids=S.docs.filter(x=>x.sourceId===d.id);const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const pays=S.payments.filter(p=>p.invoiceId===d.id);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1 class="num" style="font-family:var(--f-display)">${h(d.number)}</h1><div class="sub">${h(docTitle(d))} · ${h(d.client&&d.client.name||'')}</div></div></div>
-   <div class="row"><button class="btn primary" id="pdf">${I.pdf}Download PDF</button>${canEdit?`<button class="btn" id="ed">${I.pen}Edit</button>`:''}</div></div>
-  <div class="view-grid"><div class="card preview-wrap"><div class="preview-scale">${renderSheet(d)}</div></div>
+   <div class="row">${d.legacy?'':`<button class="btn primary" id="pdf">${I.pdf}Download PDF</button>`}${canEdit?`<button class="btn" id="ed">${I.pen}Edit</button>`:''}</div></div>
+  <div class="view-grid">${d.legacy?`<div class="card pad grid"><span class="pill">Previous invoice · entered manually</span><h2 class="num">${h(d.number)}</h2>
+    <div class="grid g2"><div class="kv"><span class="muted">Date</span><span>${fdate(d.date)}</span></div><div class="kv"><span class="muted">Due</span><span>${fdate(d.dueDate)}</span></div>
+    <div class="kv"><span class="muted">LPO / ref</span><span>${h(d.ref||'—')}</span></div><div class="kv"><span class="muted">VAT included</span><span class="num">${money(d.vat||0)}</span></div></div>
+    ${d.notes?`<div class="muted">${h(d.notes)}</div>`:''}</div>`:`<div class="card preview-wrap"><div class="preview-scale">${renderSheet(d)}</div></div>`}
   <aside class="side">
    <div class="card pad"><div class="row" style="margin-bottom:8px"><h3 class="grow">Status</h3><span class="pill ${k}">${h(s)}</span></div>
     ${d.type!=='delivery'?`<div class="kv"><span class="muted">Total</span><span class="num">${cur(t.total)}</span></div>`:''}
@@ -549,8 +553,8 @@ VIEWS.view=()=>{
     ${d.type==='invoice'&&can('payments')&&paid<t.total?`<button class="btn primary" id="pay">${I.cash}Record payment</button>`:''}
     ${d.type==='quotation'&&can('quotation')?`<select id="qs" aria-label="Quotation status">${['draft','sent','accepted','rejected'].map(x=>`<option ${(d.status||'draft')===x?'selected':''} value="${x}">Mark as ${x}</option>`).join('')}</select>`:''}
     ${d.type==='quotation'&&can('invoice')?`<button class="btn" data-conv="invoice">Convert to invoice</button>`:''}
-    ${(d.type==='quotation'||d.type==='invoice')&&can('delivery')?`<button class="btn" data-conv="delivery">Make delivery note</button>`:''}
-    ${can(d.type)?`<button class="btn" id="dup">Duplicate</button>`:''}
+    ${!d.legacy&&(d.type==='quotation'||d.type==='invoice')&&can('delivery')?`<button class="btn" data-conv="delivery">Make delivery note</button>`:''}
+    ${!d.legacy&&can(d.type)?`<button class="btn" id="dup">Duplicate</button>`:''}
     ${d.client&&d.clientId&&can('reports')?`<button class="btn" id="soa">Client statement (SOA)</button>`:''}
     ${can('delete')||isAdmin()?`<button class="btn danger" id="del">Delete</button>`:''}
    </div>
@@ -562,9 +566,10 @@ VIEWS_AFTER.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:d&&d.type}));
   if(!d)return;
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
-  $('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d));
+  $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`
+    .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d)));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
-  $('#ed')&&($('#ed').onclick=()=>go('edit',{id:d.id}));
+  $('#ed')&&($('#ed').onclick=()=>d.legacy?legacyForm(d):go('edit',{id:d.id}));
   $('#dlv')&&($('#dlv').onclick=()=>go('deliver',{id:d.id}));
   $('#pay')&&($('#pay').onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
   $('#qs')&&($('#qs').onchange=e=>save('docs',d.id,{...d,status:e.target.value,updatedAt:new Date().toISOString()},'Status updated'));
@@ -853,13 +858,13 @@ VIEWS.client=()=>{
   const x=soaData(c.id,from,to);
   const docs=S.docs.filter(d=>d.clientId===c.id).sort((a,b)=>b.date>a.date?1:-1);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Clients</button><div><h1>${h(c.name)}</h1><div class="sub">${h([c.contact,c.phone,c.email].filter(Boolean).join(' · '))}</div></div></div>
-   <div class="row">${can('clients')?`<button class="btn" id="ec">${I.pen}Edit</button>`:''}${can('payments')?`<button class="btn" id="cp">${I.cash}Record payment</button>`:''}${can('reports')?`<button class="btn primary" id="soa">${I.pdf}SOA PDF</button>`:''}</div></div>
+   <div class="row">${can('clients')?`<button class="btn" id="ec">${I.pen}Edit</button>`:''}${can('invoice')?`<button class="btn" id="old-inv">${I.plus}Add previous invoices</button>`:''}${can('payments')?`<button class="btn" id="cp">${I.cash}Record payment</button>`:''}${can('reports')?`<button class="btn primary" id="soa">${I.pdf}SOA PDF</button>`:''}</div></div>
   ${can('reports')?`<div class="kpis"><div class="card kpi hl"><span class="label">Balance due</span><span class="v">${money(clientBalance(c.id))}<small>${h(S.cfg.currency)}</small></span></div>
    <div class="card kpi"><span class="label">Overdue 1–30</span><span class="v">${money(x.ag.a30)}</span></div><div class="card kpi"><span class="label">Overdue 31–90</span><span class="v">${money(x.ag.a60+x.ag.a90)}</span></div><div class="card kpi"><span class="label">Over 90 days</span><span class="v">${money(x.ag.a90p)}</span></div></div>
-  <div class="card"><div class="pad row"><h2 class="grow">Statement of account</h2><label class="field"><span>From</span><input type="date" id="sf" value="${from}"></label><label class="field"><span>To</span><input type="date" id="st" value="${to}"></label></div>
+  <div class="card"><div class="pad row"><div class="grow" style="min-width:0"><h2>Statement of account</h2><div class="muted" style="font-size:.8rem">Tap a line to edit it. Old invoices from before this app: <b>Add previous invoices</b>. Old balance: <b>Edit</b> client.</div></div><label class="field"><span>From</span><input type="date" id="sf" value="${from}"></label><label class="field"><span>To</span><input type="date" id="st" value="${to}"></label></div>
    <div class="scroll-x"><table class="tbl"><thead><tr><th>Date</th><th>Transaction</th><th>Number</th><th>Reference</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead><tbody>
    <tr><td class="num">${fdate(from)}</td><td colspan="5"><b>Balance brought forward</b></td><td class="r num"><b>${money(x.open)}</b></td></tr>
-   ${x.rows.map(r=>`<tr><td class="num">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="num">${r.id?`<a href="#" data-open="${r.id}">${h(r.no)}</a>`:h(r.no)}</td><td>${h(r.ref)}</td><td class="r num">${r.dr?money(r.dr):''}</td><td class="r num">${r.cr?money(r.cr):''}</td><td class="r num">${money(r.bal)}</td></tr>`).join('')}
+   ${x.rows.map(r=>`<tr class="soarow" ${r.id?`data-sinv="${r.id}"`:r.pid?`data-spay="${r.pid}"`:r.open?'data-sopen="1"':''} tabindex="0"><td class="num">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="num">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r num">${r.dr?money(r.dr):''}</td><td class="r num">${r.cr?money(r.cr):''}</td><td class="r num">${money(r.bal)}</td></tr>`).join('')}
    <tr><td colspan="4"><b>Closing balance</b></td><td class="r num"><b>${money(x.invd)}</b></td><td class="r num"><b>${money(x.recd)}</b></td><td class="r num"><b>${money(x.close)}</b></td></tr></tbody></table></div></div>`:''}
   <div class="card"><div class="pad"><h2>Documents</h2></div><div class="list">${docs.filter(d=>visibleDocs().includes(d)).map(docRow).join('')||'<div class="empty">No documents for this client yet.</div>'}</div></div>`;
 };
@@ -867,10 +872,80 @@ VIEWS_AFTER.client=()=>{
   const c=S.clients.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>go('clients'));if(!c)return;
   $('#ec')&&($('#ec').onclick=()=>clientForm(c));
   $('#cp')&&($('#cp').onclick=()=>paymentForm({clientId:c.id}));
+  $('#old-inv')&&($('#old-inv').onclick=()=>legacyBulk(c));
+  $$('[data-sinv]').forEach(r=>r.onclick=()=>{const d=S.docs.find(x=>x.id===r.dataset.sinv);if(!d)return;d.legacy&&can('invoice')?legacyForm(d):go('view',{id:d.id})});
+  $$('[data-spay]').forEach(r=>r.onclick=()=>{if(!can('payments')){toast('You don\'t have permission to edit payments.',true);return}const p=S.payments.find(x=>x.id===r.dataset.spay);if(p)paymentForm(p)});
+  $$('[data-sopen]').forEach(r=>r.onclick=()=>can('clients')&&clientForm(c));
+  $$('.soarow').forEach(r=>r.onkeydown=e=>{if(e.key==='Enter')r.click()});
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
   const sf=$('#sf'),st=$('#st');if(sf){const ch=()=>{S.params.sf=sf.value;S.params.st=st.value;render()};sf.onchange=ch;st.onchange=ch}
   $('#soa')&&($('#soa').onclick=()=>{const f=$('#sf').value,t=$('#st').value;downloadPdf(renderSOA(c.id,f,t),`SOA ${c.name} ${t}.pdf`.replace(/[\\/:*?"<>|]/g,''))});
 };
+/* ----- previous invoices (issued before this app) ----- */
+function parseDate(v){v=String(v||'').trim();if(!v)return '';let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}
+  const t=new Date(v);return isNaN(t)?'':new Date(t-t.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
+const parseAmt=v=>{const n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:r2(n)};
+function legacyBulk(c){
+  let rows=[{no:'',date:'',due:'',ref:'',amount:'',paid:''}];
+  const o=modal('Add previous invoices · '+c.name,`<div class="muted" style="font-size:.86rem">Invoices issued before you started this app. They count in the statement, ageing and receivables. <b>Paste from Excel</b> into any box: columns <b>Invoice no, Date, Amount, Paid</b> (Paid and LPO optional).</div>
+    <div class="scroll-x"><table class="tbl lgt"><thead><tr><th>Invoice no.</th><th>Date</th><th>Due date</th><th>LPO / ref</th><th class="r">Amount incl. VAT</th><th class="r">Already paid</th><th></th></tr></thead><tbody id="lg-rows"></tbody></table></div>
+    <div class="row"><button class="btn" id="lg-add" type="button">${I.plus}Add row</button><span class="grow"></span><span class="muted" id="lg-sum"></span></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="lg-save">Save</button>`,true);
+  const cd=+c.creditDays||S.cfg.dueDays;
+  const read=()=>{$$('#lg-rows tr',o).forEach((tr,k)=>{$$('[data-lf]',tr).forEach(el=>rows[k][el.dataset.lf]=el.value)})};
+  const sum=()=>{read();const ok=rows.filter(r=>r.no&&parseAmt(r.amount));const t=ok.reduce((s,r)=>s+parseAmt(r.amount)-Math.min(parseAmt(r.paid),parseAmt(r.amount)),0);
+    $('#lg-sum',o).textContent=`${ok.length} invoice${ok.length===1?'':'s'} · balance ${cur(t)}`;$('#lg-save',o).textContent=ok.length?`Save ${ok.length} invoice${ok.length===1?'':'s'}`:'Save'};
+  const draw=()=>{$('#lg-rows',o).innerHTML=rows.map((r,k)=>`<tr>
+     <td><input data-lf="no" value="${h(r.no)}" placeholder="e.g. 2025/118" aria-label="Invoice number"></td>
+     <td><input data-lf="date" type="date" value="${h(r.date)}" aria-label="Invoice date"></td>
+     <td><input data-lf="due" type="date" value="${h(r.due)}" aria-label="Due date"></td>
+     <td><input data-lf="ref" value="${h(r.ref)}" aria-label="LPO or reference"></td>
+     <td><input data-lf="amount" inputmode="decimal" value="${h(r.amount)}" style="text-align:right" aria-label="Amount"></td>
+     <td><input data-lf="paid" inputmode="decimal" value="${h(r.paid)}" style="text-align:right" placeholder="0" aria-label="Already paid"></td>
+     <td><button class="xbtn" type="button" data-lrm="${k}" aria-label="Remove row">✕</button></td></tr>`).join('');
+    $$('[data-lrm]',o).forEach(b=>b.onclick=()=>{read();rows.splice(+b.dataset.lrm,1);if(!rows.length)rows.push({no:'',date:'',due:'',ref:'',amount:'',paid:''});draw()});
+    $$('[data-lf]',o).forEach(el=>{el.oninput=sum;el.onpaste=e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(!/[\t\n]/.test(t))return;e.preventDefault();read();
+      const lines=t.split(/\r?\n/).map(l=>(l.includes('\t')?l.split('\t'):l.split(/;|,(?!\d{3}\b)/)).map(x=>x.trim())).filter(c=>c.some(Boolean));
+      const add=lines.filter(c=>c[0]&&!/^inv|^no|^number/i.test(c[0])||parseAmt(c[2])).map(cl=>({no:cl[0]||'',date:parseDate(cl[1]),due:'',ref:cl[4]||'',amount:cl[2]?String(parseAmt(cl[2])):'',paid:cl[3]?String(parseAmt(cl[3])):''}));
+      rows=rows.filter(r=>r.no||r.amount).concat(add);if(!rows.length)rows.push({no:'',date:'',due:'',ref:'',amount:'',paid:''});draw();toast(add.length+' row'+(add.length===1?'':'s')+' pasted')}});
+    sum()};
+  draw();
+  $('#lg-add',o).onclick=()=>{read();rows.push({no:'',date:'',due:'',ref:'',amount:'',paid:''});draw();const ins=$$('[data-lf="no"]',o);ins[ins.length-1].focus()};
+  $('#lg-save',o).onclick=async()=>{read();const good=[],bad=[];
+    rows.forEach((r,k)=>{if(!r.no&&!r.amount)return;const amt=parseAmt(r.amount),date=parseDate(r.date);
+      if(!r.no||!amt||!date){bad.push(k+1);return}
+      if(S.docs.some(d=>d.number===r.no.trim())||good.some(g=>g.no===r.no.trim())){bad.push(k+1);toast('Invoice '+r.no+' already exists.',true);return}
+      good.push({...r,no:r.no.trim(),amt,date})});
+    if(bad.length){toast('Check row '+bad.join(', ')+': invoice no., date and amount are needed.',true);return}
+    if(!good.length){toast('Enter at least one invoice.',true);return}
+    const b=$('#lg-save',o);b.disabled=true;let n=0;
+    for(const r of good){const id=uid(),now=new Date().toISOString();
+      const doc={type:'invoice',legacy:true,number:r.no,date:r.date,dueDate:parseDate(r.due)||addDays(r.date,cd),ref:r.ref||'',amount:r.amt,vat:0,items:[],
+        clientId:c.id,client:clientSnap(c),notes:'Previous invoice, entered manually',createdBy:S.me.id,createdByName:S.me.name,createdAt:now,updatedAt:now};
+      if(!await save('docs',id,doc))break;n++;
+      const paid=Math.min(parseAmt(r.paid),r.amt);
+      if(paid>0&&can('payments'))await save('payments',uid(),{clientId:c.id,invoiceId:id,amount:paid,date:r.date,method:'Previous payment',ref:'',note:'Paid before using the app',createdBy:S.me.id,updatedAt:now});
+    }
+    b.disabled=false;if(n){toast(n+' previous invoice'+(n===1?'':'s')+' added');closeModal()}};
+}
+function legacyForm(d){
+  const paid=paidOn(d.id);
+  const o=modal('Previous invoice',`<div class="grid g2">
+    <label class="field"><span>Invoice no.</span><input id="lf-no" value="${h(d.number)}"></label><label class="field"><span>LPO / ref</span><input id="lf-ref" value="${h(d.ref||'')}"></label>
+    <label class="field"><span>Date</span><input type="date" id="lf-date" value="${h(d.date)}"></label><label class="field"><span>Due date</span><input type="date" id="lf-due" value="${h(d.dueDate||'')}"></label>
+    <label class="field"><span>Amount incl. VAT (${h(S.cfg.currency)})</span><input id="lf-amt" inputmode="decimal" value="${h(d.amount)}"></label><label class="field"><span>VAT included (optional)</span><input id="lf-vat" inputmode="decimal" value="${h(d.vat||'')}"></label>
+    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="lf-note" value="${h(d.notes||'')}"></label></div>
+    <div class="kv"><span class="muted">Paid so far</span><span class="num">${money(paid)}</span></div>`,
+    `${can('delete')||isAdmin()?'<button class="btn danger" id="lf-del">Delete</button>':''}${can('payments')?'<button class="btn" id="lf-pay">Record payment</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="lf-save">Save</button>`);
+  $('#lf-save',o).onclick=async()=>{const no=$('#lf-no',o).value.trim(),amt=parseAmt($('#lf-amt',o).value),date=$('#lf-date',o).value;
+    if(!no||!amt||!date){toast('Invoice no., date and amount are needed.',true);return}
+    if(S.docs.some(x=>x.id!==d.id&&x.number===no)){toast('Number '+no+' is already used.',true);return}
+    const u={...d,number:no,ref:$('#lf-ref',o).value.trim(),date,dueDate:$('#lf-due',o).value||date,amount:amt,vat:parseAmt($('#lf-vat',o).value),notes:$('#lf-note',o).value.trim(),updatedAt:new Date().toISOString()};delete u.id;
+    if(await save('docs',d.id,u,'Saved'))closeModal()};
+  $('#lf-pay',o)&&($('#lf-pay',o).onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
+  $('#lf-del',o)&&($('#lf-del',o).onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
+}
 function clientForm(c,after){
   const e=c||{};
   const o=modal(c?'Edit client':'New client',`<div class="grid g2">
@@ -913,7 +988,7 @@ function paymentForm(pre={}){
    <label class="field" style="grid-column:1/-1"><span>Against invoice</span><select id="p-inv"><option value="">On account (not linked to one invoice)</option>${e.clientId?invOpts(e.clientId):''}</select></label>
    <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input type="number" step="any" id="p-amount" value="${h(e.amount||'')}"></label>
    <label class="field"><span>Date</span><input type="date" id="p-date" value="${h(e.date)}"></label>
-   <label class="field"><span>Method</span><select id="p-method">${['Bank transfer','Cash','Cheque','Card','PDC','Other'].map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
+   <label class="field"><span>Method</span><select id="p-method">${['Bank transfer','Cash','Cheque','Card','PDC','Credit note','Adjustment','Previous payment','Other'].map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
    <label class="field"><span>Reference / cheque no.</span><input id="p-ref" value="${h(e.ref||'')}"></label>
    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="p-note" value="${h(e.note||'')}"></label></div>`,
    `${e.id?'<button class="btn danger" id="p-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="p-save">Save payment</button>`);
