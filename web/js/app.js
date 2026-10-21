@@ -47,7 +47,7 @@ const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airpor
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
-  photoSize:'M',docStyle:'clean',docFont:'gothic',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
+  photoSize:'M',docStyle:'clean',docFont:'gothic',gps:'',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
@@ -72,7 +72,7 @@ const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.p
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -299,14 +299,14 @@ function sheetHead(title,number,sub){
     const w=String(c.name||'').trim().split(/\s+/);const n1=w.length>=3?w.slice(0,-2).join(' '):c.name,n2=w.length>=3?w.slice(-2).join(' '):'';
     const row=(k,txt,i)=>txt?`<div class="pc"><span class="pci ${i%2?'n':''}">${ico(k,'#ffffff')}</span><span>${h(txt)}</span></div>`:'';
     return `<div class="pdeco"></div><div class="ph"><div class="ph-l">${c.logo?img(c.logo,'class="plogo"'):''}<div class="pnm"><div class="pn1">${h(n1)}</div>${n2?`<div class="pn2">${h(n2)}</div>`:''}${c.tagline?`<div class="ptag">${h(c.tagline)}</div>`:''}${c.taxId?`<div class="ptrn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
-     <div class="ph-r">${row('pin',c.address,0)}${row('phone',c.phone,1)}${row('mail',c.email,2)}${row('globe',c.website,3)}</div></div>
+     <div class="ph-r">${row('pin',c.address,0)}${row('gps',c.gps?'GPS '+c.gps:'',1)}${row('globe',c.website,2)}</div></div>
      <div class="pband"><i></i><i></i><i></i></div>
      <div class="ptbar"><div><div class="pdt${String(title).length>20?' xl':String(title).length>13?' long':''}">${h(title)}</div><div class="pul"></div>${sub?`<div class="psub">${h(sub)}</div>`:''}</div>${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
   }
   const line=(k,v)=>v?`<div><b>${k}</b>${h(v)}</div>`:'';
   return `<div class="band"></div>
   <div class="hd"><div class="co">${c.logo?img(c.logo,'class="logo"'):''}<div class="idn"><div class="nm">${h(c.name)}</div>${c.taxId?`<div class="trn">${h(c.taxIdLabel)} ${h(c.taxId)}</div>`:''}</div></div>
-   <div class="ct"><div class="adr">${h(c.address||'')}</div>${line('T',c.phone)}${line('E',c.email)}${line('W',c.website)}</div></div>
+   <div class="ct"><div class="adr">${h(c.address||'')}</div>${line('GPS',c.gps)}${line('W',c.website)}</div></div>
   <div class="tbar"><div><div class="dt">${h(title)}</div>${sub?`<div class="dsub">${h(sub)}</div>`:''}</div>
    ${number?`<div class="nb"><img class="bc" src="${barcodeData(number)}" alt=""><div class="no">${h(number)}</div></div>`:''}</div>`;
 }
@@ -333,9 +333,10 @@ const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5
   building:'M4 21V5l8-2v18 M12 8h8v13 M7 8h2 M7 12h2 M7 16h2 M15 12h2 M15 16h2 M2 21h20',
   cal:'M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4',calchk:'M4 6h16v15H4z M4 10h16 M8 3v4 M16 3v4 M9 15.5l2 2 4-4',
   doc:'M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h5',user:'M12 12a4 4 0 110-8a4 4 0 110 8z M4 21c1-4 4-6 8-6s7 2 8 6',
-  clock:'M12 3a9 9 0 110 18a9 9 0 110-18z M12 7v5l3 2'};
+  clock:'M12 3a9 9 0 110 18a9 9 0 110-18z M12 7v5l3 2',
+  gps:'M12 2v4 M12 18v4 M2 12h4 M18 12h4 M12 7a5 5 0 110 10a5 5 0 110-10z M12 11a1 1 0 110 2a1 1 0 110-2z'};
 const ico=(n,color)=>`<img class="ic" alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${color||'#17375F'}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='${ICO[n]||ICO.doc}'/></svg>`)}">`;
-const icoFor=k=>/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
+const icoFor=k=>/^contact/i.test(k)?'user':/mobile|phone/i.test(k)?'phone':/mail/i.test(k)?'mail':/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
 const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
 function detHtml(det){
   if(!isPrem())return `<div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div>`;
@@ -361,6 +362,9 @@ function renderSheet(d){
   if(d.type==='invoice'&&d.dueDate)det.push(['Due date',fdate(d.dueDate)]);
   if(isQ&&d.validUntil)det.push(['Valid until',fdate(d.validUntil)]);
   if(d.ref)det.push([isQ?'Your ref':'LPO / Ref',d.ref]);
+  if(d.contactName)det.push(['Contact',d.contactName]);
+  if(d.contactMobile)det.push(['Mobile',d.contactMobile]);
+  if(d.contactEmail)det.push(['Email',d.contactEmail]);
   if(src)det.push([TYPE[src.type].a+' ref',src.number]);
   if(d.salesperson)det.push(['Salesperson',d.salesperson]);
   if(isSvc&&d.technician)det.push(['Technician',d.technician]);
@@ -477,7 +481,7 @@ function render(){
   const logo='<img src="assets/mark.png" alt="">';
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
     ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
-    <div class="who"><div style="color:#fff;font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
+    <div class="who"><div style="color:#fff;font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
     <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.25)" data-menu>${I.menu}</button></div>
     <main class="main"><div class="wrap">${v}</div></main></div>
     <nav class="tabbar">${tabbar(cur)}</nav></div>`;
@@ -497,7 +501,8 @@ function bindCommon(root){
   $$('[data-go]',root).forEach(b=>b.onclick=()=>go(b.dataset.go));
   $$('[data-new]',root).forEach(b=>b.onclick=newMenu);
   $$('[data-logout]',root).forEach(b=>b.onclick=()=>signOut(auth));
-  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();signOut(auth)};$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
+  $$('[data-myinfo]',root).forEach(b=>b.onclick=profileForm);
+  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();signOut(auth)};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
   $$('[data-open]',root).forEach(b=>b.onclick=()=>go('view',{id:b.dataset.open}));
 }
 function newMenu(){
@@ -620,7 +625,7 @@ function newDraft(type){
   const date=today();
   return {id:uid(),type,number:nextNumber(type,date),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
     clientId:'',client:null,ref:'',subject:'',salesperson:'',deliveryAddress:'',items:[{name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''}],discount:0,taxRate:S.cfg.taxRate,
-    notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,createdAt:new Date().toISOString(),_new:true};
+    notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:(S.me.profile||{}).mobile||'',contactEmail:(S.me.profile||{}).email||'',createdAt:new Date().toISOString(),_new:true};
 }
 VIEWS.edit=()=>{
   const p=S.params;
@@ -651,6 +656,9 @@ VIEWS.edit=()=>{
     ${isQ?`<label class="field"><span>Valid until</span><input type="date" id="e-validUntil" value="${h(d.validUntil)}"></label>`:''}
     <label class="field"><span>${isQ?'Client reference':'LPO / reference'}</span><input id="e-ref" value="${h(d.ref)}"></label>
     <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
+    <label class="field"><span>Contact person</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
+    <label class="field"><span>Contact mobile</span><input id="e-contactMobile" inputmode="tel" value="${h(d.contactMobile||'')}"></label>
+    <label class="field"><span>Contact email</span><input id="e-contactEmail" type="email" value="${h(d.contactEmail||'')}"></label>
     <label class="field" style="grid-column:span ${isDN?1:2}"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="e.g. Supply of CCTV equipment"></label>
     ${isDN?`<label class="field" style="grid-column:span 2"><span>Site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>`:''}
     ${isDN&&(d.reportType||'delivery')!=='delivery'?`<label class="field"><span>Technician</span><input id="e-technician" value="${h(d.technician||S.me.name||'')}"></label><label class="field"><span>Time in</span><input type="time" id="e-timeIn" value="${h(d.timeIn||'')}"></label><label class="field"><span>Time out</span><input type="time" id="e-timeOut" value="${h(d.timeOut||'')}"></label>
@@ -683,7 +691,7 @@ VIEWS.edit=()=>{
 };
 function readEditor(){
   const d=ED;
-  ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
+  ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','contactName','contactMobile','contactEmail','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   readAtts(d.attachments||[],'att');
 }
@@ -871,6 +879,16 @@ function thankYou(d,who){
    <p>${h(R.ty)}<br>We appreciate your business.</p><div class="from">${img(S.cfg.logo)}<div><b>${h(S.cfg.name)}</b><span class="num">${h(d.number)} · ${fdt(d.delivery.signedAt)}</span></div></div></div>`,
    `<button class="btn" id="ty-pdf">${I.pdf}${h(R.t)} PDF</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
   $('#ty-pdf',o).onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
+}
+function profileForm(){
+  const p=S.me.profile||{};
+  const o=modal('My contact details',`<p class="muted" style="margin:0">Printed on documents you create, after the reference, so clients can reach you directly.</p>
+    <div class="grid g2"><label class="field" style="grid-column:1/-1"><span>Name</span><input value="${h(S.me.name)}" disabled></label>
+    <label class="field"><span>Mobile</span><input id="pf-m" inputmode="tel" value="${h(p.mobile||'')}" placeholder="+971 50 000 0000"></label>
+    <label class="field"><span>Email</span><input id="pf-e" type="email" value="${h(p.email||'')}" placeholder="name@llct.net"></label></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="pf-s">Save</button>`);
+  $('#pf-s',o).onclick=async()=>{const d={mobile:$('#pf-m',o).value.trim(),email:$('#pf-e',o).value.trim(),updatedAt:new Date().toISOString()};
+    if(await save('profiles',S.me.id,d,'Contact details saved')){S.me.profile=d;closeModal()}};
 }
 /* ----- clients ----- */
 VIEWS.clients=()=>{
@@ -1090,7 +1108,8 @@ VIEWS.settings=()=>{
   <div class="view-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
   <div class="card pad grid"><h2>Company</h2>
    <div class="row" style="align-items:flex-start"><div class="field"><span style="font-size:.75rem;font-weight:600;color:var(--muted)">Logo</span><button class="logo-box" id="s-logo" type="button">${c.logo?img(c.logo):'Upload logo'}</button>${c.logo?'<button class="btn ghost sm" id="s-logo-x">Remove</button>':''}</div>
-    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}${f('tagline','Tagline (Premium style)',c.tagline,'text',true)}</div></div>
+    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}${f('tagline','Tagline (Premium style)',c.tagline,'text',true)}
+     <label class="field" style="grid-column:1/-1"><span>Company GPS (shown in the header)</span><div class="row" style="flex-wrap:nowrap"><input id="s-gps" value="${h(c.gps||'')}" placeholder="25.2xxxxx, 55.3xxxxx"><button class="btn" id="s-gps-here" type="button">Use my location</button></div></label></div></div>
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
@@ -1120,11 +1139,13 @@ VIEWS_AFTER.settings=()=>{
   $('#s-logo').onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading logo…');c.logo=await storeImage(f,600,true);$('#s-logo').innerHTML=img(c.logo)};
   $('#s-logo-x')&&($('#s-logo-x').onclick=()=>{c.logo='';$('#s-logo').innerHTML='Upload logo'});
   $('#s-sig-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.signature=await storeImage(f,600,true);toast('Signature image ready. Save settings to keep it.')};
+  $('#s-gps-here').onclick=async()=>{const b=$('#s-gps-here');b.disabled=true;b.textContent='Getting location…';const g=await getGPS();b.disabled=false;b.textContent='Use my location';
+    if(hasGPS(g)){$('#s-gps').value=fmtGPS(g);toast('Location filled in (±'+g.acc+' m). Save settings to keep it.')}else toast(g&&g.error==='denied'?'Location is blocked. Allow location access and try again.':'Location not available.',true)};
   $('#s-stamp-up').onclick=async()=>{const f=await pickImage();if(!f)return;c.stamp=await storeImage(f,500,true);$('#s-stamp-pv').innerHTML=`<img src="${h(src(c.stamp))}" alt="Company stamp" style="max-height:80px;background:#fff;border-radius:6px;padding:4px">`;toast('Stamp ready. Save settings to keep it.')};
   $('#s-stamp-clr').onclick=()=>{c.stamp='';$('#s-stamp-pv').innerHTML='<span class="muted">No stamp.</span>';toast('Stamp removed. Save settings to keep the change.')};
   $('#s-sig-clr').onclick=()=>{sp.clear();c.signature='';toast('Signature cleared. Save settings to keep the change.')};
   $('#s-save').onclick=async()=>{
-    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline'].forEach(k=>c[k]=$('#s-'+k).value.trim());
+    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline','gps'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
     c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
@@ -1175,6 +1196,8 @@ onAuthStateChanged(auth,async u=>{
     const usr=await Store.get('users',u.uid);
     if(!usr||usr.active===false){messageScreen('Access turned off','This login is not active. Ask your admin.');return}
     S.me.name=usr.name||u.email;
+    const pr=await Store.get('profiles',u.uid).catch(()=>null);
+    S.me.profile={mobile:(pr&&pr.mobile)||usr.phone||'',email:(pr&&pr.email)||(usr.email&&!/staff\.attendance\.app$/i.test(usr.email)?usr.email:'')};
     if(usr.role==='admin')S.me.role='admin';
     else{const a=await Store.get('access',u.uid).catch(()=>null);
       if(!a||a.enabled===false){messageScreen('No invoicing access yet',`Signed in as <b>${h(S.me.name)}</b>. Ask the admin to turn on invoicing access for you in Staff &amp; access.`,true);return}

@@ -290,6 +290,11 @@ service cloud.firestore {
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
       allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
+    // Each user's own contact details, printed on documents they create.
+    match /inv_profiles/{uid} {
+      allow read: if invOn();
+      allow write: if isAdmin() || (isSelf(uid) && invOn());
+    }
     // Document numbers already used (QTN…/INV…/DLN… + date + 3 random digits). Claimed once, never changed.
     match /inv_numbers/{number} {
       allow read: if invOn();

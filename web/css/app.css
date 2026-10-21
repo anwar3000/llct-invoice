@@ -597,3 +597,8 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium.f-gothic .pfr{font-size:7.5px}
 .sheet.premium .sum4>div>div{border:0;padding:0;background:none;border-radius:0}
 .sheet.premium .sum4>div{padding:11px 14px}
+/* premium: compact detail rows so contact lines fit */
+.sheet.premium .pr{grid-template-columns:28px 1fr auto;gap:10px;padding:4px 4px}
+.sheet.premium .pico{width:24px;height:24px}
+.sheet.premium .pico .ic{width:13px;height:13px}
+.sheet.premium .pv{font-size:11px}
