@@ -602,3 +602,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .pico{width:24px;height:24px}
 .sheet.premium .pico .ic{width:13px;height:13px}
 .sheet.premium .pv{font-size:11px}
+.sheet.premium .pk{white-space:nowrap;letter-spacing:.08em}
+.sheet.premium .pv{white-space:nowrap}
+.sheet.premium .pv.sm{font-size:9.5px}
+.sheet.premium .pv.wrap{font-size:9.5px;white-space:normal}

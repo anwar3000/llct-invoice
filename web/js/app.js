@@ -340,7 +340,7 @@ const icoFor=k=>/^contact/i.test(k)?'user':/mobile|phone/i.test(k)?'phone':/mail
 const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
 function detHtml(det){
   if(!isPrem())return `<div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div>`;
-  return `<div class="box pdet">${det.map(([k,v],i)=>`<div class="pr"><span class="pico ${i%2?'pk2':''}">${ico(icoFor(k),i%2?S.cfg.brand:S.cfg.charcoal)}</span><span class="pk">${h(k)}</span><span class="pv">${h(v)}</span></div>`).join('')}</div>`;
+  return `<div class="box pdet">${det.map(([k,v],i)=>`<div class="pr"><span class="pico ${i%2?'pk2':''}">${ico(icoFor(k),i%2?S.cfg.brand:S.cfg.charcoal)}</span><span class="pk">${h(k)}</span><span class="pv${String(v).length>44?' wrap':String(v).length>32?' sm':''}">${h(v)}</span></div>`).join('')}</div>`;
 }
 function termsHtml(t){
   if(!isPrem())return `<div class="terms">${h(t)}</div>`;
@@ -363,8 +363,7 @@ function renderSheet(d){
   if(isQ&&d.validUntil)det.push(['Valid until',fdate(d.validUntil)]);
   if(d.ref)det.push([isQ?'Your ref':'LPO / Ref',d.ref]);
   if(d.contactName)det.push(['Contact',d.contactName]);
-  if(d.contactMobile)det.push(['Mobile',d.contactMobile]);
-  if(d.contactEmail)det.push(['Email',d.contactEmail]);
+  if(d.contactMobile||d.contactEmail)det.push([d.contactMobile&&d.contactEmail?'Mobile / Email':d.contactMobile?'Mobile':'Email',[d.contactMobile,d.contactEmail].filter(Boolean).join('  |  ')]);
   if(src)det.push([TYPE[src.type].a+' ref',src.number]);
   if(d.salesperson)det.push(['Salesperson',d.salesperson]);
   if(isSvc&&d.technician)det.push(['Technician',d.technician]);
