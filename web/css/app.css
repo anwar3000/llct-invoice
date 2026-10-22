@@ -615,3 +615,20 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.clean .trn{font-size:10px}
 .sheet .co .nm{font-weight:800}
 .sheet.f-gothic .co .nm{font-size:18px}
+
+/* ===== Receipt ===== */
+.sheet .rcamt{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border:1px solid #e3e1dd;border-radius:6px;break-inside:avoid}
+.sheet .rcamt .rk{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#6b7280;font-weight:600}
+.sheet .rcamt .rv{font-family:var(--f-display);font-size:32px;font-weight:800;color:var(--c);line-height:1.15;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.sheet .rcamt .rv small{font-size:14px;font-weight:600;opacity:.7;margin-right:2px}
+.sheet .rcamt .rw{font-size:10.5px;color:#3d4452}
+.sheet .rcamt .stamp{font-size:15px;padding:5px 14px;transform:rotate(-8deg)}
+.sheet.receipt table{margin-top:2px}
+.sheet.clean .rcamt{border:0;border-top:1px solid #111;border-bottom:1px solid #111;border-radius:0;padding:16px 0}
+.sheet.clean .rcamt .rk{letter-spacing:0;text-transform:none;font-size:10px;color:#6b6b6b;font-weight:400}
+.sheet.clean .rcamt .rv{font-family:var(--f-body);font-weight:700;color:#111;font-size:28px}
+.sheet.clean .rcamt .stamp{transform:none}
+.sheet.premium .rcamt{background:#f4f5f7;border:0;border-left:4px solid var(--b);border-radius:7px;padding:20px 26px}
+.sheet.premium .rcamt .rv{font-size:36px}
+.sheet.premium.f-gothic .rcamt .rv{font-size:32px}
+.sheet.premium .rcamt .stamp{border-color:var(--b);color:var(--b)}

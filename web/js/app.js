@@ -43,7 +43,7 @@ function numWords(n){
 /* ================= config & permissions ================= */
 const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
   currency:'AED',currencyName:'dirhams',minorName:'fils',taxLabel:'VAT',taxRate:5,
-  prefix:{quotation:'QTN',invoice:'INV',delivery:'DLN'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
+  prefix:{quotation:'QTN',invoice:'INV',delivery:'DLN',receipt:'RCT'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
@@ -336,7 +336,7 @@ const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5
   clock:'M12 3a9 9 0 110 18a9 9 0 110-18z M12 7v5l3 2',
   gps:'M12 2v4 M12 18v4 M2 12h4 M18 12h4 M12 7a5 5 0 110 10a5 5 0 110-10z M12 11a1 1 0 110 2a1 1 0 110-2z'};
 const ico=(n,color)=>`<img class="ic" alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${color||'#17375F'}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='${ICO[n]||ICO.doc}'/></svg>`)}">`;
-const icoFor=k=>/^contact/i.test(k)?'user':/mobile|phone/i.test(k)?'phone':/mail/i.test(k)?'mail':/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
+const icoFor=k=>/^contact|received by/i.test(k)?'user':/^bank/i.test(k)?'building':/mobile|phone/i.test(k)?'phone':/mail/i.test(k)?'mail':/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
 const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
 function detHtml(det){
   if(!isPrem())return `<div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div>`;
@@ -604,7 +604,7 @@ VIEWS.view=()=>{
     ${can('delete')||isAdmin()?`<button class="btn danger" id="del">Delete</button>`:''}
    </div>
    ${(d.attachments||[]).length?`<div class="card pad"><h3 style="margin-bottom:8px">Attachments</h3><div class="attmini">${d.attachments.map((a,k)=>`<button class="am" data-openatt="${k}" title="${h(a.caption||a.name||'')}">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}<small>${h(a.caption||a.name||'')}</small></button>`).join('')}</div></div>`:''}
-   ${pays.length?`<div class="card pad"><h3 style="margin-bottom:6px">Payments</h3>${pays.map(p=>`<div class="kv"><span>${fdate(p.date)} · ${h(p.method||'')}</span><span class="num">${money(p.amount)}</span></div>`).join('')}</div>`:''}
+   ${pays.length?`<div class="card pad"><h3 style="margin-bottom:6px">Payments</h3>${pays.map(p=>`<div class="kv"><span>${fdate(p.date)} · ${h(p.method||'')}</span><span class="row" style="gap:6px"><span class="num">${money(p.amount)}</span><button class="btn ghost sm" data-rcpt="${p.id}" title="Download receipt">${I.pdf}</button></span></div>`).join('')}</div>`:''}
   </aside></div>`;
 };
 VIEWS_AFTER.view=()=>{
@@ -614,6 +614,7 @@ VIEWS_AFTER.view=()=>{
   $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`
     .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d)));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
+  $$('[data-rcpt]').forEach(b=>b.onclick=()=>downloadReceipt(S.payments.find(x=>x.id===b.dataset.rcpt)));
   $('#ed')&&($('#ed').onclick=()=>d.legacy?legacyForm(d):go('edit',{id:d.id}));
   $('#dlv')&&($('#dlv').onclick=()=>go('deliver',{id:d.id}));
   $('#pay')&&($('#pay').onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
@@ -1035,7 +1036,7 @@ VIEWS.payments=()=>{
   const ym=today().slice(0,7);
   return `<div class="head"><div><h1>Payments</h1><div class="sub">${cur(list.filter(p=>(p.date||'').startsWith(ym)).reduce((s,p)=>s+(+p.amount||0),0))} received this month</div></div>${can('payments')?`<button class="btn primary" id="np">${I.plus}Record payment</button>`:''}</div>
   <div class="card list">${list.length?list.map(p=>{const c=S.clients.find(x=>x.id===p.clientId);const inv=S.docs.find(d=>d.id===p.invoiceId);
-   return `<button class="li" data-p="${p.id}"><span class="ico p">PAY</span><span style="min-width:0"><div class="t">${h(c?c.name:'Unknown client')}</div><div class="s">${fdate(p.date)} · ${h(p.method||'')}${p.ref?' · '+h(p.ref):''}${inv?' · '+h(inv.number):' · on account'}</div></span><span class="r num">${money(p.amount)}</span></button>`}).join(''):`<div class="empty"><b>No payments recorded</b>Record money received against an invoice or on account.</div>`}</div>`;
+   return `<button class="li" data-p="${p.id}"><span class="ico p">PAY</span><span style="min-width:0"><div class="t">${h(c?c.name:'Unknown client')}</div><div class="s">${fdate(p.date)} · ${h(p.method||'')}${p.receiptNo?' · <span class="num">'+h(p.receiptNo)+'</span>':''}${p.ref?' · '+h(p.ref):''}${inv?' · '+h(inv.number):' · on account'}</div></span><span class="r num">${money(p.amount)}</span></button>`}).join(''):`<div class="empty"><b>No payments recorded</b>Record money received against an invoice or on account.</div>`}</div>`;
 };
 VIEWS_AFTER.payments=()=>{$('#np')&&($('#np').onclick=()=>paymentForm());$$('[data-p]').forEach(b=>b.onclick=()=>can('payments')&&paymentForm(S.payments.find(p=>p.id===b.dataset.p)))};
 function paymentForm(pre={}){
@@ -1048,17 +1049,69 @@ function paymentForm(pre={}){
    <label class="field"><span>Date</span><input type="date" id="p-date" value="${h(e.date)}"></label>
    <label class="field"><span>Method</span><select id="p-method">${['Bank transfer','Cash','Cheque','Card','PDC','Credit note','Adjustment','Previous payment','Other'].map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
    <label class="field"><span>Reference / cheque no.</span><input id="p-ref" value="${h(e.ref||'')}"></label>
-   <label class="field" style="grid-column:1/-1"><span>Note</span><input id="p-note" value="${h(e.note||'')}"></label></div>`,
-   `${e.id?'<button class="btn danger" id="p-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="p-save">Save payment</button>`);
+   <label class="field"><span>Bank (cheque / transfer)</span><input id="p-bank" value="${h(e.bank||'')}"></label>
+   <label class="field"><span>Cheque date</span><input type="date" id="p-chq" value="${h(e.chequeDate||'')}"></label>
+   <label class="field" style="grid-column:1/-1"><span>Note (printed on receipt)</span><input id="p-note" value="${h(e.note||'')}"></label></div>`,
+   `${e.id?'<button class="btn danger" id="p-del">Delete</button><button class="btn" id="p-rcpt">'+I.pdf+'Receipt</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="p-save">Save payment</button>`);
   $('#p-client',o).onchange=ev=>{e.clientId=ev.target.value;e.invoiceId='';$('#p-inv',o).innerHTML='<option value="">On account (not linked to one invoice)</option>'+invOpts(e.clientId)};
   $('#p-inv',o).onchange=ev=>{const op=ev.target.selectedOptions[0];if(op&&op.dataset.due&&!$('#p-amount',o).value)$('#p-amount',o).value=op.dataset.due};
   if(e.invoiceId&&!e.amount){const op=$('#p-inv',o).selectedOptions[0];if(op&&op.dataset.due)$('#p-amount',o).value=op.dataset.due}
-  $('#p-save',o).onclick=async()=>{const d={clientId:$('#p-client',o).value,invoiceId:$('#p-inv',o).value,amount:r2($('#p-amount',o).value),date:$('#p-date',o).value,method:$('#p-method',o).value,ref:$('#p-ref',o).value.trim(),note:$('#p-note',o).value.trim(),createdBy:e.createdBy||S.me.id,updatedAt:new Date().toISOString()};
+  $('#p-rcpt',o)&&($('#p-rcpt',o).onclick=()=>downloadReceipt(S.payments.find(x=>x.id===e.id)||e));
+  $('#p-save',o).onclick=async()=>{const base={...e};delete base.id;if(!e.id)base.createdAt=new Date().toISOString();const d={...base,bank:$('#p-bank',o).value.trim(),chequeDate:$('#p-chq',o).value,clientId:$('#p-client',o).value,invoiceId:$('#p-inv',o).value,amount:r2($('#p-amount',o).value),date:$('#p-date',o).value,method:$('#p-method',o).value,ref:$('#p-ref',o).value.trim(),note:$('#p-note',o).value.trim(),createdBy:e.createdBy||S.me.id,updatedAt:new Date().toISOString()};
     if(!d.clientId){toast('Choose the client.',true);return}if(!(d.amount>0)){toast('Enter an amount above zero.',true);return}
-    if(await save('payments',e.id||uid(),d,'Payment recorded'))render(),closeModal()};
+    const b=$('#p-save',o);b.disabled=true;const id=e.id||uid();
+    if(!d.receiptNo&&!/credit|adjust|previous/i.test(d.method))d.receiptNo=await reserveNumber('receipt',d.date);
+    if(await save('payments',id,d,e.id?'Payment saved':'Payment recorded')){closeModal();render();if(!e.id&&d.receiptNo)receiptPrompt({...d,id})}else b.disabled=false};
   $('#p-del',o)&&($('#p-del',o).onclick=async()=>{if(!await confirmBox('Delete payment?','This changes the client balance and invoice status.'))return;await Store.remove('payments',e.id);toast('Payment deleted');closeModal()});
 }
 
+function receiptPrompt(p){
+  const o=modal('Payment recorded',`<div class="thanks"><div class="tick">✓</div><h2>${h(cur(p.amount))}</h2><p>Received from ${h((S.clients.find(c=>c.id===p.clientId)||{}).name||'')}<br>Receipt <b class="num">${h(p.receiptNo)}</b></p></div>`,
+    `<button class="btn" data-x>Done</button><span class="grow"></span><button class="btn primary" id="rp-pdf">${I.pdf}Download receipt</button>`);
+  $('#rp-pdf',o).onclick=()=>{closeModal();downloadReceipt(p)};
+}
+async function downloadReceipt(p){
+  if(!p)return;
+  if(!p.receiptNo){p={...p,receiptNo:await reserveNumber('receipt',p.date)};
+    if(can('payments')&&p.id){const x={...p};delete x.id;await save('payments',p.id,x)}}
+  const cl=S.clients.find(c=>c.id===p.clientId)||{};
+  downloadPdf(renderReceipt(p),`Receipt ${p.receiptNo} ${cl.name||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
+}
+function renderReceipt(p){
+  const c=S.cfg,cl=S.clients.find(x=>x.id===p.clientId)||{},inv=S.docs.find(d=>d.id===p.invoiceId);
+  const amt=r2(p.amount);
+  // what was owed on the invoice before and after this payment
+  let alloc='';
+  if(inv){const tot=totals(inv).total;const before=r2(S.payments.filter(x=>x.invoiceId===inv.id&&x.id!==p.id&&(x.date<p.date||(x.date===p.date&&(x.createdAt||x.updatedAt||'')<(p.createdAt||p.updatedAt||'')))).reduce((s,x)=>s+(+x.amount||0),0));
+    const bal=r2(tot-before-amt);
+    alloc=`<table><thead><tr><th>Invoice</th><th>Invoice date</th><th class="r">Invoice total</th><th class="r">Paid before</th><th class="r">This payment</th><th class="r">Balance due</th></tr></thead>
+     <tbody><tr><td><div class="it">${h(inv.number)}</div>${inv.ref?`<div class="idesc">${h(inv.ref)}</div>`:''}</td><td>${fdate(inv.date)}</td><td class="r m">${money(tot)}</td><td class="r m">${money(before)}</td><td class="r m b">${money(amt)}</td><td class="r m b">${money(Math.max(bal,0))}</td></tr></tbody></table>`}
+  else alloc=`<table><thead><tr><th>Applied to</th><th class="r">Amount</th></tr></thead><tbody><tr><td><div class="it">Payment on account</div><div class="idesc">Not linked to a single invoice</div></td><td class="r m b">${money(amt)}</td></tr></tbody></table>`;
+  // client balance straight after this payment (same-day payments counted in the order they were recorded)
+  const stamp=x=>x.createdAt||x.updatedAt||'';
+  const accBal=r2((+cl.openingBalance||0)+S.docs.filter(d=>d.type==='invoice'&&d.clientId===p.clientId&&d.date<=p.date).reduce((s2,d)=>s2+totals(d).total,0)
+    -S.payments.filter(x=>x.clientId===p.clientId&&(x.id===p.id||x.date<p.date||(x.date===p.date&&stamp(x)<stamp(p)))).reduce((s2,x)=>s2+(+x.amount||0),0)-(S.payments.some(x=>x.id===p.id)?0:amt));
+  const det=[['Receipt date',fdate(p.date)],['Payment method',p.method||'—']];
+  if(p.ref)det.push([/cheque|pdc/i.test(p.method||'')?'Cheque no.':'Reference',p.ref]);
+  if(p.bank)det.push(['Bank',p.bank]);
+  if(p.chequeDate)det.push(['Cheque date',fdate(p.chequeDate)]);
+  const by=nameOf(p.createdBy,'');if(by)det.push(['Received by',by]);
+  const pdc=/pdc/i.test(p.method||'')||(p.chequeDate&&p.chequeDate>p.date);
+  return `<div class="sheet receipt${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Receipt',p.receiptNo||'',isPrem()?'Thank you for your payment':'')}
+  <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">Received from</div><div class="cn">${h(cl.name||'—')}</div>
+    <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.address,cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div></div>
+    ${detHtml(det)}</div>
+  <div class="rcamt"><div><div class="rk">Amount received</div><div class="rv"><small>${h(c.currency)}</small> ${money(amt)}</div><div class="rw">${h(numWords(amt))}</div></div>
+    <div class="rst"><span class="stamp">${pdc?'CHEQUE RECEIVED':'PAID'}</span></div></div>
+  ${alloc}
+  <div class="foot"><div class="fl">${p.note?`<div class="note"><div class="hh">Note</div><div class="terms">${h(p.note)}</div></div>`:''}
+    ${pdc?`<div class="terms">Payment by cheque is subject to realisation. This receipt is valid once the cheque is cleared.</div>`:''}</div>
+    <div class="tot"><div class="tr"><span>This payment</span><span class="m">${money(amt)}</span></div>
+      <div class="tr gr"><span>Account balance <small>${h(c.currency)}</small></span><span class="m">${money(accBal)}</span></div></div></div>
+  <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}</div></div>
+    <div class="sig"><div class="img"></div><div class="ln"><b>Thank you for your payment</b><br>Please keep this receipt for your records.</div></div></div>
+  ${sheetFoot()}</div>`;
+}
 /* ----- products ----- */
 VIEWS.products=()=>{
   const q=(S.params.q||'').toLowerCase();const list=S.products.filter(p=>!q||[p.name,p.desc,p.barcode].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
