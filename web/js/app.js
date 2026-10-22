@@ -421,6 +421,11 @@ function renderSOA(cid,from,to){
   <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Accounts department')}</div></div><div class="sig"><div class="img"></div><div class="ln"><b>Confirmed by customer</b><br>Signature & stamp</div></div></div>
   ${sheetFoot()}</div>`;
 }
+// Premium: space "TRADING LLC" out to the exact width of "LEADERS LINE" so both lines align.
+function alignBrand(root=document){
+  $$('.sheet.premium .pnm',root).forEach(b=>{const a=$('.pn1',b),t=$('.pn2',b);if(!a||!t)return;
+    t.style.letterSpacing='0px';t.style.marginRight='0px';const w1=a.offsetWidth,w2=t.offsetWidth,n=t.textContent.length;
+    if(n>1&&w1>w2){const ls=(w1-w2)/(n-1);t.style.letterSpacing=ls.toFixed(2)+'px';t.style.marginRight=(-ls).toFixed(2)+'px'}})}
 function fitPreview(host){const w=host.clientWidth-24;const k=Math.min(1,w/794);const sc=$('.preview-scale',host);if(!sc)return;sc.style.transform=`scale(${k})`;sc.style.width='794px';host.style.height=(sc.firstElementChild.offsetHeight*k+24)+'px'}
 const isNative=()=>!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 function b64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(out)}
@@ -437,6 +442,7 @@ async function downloadPdf(html,filename,merge=[]){
   const st=document.createElement('div');st.className='pdf-stage';st.innerHTML=`<div class="pdfdoc">${html}</div>`;document.body.appendChild(st);
   try{
     await Promise.all($$('img[data-ref^="img:"]',st).map(async i=>{i.src=(await loadImg(i.dataset.ref.slice(4)))||BLANK}));
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;alignBrand(st);
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
     const w=html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
       jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging','.words','.info','figure']}}).from(st.firstElementChild);
@@ -486,7 +492,7 @@ function render(){
     <nav class="tabbar">${tabbar(cur)}</nav></div>`;
   bindCommon(app);
   if(VIEWS_AFTER[cur])VIEWS_AFTER[cur]();
-  $$('.preview-wrap').forEach(fitPreview);
+  $$('.preview-wrap').forEach(fitPreview);alignBrand();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>alignBrand());
 }
 function tabbar(cur){
   const t=[['home','Home',I.home]];
@@ -1133,7 +1139,7 @@ VIEWS.settings=()=>{
 VIEWS_AFTER.settings=()=>{
   if(!isAdmin())return;
   const sp=sigPad($('#s-sig'));
-  const pv=()=>{const k1=S.cfg.docStyle,k2=S.cfg.docFont;S.cfg.docStyle=$('#s-docStyle').value;S.cfg.docFont=$('#s-docFont').value;$$('.preview-scale').forEach(x=>x.innerHTML=renderSheet(window.__sample));S.cfg.docStyle=k1;S.cfg.docFont=k2;setTimeout(()=>$$('.preview-wrap').forEach(fitPreview),50)};
+  const pv=()=>{const k1=S.cfg.docStyle,k2=S.cfg.docFont;S.cfg.docStyle=$('#s-docStyle').value;S.cfg.docFont=$('#s-docFont').value;$$('.preview-scale').forEach(x=>x.innerHTML=renderSheet(window.__sample));S.cfg.docStyle=k1;S.cfg.docFont=k2;setTimeout(()=>{$$('.preview-wrap').forEach(fitPreview);alignBrand()},50)};
   $('#s-docStyle').onchange=pv;$('#s-docFont').onchange=pv;const c=clone(S.cfg);
   $('#s-logo').onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading logo…');c.logo=await storeImage(f,600,true);$('#s-logo').innerHTML=img(c.logo)};
   $('#s-logo-x')&&($('#s-logo-x').onclick=()=>{c.logo='';$('#s-logo').innerHTML='Upload logo'});

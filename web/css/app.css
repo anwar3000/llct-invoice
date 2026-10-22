@@ -606,3 +606,12 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .pv{white-space:nowrap}
 .sheet.premium .pv.sm{font-size:9.5px}
 .sheet.premium .pv.wrap{font-size:9.5px;white-space:normal}
+/* company name: larger and bolder; premium name lines align */
+.sheet.premium .pnm{display:flex;flex-direction:column;align-items:flex-start}
+.sheet.premium .pn1,.sheet.premium .pn2{display:inline-block;white-space:nowrap}
+.sheet.premium .pn2{font-weight:600}
+.sheet.premium.f-gothic .pn2{font-weight:600;font-size:13px}
+.sheet.clean .co .nm,.sheet.clean.f-gothic .co .nm,.sheet.clean.f-modern .co .nm{font-size:16px;font-weight:700;letter-spacing:.01em}
+.sheet.clean .trn{font-size:10px}
+.sheet .co .nm{font-weight:800}
+.sheet.f-gothic .co .nm{font-size:18px}
