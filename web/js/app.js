@@ -2,7 +2,7 @@
 // Uses the same Firebase project and staff logins as LLCT Attendance.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction, getDocsFromServer, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp=initializeApp(firebaseConfig);
@@ -1259,6 +1259,25 @@ VIEWS_AFTER.settings=()=>{
   };
 };
 
+/* ================= starter lists bundled with the app (added once, by an admin) ================= */
+const SEEDS=['data/seed-starter-20261023.json'];
+async function runSeeds(){
+  for(const url of SEEDS){
+    try{
+      const cfgSnap=await getDocFromServer(doc(fdb,COL.config,'company'));const done=(cfgSnap.exists()&&cfgSnap.data().seeds)||{};
+      const seed=await (await fetch(url,{cache:'no-store'})).json();if(done[seed.id])continue;
+      // read what is already there straight from the server, so nothing is added twice
+      const names=async col=>new Set((await getDocsFromServer(collection(fdb,COL[col]))).docs.map(d=>String(d.data().name||'').trim().toLowerCase()));
+      const haveC=await names('clients'),haveP=await names('products');let nc=0,np=0;const now=new Date().toISOString();
+      for(const c of seed.clients||[]){if(haveC.has(c.name.trim().toLowerCase()))continue;
+        await setDoc(doc(fdb,COL.clients,uid()),{...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now});nc++}
+      for(const p of seed.products||[]){if(haveP.has(p.name.trim().toLowerCase()))continue;
+        await setDoc(doc(fdb,COL.products,uid()),{...p,createdBy:S.me.id,createdAt:now,updatedAt:now});np++}
+      await setDoc(doc(fdb,COL.config,'company'),{seeds:{...done,[seed.id]:now}},{merge:true});
+      if(nc||np)toast(`Added ${nc} customer${nc===1?'':'s'} and ${np} product${np===1?'':'s'}`);
+    }catch(e){console.warn('seed',url,e)}
+  }
+}
 /* ================= sign-in & data ================= */
 function loginScreen(){
   const app=$('#app');
@@ -1286,6 +1305,7 @@ function startData(){
   Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
   Store.sub('clients',r=>{S.clients=r;soon()});
   Store.sub('products',r=>{S.products=r;soon()});
+  if(isAdmin())setTimeout(runSeeds,1500);
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});

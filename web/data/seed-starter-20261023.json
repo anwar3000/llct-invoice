@@ -1,0 +1,599 @@
+{
+ "id": "starter-20261023",
+ "clients": [
+  {
+   "name": "LEGOLAND Dubai",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Dubai Parks and Resorts\nSheikh Zayed Road (E11), Jebel Ali\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Nando's UAE",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Ground Level, Turia Building, Street 7\nThe Greens\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Tips & Toes",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Garden Side, Bay Avenue (between Aspect Tower & Bay Avenue)\nBusiness Bay\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Buland 2 Trading",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Ground Floor, Mariam Building, Al Soor Street\nAl Daghaya, Deira\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Agility Logistics",
+   "contact": "",
+   "phone": "+971 4 813 1222",
+   "email": "dubai@agility.com",
+   "taxId": "",
+   "address": "Jebel Ali Free Zone (South Zone)\nPO Box 17713\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Life Pharmacy LLC",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Al Thanyah First, Barsha Heights\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0,
+   "places": [
+    {
+     "name": "Life Pharmacy Barsha Heights",
+     "lat": 25.097294,
+     "lng": 55.170342,
+     "radius": 200
+    }
+   ]
+  },
+  {
+   "name": "IKEA Dubai Festival City",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "IKEA Dubai Festival City\nPO Box 50618\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  },
+  {
+   "name": "Mastercraft",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Al Satwa\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  }
+ ],
+ "products": [
+  {
+   "name": "Dahua 4MP IR Bullet IP Camera",
+   "category": "CCTV Cameras",
+   "desc": "WizSense, 2.8 mm fixed lens, IR 30 m, H.265+, IP67, PoE, human & vehicle detection",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-IPC-HFW2441S-S",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 4MP IR Turret IP Camera",
+   "category": "CCTV Cameras",
+   "desc": "WizSense, 2.8 mm fixed lens, IR 30 m, built-in mic, IP67, PoE",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-IPC-HDW2441T-S",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 4MP Vandal-proof Dome IP Camera",
+   "category": "CCTV Cameras",
+   "desc": "WizSense, 2.8 mm, IR 30 m, IK10 vandal-proof, IP67, PoE",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-IPC-HDBW2441E-S",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 8MP 4K IR Bullet IP Camera",
+   "category": "CCTV Cameras",
+   "desc": "WizSense, 4K resolution, 2.8 mm, IR 30 m, H.265+, IP67, PoE",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-IPC-HFW2841S-S",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 4MP Full-colour Active Deterrence Camera",
+   "category": "CCTV Cameras",
+   "desc": "TiOC, smart dual illumination, red & blue warning light, built-in siren, 2-way audio, PoE",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-IPC-HFW3449T1-AS-PV",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 2MP 25x Starlight PTZ Camera",
+   "category": "CCTV Cameras",
+   "desc": "25x optical zoom, IR 100 m, auto-tracking, IP66, PoE+",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DH-SD49225XA-HNR",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 8-Channel 4K PoE NVR",
+   "category": "NVR & Storage",
+   "desc": "8 ch, 8 PoE ports, 1 SATA HDD, up to 12MP recording, H.265+, smart search",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "NVR4108HS-8P-4KS2/L",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 16-Channel 4K PoE NVR",
+   "category": "NVR & Storage",
+   "desc": "16 ch, 16 PoE ports, 2 SATA HDD, up to 12MP recording, H.265+",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "NVR4216-16P-4KS2/L",
+   "photo": ""
+  },
+  {
+   "name": "Dahua 32-Channel AI NVR",
+   "category": "NVR & Storage",
+   "desc": "32 ch, 4 SATA HDD, WizSense AI (face & perimeter), 4K output",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "NVR5432-EI",
+   "photo": ""
+  },
+  {
+   "name": "Seagate SkyHawk 4TB Surveillance HDD",
+   "category": "NVR & Storage",
+   "desc": "3.5\" SATA, designed for 24/7 video recording, up to 64 cameras",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "ST4000VX016",
+   "photo": ""
+  },
+  {
+   "name": "Seagate SkyHawk 8TB Surveillance HDD",
+   "category": "NVR & Storage",
+   "desc": "3.5\" SATA, 24/7 surveillance workload, up to 64 cameras",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "WD Purple 4TB Surveillance HDD",
+   "category": "NVR & Storage",
+   "desc": "3.5\" SATA, AllFrame technology for 24/7 recording",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "WD43PURZ",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Gateway",
+   "category": "Oxygen IoT",
+   "desc": "Central hub for Oxygen IoT devices, Wi-Fi + Zigbee, app & voice control",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Wall Switch – 1 Gang",
+   "category": "Oxygen IoT",
+   "desc": "Touch panel, Wi-Fi, app control, schedules and scenes",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Wall Switch – 2 Gang",
+   "category": "Oxygen IoT",
+   "desc": "Touch panel, Wi-Fi, app control, schedules and scenes",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Wall Switch – 3 Gang",
+   "category": "Oxygen IoT",
+   "desc": "Touch panel, Wi-Fi, app control, schedules and scenes",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Plug",
+   "category": "Oxygen IoT",
+   "desc": "Wi-Fi socket with energy monitoring and timer",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Door / Window Sensor",
+   "category": "Oxygen IoT",
+   "desc": "Wireless contact sensor, instant app alerts",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Motion Sensor",
+   "category": "Oxygen IoT",
+   "desc": "PIR sensor for automation and security alerts",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Temperature & Humidity Sensor",
+   "category": "Oxygen IoT",
+   "desc": "Live readings and alerts, for server rooms and stores",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Water Leak Sensor",
+   "category": "Oxygen IoT",
+   "desc": "Instant alert on water leakage",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Smart Curtain Motor",
+   "category": "Oxygen IoT",
+   "desc": "Quiet motor with app, schedule and voice control",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Schneider Actassi Cat6 U/UTP Cable – 305 m",
+   "category": "Network & Cabling",
+   "desc": "4-pair, 23 AWG solid copper, LSZH jacket, 305 m box",
+   "unit": "box",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Cat6 Patch Cord – 1 m",
+   "category": "Network & Cabling",
+   "desc": "Pre-terminated, moulded boots",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Cat6 Patch Cord – 3 m",
+   "category": "Network & Cabling",
+   "desc": "Pre-terminated, moulded boots",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Cat6 RJ45 Connectors (box of 100)",
+   "category": "Network & Cabling",
+   "desc": "Shielded-ready modular plugs for solid cable",
+   "unit": "box",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Cat6 Keystone Jack",
+   "category": "Network & Cabling",
+   "desc": "Toolless, for faceplates and patch panels",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Single-port Faceplate",
+   "category": "Network & Cabling",
+   "desc": "UK-style 86 x 86 mm with shutter",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "24-port Cat6 Patch Panel",
+   "category": "Network & Cabling",
+   "desc": "1U, 19\" rack mount, with cable management",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "12U Wall-mount Network Rack",
+   "category": "Network & Cabling",
+   "desc": "600 x 450 mm, glass door, fan, PDU and shelf",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "D-Link 8-port Gigabit PoE Switch",
+   "category": "Network & Cabling",
+   "desc": "8 x 10/100/1000, 4 PoE ports, desktop, unmanaged",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DGS-1008P",
+   "photo": ""
+  },
+  {
+   "name": "D-Link 10-port Gigabit Smart PoE Switch",
+   "category": "Network & Cabling",
+   "desc": "8 PoE+ ports + 2 SFP, smart managed, for CCTV",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DGS-1100-10MP",
+   "photo": ""
+  },
+  {
+   "name": "D-Link 28-port Gigabit Smart Managed PoE Switch",
+   "category": "Network & Cabling",
+   "desc": "24 PoE ports + 4 SFP, rack mount",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DGS-1210-28P",
+   "photo": ""
+  },
+  {
+   "name": "D-Link AX1800 Wi-Fi 6 Router",
+   "category": "Network & Cabling",
+   "desc": "Dual-band Wi-Fi 6, gigabit ports, WPA3",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DIR-X1860",
+   "photo": ""
+  },
+  {
+   "name": "D-Link AC1200 Wireless Access Point",
+   "category": "Network & Cabling",
+   "desc": "Dual-band wave 2, PoE powered, ceiling mount",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "DAP-2662",
+   "photo": ""
+  },
+  {
+   "name": "Desktop PC – Intel Core i5",
+   "category": "Computers & IT",
+   "desc": "Intel Core i5 (14th Gen), 16 GB DDR5, 512 GB NVMe SSD, Windows 11 Pro",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Desktop PC – Intel Core i7",
+   "category": "Computers & IT",
+   "desc": "Intel Core i7 (14th Gen), 32 GB DDR5, 1 TB NVMe SSD, Windows 11 Pro",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Desktop PC – AMD Ryzen 5",
+   "category": "Computers & IT",
+   "desc": "AMD Ryzen 5 7600, 16 GB DDR5, 512 GB NVMe SSD, Windows 11 Pro",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Desktop PC – AMD Ryzen 7",
+   "category": "Computers & IT",
+   "desc": "AMD Ryzen 7 7700, 32 GB DDR5, 1 TB NVMe SSD, Windows 11 Pro",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "APC Back-UPS 1 kVA",
+   "category": "Computers & IT",
+   "desc": "1000 VA / 600 W, AVR, 230 V, IEC outlets, for PCs and NVRs",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "BX1000MI",
+   "photo": ""
+  },
+  {
+   "name": "APC Smart-UPS 1 kVA",
+   "category": "Computers & IT",
+   "desc": "1000 VA / 670 W line-interactive, LCD, pure sine wave, for servers and network racks",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "SMT1000IC",
+   "photo": ""
+  },
+  {
+   "name": "Monitor 22\" Full HD",
+   "category": "Computers & IT",
+   "desc": "21.5\" FHD 1920 x 1080, HDMI + VGA, VESA mount",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Monitor 24\" Full HD IPS",
+   "category": "Computers & IT",
+   "desc": "23.8\" FHD IPS, HDMI + DisplayPort, height-adjustable stand",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Monitor 27\" QHD IPS",
+   "category": "Computers & IT",
+   "desc": "27\" 2560 x 1440 IPS, HDMI + DisplayPort, height-adjustable",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Display 43\" 4K UHD (CCTV monitoring)",
+   "category": "Computers & IT",
+   "desc": "43\" 4K LED display, HDMI, 24/7 suitable, wall bracket included",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Display 55\" 4K UHD (CCTV / signage)",
+   "category": "Computers & IT",
+   "desc": "55\" 4K LED display, HDMI, wall bracket included",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Site Survey & System Design",
+   "category": "Services",
+   "desc": "Site visit, camera coverage and network plan, recommended equipment and quotation",
+   "unit": "visit",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "CCTV Camera Installation",
+   "category": "Services",
+   "desc": "Per camera: mounting, cabling up to 30 m, termination, angle adjustment and testing",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Network Cabling – per Point",
+   "category": "Services",
+   "desc": "Cat6 cable pull, termination both ends, labelling and continuity test",
+   "unit": "point",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "NVR Installation & Configuration",
+   "category": "Services",
+   "desc": "Rack mounting, HDD installation, recording schedule, motion/AI rules and mobile app setup",
+   "unit": "lot",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Oxygen IoT Automation Setup",
+   "category": "Services",
+   "desc": "Device pairing, rooms, scenes and schedules, app configuration and user training",
+   "unit": "lot",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Computer Setup & Installation",
+   "category": "Services",
+   "desc": "Windows setup, drivers, Office installation, email and printer setup, data transfer",
+   "unit": "pcs",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Testing, Commissioning & Handover",
+   "category": "Services",
+   "desc": "Final system test, user training, as-built drawing and handover documents",
+   "unit": "lot",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Call-out Service Visit",
+   "category": "Services",
+   "desc": "Technician attendance within Dubai, includes first hour of diagnosis",
+   "unit": "visit",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Additional Labour – per Hour",
+   "category": "Services",
+   "desc": "Technician time beyond the first hour of a service visit",
+   "unit": "hour",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  },
+  {
+   "name": "Annual Maintenance Contract (AMC)",
+   "category": "Services",
+   "desc": "Quarterly preventive maintenance, cleaning, health check, firmware updates and priority support",
+   "unit": "year",
+   "price": 0,
+   "barcode": "",
+   "photo": ""
+  }
+ ]
+}
