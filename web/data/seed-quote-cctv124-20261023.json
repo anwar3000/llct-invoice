@@ -1,0 +1,236 @@
+{
+ "id": "quote-cctv124-20261023",
+ "docs": [
+  {
+   "type": "quotation",
+   "subject": "Supply, installation, testing & commissioning of IP CCTV system – 124 cameras, 30 days recording",
+   "client": {
+    "name": "Client (to be confirmed)"
+   },
+   "clientId": "",
+   "items": [
+    {
+     "name": "Dahua 4MP IR Vandal-proof Dome IP Camera",
+     "desc": "Model DH-IPC-HDBW2441E-S · WizSense, 2.8 mm, IR 30 m, H.265+, IK10, IP67, PoE · indoor areas",
+     "qty": 84,
+     "unit": "pcs",
+     "price": 265
+    },
+    {
+     "name": "Dahua 4MP IR Bullet IP Camera",
+     "desc": "Model DH-IPC-HFW2441S-S · WizSense, 2.8 mm, IR 30 m, H.265+, IP67, PoE · outdoor / perimeter",
+     "qty": 40,
+     "unit": "pcs",
+     "price": 270
+    },
+    {
+     "name": "Camera Back Box / Junction Box",
+     "desc": "Dahua aluminium junction box (IP66) matched to each camera model, for neat cable entry and mounting",
+     "qty": 124,
+     "unit": "pcs",
+     "price": 45
+    },
+    {
+     "name": "Dahua 32-Channel AI NVR",
+     "desc": "Model NVR5432-EI · 32 ch, 4 SATA bays, 4K HDMI output, WizSense AI search, H.265+ · 4 units = 128 channels (124 cameras + 4 spare)",
+     "qty": 4,
+     "unit": "pcs",
+     "price": 2950
+    },
+    {
+     "name": "Seagate SkyHawk 8TB Surveillance HDD",
+     "desc": "3.5\" SATA, 24/7 rated · 3 per NVR = 24 TB per NVR for 30 days continuous recording (31 cameras × ~650 GB each, 4MP H.265 @ 2 Mbps)",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 850
+    },
+    {
+     "name": "Display 43\" 4K UHD Monitor",
+     "desc": "43\" 4K LED display for live view in security room, with wall bracket and 5 m HDMI cable",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 1350
+    },
+    {
+     "name": "D-Link 24-port Gigabit PoE Smart Managed Switch",
+     "desc": "Model DGS-1210-28P · 24 × GE PoE (193 W budget) + 4 SFP/combo, rack mount · 6 units = 144 PoE ports for 124 cameras",
+     "qty": 6,
+     "unit": "pcs",
+     "price": 1750
+    },
+    {
+     "name": "D-Link 24-port Gigabit Smart Managed Core Switch",
+     "desc": "Model DGS-1210-28 · 24 × GE + 4 SFP · aggregates PoE switches and NVRs, terminates fibre uplink",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 950
+    },
+    {
+     "name": "1G Single-mode SFP Module (LX, 10 km)",
+     "desc": "D-Link DEM-310GT, LC duplex · one at each end of the fibre uplink",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 260
+    },
+    {
+     "name": "Fibre Optic Cable 6-core Single-mode Armoured",
+     "desc": "OS2, outdoor/indoor armoured, for uplink from CCTV rack to main network room (estimated 200 m)",
+     "qty": 200,
+     "unit": "m",
+     "price": 7
+    },
+    {
+     "name": "Fibre Patch Panel (LIU) 12-port, Rack-mount",
+     "desc": "1U sliding LIU with LC adapters, splice tray and SM pigtails · one at each end",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 480
+    },
+    {
+     "name": "LC-LC Single-mode Duplex Patch Cord 3 m",
+     "desc": "OS2 fibre patch cords for SFP connection",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 45
+    },
+    {
+     "name": "Fibre Splicing & OTDR Testing",
+     "desc": "Fusion splicing of 6 cores at both ends, OTDR / power-meter test report",
+     "qty": 1,
+     "unit": "lot",
+     "price": 1400
+    },
+    {
+     "name": "42U Floor-standing Network Rack 800 × 1000",
+     "desc": "800 W × 1000 D, perforated front & rear doors, side panels, 4 roof fans, 2 fixed shelves, castors & levelling feet, earthing kit",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 3200
+    },
+    {
+     "name": "PDU 12-way Rack-mount",
+     "desc": "19\" universal sockets with surge protection and switch",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 280
+    },
+    {
+     "name": "1U Horizontal Cable Manager",
+     "desc": "Metal, with D-rings, for neat patching",
+     "qty": 7,
+     "unit": "pcs",
+     "price": 65
+    },
+    {
+     "name": "24-port Cat6 Patch Panel (loaded)",
+     "desc": "1U, 19\", with rear cable management · 6 panels = 144 ports",
+     "qty": 6,
+     "unit": "pcs",
+     "price": 360
+    },
+    {
+     "name": "Cat6 Patch Cord 1 m",
+     "desc": "Moulded boots · camera ports, switch uplinks and NVR connections",
+     "qty": 140,
+     "unit": "pcs",
+     "price": 9
+    },
+    {
+     "name": "APC Smart-UPS 3 kVA Rack-mount",
+     "desc": "Model SMT3000RMI2UC · 3000 VA / 2700 W, pure sine wave, LCD · backup for switches, NVRs and monitor (≈1.3 kW load)",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 2650
+    },
+    {
+     "name": "Cat6 U/UTP LSZH Cable 305 m (Schneider Actassi)",
+     "desc": "23 AWG solid copper, LSZH · 124 points × avg 50 m + 5% wastage ≈ 6510 m",
+     "qty": 22,
+     "unit": "box",
+     "price": 690
+    },
+    {
+     "name": "RJ45 Cat6 Connectors with Boots (100 pcs)",
+     "desc": "Camera-end termination",
+     "qty": 3,
+     "unit": "box",
+     "price": 65
+    },
+    {
+     "name": "GI Cable Tray / Trunking 100 × 50 mm with Cover",
+     "desc": "Main cable route with couplers, bends, tees, hangers and supports (estimated 300 m)",
+     "qty": 300,
+     "unit": "m",
+     "price": 38
+    },
+    {
+     "name": "PVC Heavy-gauge Conduit 20 mm with Fittings",
+     "desc": "Drops from main route to each camera (avg 15 m per point) incl. saddles, bends, couplers and junction boxes",
+     "qty": 1860,
+     "unit": "m",
+     "price": 6
+    },
+    {
+     "name": "Flexible Conduit 20 mm with Glands",
+     "desc": "Final connection into each camera back box (1.5 m per point)",
+     "qty": 186,
+     "unit": "m",
+     "price": 5
+    },
+    {
+     "name": "Installation of Containment",
+     "desc": "Fixing of cable tray/trunking and conduit system as per route plan, incl. fixings and supports",
+     "qty": 1,
+     "unit": "lot",
+     "price": 22380
+    },
+    {
+     "name": "Cable Pulling, Termination & Testing",
+     "desc": "Per point: pull Cat6 through containment, terminate RJ45 at camera and patch panel at rack, label both ends, continuity / Fluke test",
+     "qty": 124,
+     "unit": "point",
+     "price": 85
+    },
+    {
+     "name": "Camera Installation & Alignment",
+     "desc": "Per camera: mount back box and camera, focus and angle adjustment to agreed field of view",
+     "qty": 124,
+     "unit": "pcs",
+     "price": 75
+    },
+    {
+     "name": "Fibre Cable Laying",
+     "desc": "Pull and fix 6-core armoured fibre in containment between CCTV rack and network room",
+     "qty": 200,
+     "unit": "m",
+     "price": 8
+    },
+    {
+     "name": "Rack Assembly, NVR & Network Configuration",
+     "desc": "Rack build, UPS/PDU, switches (VLAN, PoE, uplink), NVR setup, HDD format, recording schedule, AI rules, user accounts, DMSS mobile & SmartPSS remote viewing",
+     "qty": 1,
+     "unit": "lot",
+     "price": 4500
+    },
+    {
+     "name": "Testing, Commissioning & Handover",
+     "desc": "End-to-end test, 30-day retention check, user training, camera schedule, as-built drawings and handover documents",
+     "qty": 1,
+     "unit": "lot",
+     "price": 3500
+    },
+    {
+     "name": "Access Equipment & Consumables",
+     "desc": "Ladders / mobile scaffold, cable ties, labels, sleeves, fixings and site consumables",
+     "qty": 1,
+     "unit": "lot",
+     "price": 2000
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "notes": "Design basis: 84 dome + 40 bullet Dahua 4MP WizSense cameras; 4 × 32-ch NVR (31 cameras each); 30 days continuous recording at 4MP H.265, 20 fps (~2 Mbps per camera ≈ 650 GB per camera per month) on 3 × 8 TB per NVR; all cameras home-run on Cat6 to one 42U rack (max 90 m per run); one single-mode fibre uplink to the client network. Quantities of cable and containment are estimates and will be measured on site.",
+   "terms": "Prices are valid for 15 days from the quotation date.\nPayment: 50% advance with LPO, 40% on delivery of materials, 10% on testing & commissioning.\nDelivery: 2–3 weeks for materials from LPO; installation 3–4 weeks depending on site access.\nWarranty: 2 years on Dahua equipment (manufacturer), 1 year on workmanship.\nExclusions: civil works, core drilling, false-ceiling opening/closing, power points, fire-stopping, permits and internet connection.\nCable and containment lengths are estimates; final quantities will be measured and billed as installed."
+  }
+ ]
+}

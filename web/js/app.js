@@ -1260,7 +1260,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1273,8 +1273,17 @@ async function runSeeds(){
         await setDoc(doc(fdb,COL.clients,uid()),{...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now});nc++}
       for(const p of seed.products||[]){if(haveP.has(p.name.trim().toLowerCase()))continue;
         await setDoc(doc(fdb,COL.products,uid()),{...p,createdBy:S.me.id,createdAt:now,updatedAt:now});np++}
+      const made=[];
+      for(const d0 of seed.docs||[]){const date=today(),id=uid(),pf=S.me.profile||{};
+        const number=await reserveNumber(d0.type,date,d0.reportType);
+        const d={...d0,number,date,validUntil:d0.type==='quotation'?addDays(date,S.cfg.validDays):'',dueDate:d0.type==='invoice'?addDays(date,S.cfg.dueDays):'',ref:d0.ref||'',salesperson:S.me.name||'',
+          status:d0.type==='quotation'?'draft':'',attachments:[],createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:pf.mobile||'',contactEmail:pf.email||'',createdAt:now,updatedAt:now};
+        await setDoc(doc(fdb,COL.docs,id),d);made.push(number);
+        for(const i of d.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
+          await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:+i.price||0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:number})}}
       await setDoc(doc(fdb,COL.config,'company'),{seeds:{...done,[seed.id]:now}},{merge:true});
       if(nc||np)toast(`Added ${nc} customer${nc===1?'':'s'} and ${np} product${np===1?'':'s'}`);
+      if(made.length)setTimeout(()=>toast('Quotation '+made.join(', ')+' created. Open Documents → Quotations.'),2600);
     }catch(e){console.warn('seed',url,e)}
   }
 }
