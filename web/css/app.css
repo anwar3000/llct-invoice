@@ -166,7 +166,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .trn{display:inline-flex;align-self:flex-start;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;color:var(--c);border:1px solid #d9dbe0;border-radius:3px;padding:2px 7px;text-transform:uppercase}
 .sheet .ct{border-left:2px solid var(--b);padding-left:14px;font-size:10px;line-height:1.65;color:#4f535a;min-width:190px}
 .sheet .ct .adr{white-space:pre-line;color:#2b2e33;font-weight:500;margin-bottom:2px}
-.sheet .ct b{display:inline-block;width:14px;color:var(--b);font-weight:700}
+.sheet .ct b{display:inline-block;width:30px;color:var(--b);font-weight:700;font-size:9px;letter-spacing:.04em}
 .sheet .tbar{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid #e3e1dd;border-bottom:1px solid #e3e1dd;padding:12px 0}
 .sheet .tbar .dt{font-family:var(--f-display);font-weight:800;font-size:25px;letter-spacing:.16em;text-transform:uppercase;color:var(--c);line-height:1;display:flex;align-items:center;gap:12px}
 .sheet .tbar .dt:before{content:"";width:5px;height:24px;background:var(--b);border-radius:1px}
