@@ -632,3 +632,5 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .rcamt .rv{font-size:36px}
 .sheet.premium.f-gothic .rcamt .rv{font-size:32px}
 .sheet.premium .rcamt .stamp{border-color:var(--b);color:var(--b)}
+.pcat{padding:10px 16px 6px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--sunk);border-top:1px solid var(--line)}
+.pcat:first-child{border-top:0}

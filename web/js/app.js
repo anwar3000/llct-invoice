@@ -900,13 +900,13 @@ function profileForm(){
 VIEWS.clients=()=>{
   const q=(S.params.q||'').toLowerCase();
   const list=S.clients.filter(c=>!q||[c.name,c.contact,c.phone,c.email].join(' ').toLowerCase().includes(q)).map(c=>({c,b:clientBalance(c.id)})).sort((a,b)=>b.b-a.b||a.c.name.localeCompare(b.c.name));
-  return `<div class="head"><div><h1>Clients & SOA</h1><div class="sub">${S.clients.length} clients${can('reports')?' · '+cur(list.reduce((s,x)=>s+x.b,0))+' receivable':''}</div></div>${can('clients')?`<button class="btn primary" id="nc">${I.plus}Add client</button>`:''}</div>
+  return `<div class="head"><div><h1>Clients & SOA</h1><div class="sub">${S.clients.length} clients${can('reports')?' · '+cur(list.reduce((s,x)=>s+x.b,0))+' receivable':''}</div></div>${can('clients')?`<div class="row"><button class="btn" id="imc">Import</button><button class="btn primary" id="nc">${I.plus}Add client</button></div>`:''}</div>
   <input class="search" id="cq" placeholder="Search clients" value="${h(S.params.q||'')}">
   <div class="card list">${list.length?list.map(({c,b})=>`<button class="li" data-c="${c.id}"><span class="ico q">${h(c.name.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</span><span style="min-width:0"><div class="t">${h(c.name)}</div><div class="s">${h([c.contact,c.phone].filter(Boolean).join(' · ')||'No contact details')}</div></span>
    <span class="r">${can('reports')?`<div class="num" style="${b>0?'font-weight:600':''}">${money(b)}</div><span class="pill ${b>0?'warn':'good'}">${b>0?'balance due':b<0?'in credit':'settled'}</span>`:''}</span></button>`).join(''):`<div class="empty"><b>No clients yet</b>Add a client to start quoting and invoicing.</div>`}</div>`;
 };
 VIEWS_AFTER.clients=()=>{
-  $('#nc')&&($('#nc').onclick=()=>clientForm());
+  $('#nc')&&($('#nc').onclick=()=>clientForm());$('#imc')&&($('#imc').onclick=()=>importForm('clients'));
   $$('[data-c]').forEach(b=>b.onclick=()=>go('client',{id:b.dataset.c,from:'clients'}));
   const cq=$('#cq');cq.oninput=()=>{S.params.q=cq.value;clearTimeout(cq._t);cq._t=setTimeout(()=>{render();const n=$('#cq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
 };
@@ -1112,25 +1112,72 @@ function renderReceipt(p){
     <div class="sig"><div class="img"></div><div class="ln"><b>Thank you for your payment</b><br>Please keep this receipt for your records.</div></div></div>
   ${sheetFoot()}</div>`;
 }
+/* ----- import lists (CSV from Excel / Google Sheets) ----- */
+function parseCSV(t){
+  t=String(t||'').replace(/^\uFEFF/,'');const delim=(t.split('\n')[0].match(/\t/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?'\t':',';
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++}else q=false}else cell+=ch}
+    else if(ch==='"')q=true;else if(ch===delim){row.push(cell);cell=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}else cell+=ch}
+  if(cell||row.length){row.push(cell);rows.push(row)}
+  return rows.filter(r=>r.some(c=>String(c).trim()));
+}
+const IMPORT={
+  clients:{title:'Import clients',cols:{name:/^(name|client|company|customer)/i,contact:/contact|attn/i,phone:/phone|mobile|tel/i,email:/mail/i,taxId:/trn|tax|vat/i,address:/address|location/i,creditDays:/credit|terms|days/i,lat:/^lat/i,lng:/^(lng|lon)/i,placeName:/place|site/i},
+    hint:'Columns: name, contact, phone, email, TRN, address, credit days (optional: lat, lng, place name)',
+    build:r=>{const d={name:r.name,contact:r.contact||'',phone:r.phone||'',email:r.email||'',taxId:r.taxId||'',address:(r.address||'').replace(/\s*\|\s*/g,'\n'),creditDays:parseInt(r.creditDays)||S.cfg.dueDays,openingBalance:0};
+      const la=parseFloat(r.lat),ln=parseFloat(r.lng);if(!isNaN(la)&&!isNaN(ln))d.places=[{name:r.placeName||r.name,lat:la,lng:ln,radius:200,addedAt:new Date().toISOString()}];return d},
+    exists:d=>S.clients.some(c=>String(c.name).trim().toLowerCase()===d.name.trim().toLowerCase()),col:'clients'},
+  products:{title:'Import products',cols:{name:/^(name|item|product)/i,category:/categ|group|type/i,desc:/desc|spec|detail/i,unit:/unit|uom/i,price:/price|rate|amount/i,barcode:/barcode|sku|code|model/i},
+    hint:'Columns: name, category, description, unit, price, barcode / SKU',
+    build:r=>({name:r.name,category:r.category||'',desc:(r.desc||'').replace(/\s*\|\s*/g,'\n'),unit:r.unit||'pcs',price:parseAmt(r.price),barcode:r.barcode||'',photo:'',createdBy:S.me.id,createdAt:new Date().toISOString()}),
+    exists:d=>S.products.some(p=>String(p.name).trim().toLowerCase()===d.name.trim().toLowerCase()),col:'products'}};
+function importForm(kind){
+  const K=IMPORT[kind];let items=[];
+  const o=modal(K.title,`<div class="muted" style="font-size:.86rem">Choose a CSV file (Excel: <b>File → Save as → CSV</b>) or paste rows copied from Excel / Google Sheets. The first row must be the column headings. ${h(K.hint)}.</div>
+    <div class="row"><button class="btn" id="im-file" type="button">${I.plus}Choose CSV file</button><span class="muted" id="im-name"></span></div>
+    <textarea id="im-text" rows="6" placeholder="name,phone,email,address&#10;Example LLC,+971 4 000 0000,info@example.com,Office 1 | Business Bay | Dubai"></textarea>
+    <div id="im-prev"></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="im-go" disabled>Import</button>`,true);
+  const preview=()=>{const rows=parseCSV($('#im-text',o).value);items=[];
+    if(rows.length<2){$('#im-prev',o).innerHTML='';$('#im-go',o).disabled=true;return}
+    const head=rows[0].map(x=>String(x).trim());const map={};
+    Object.entries(K.cols).forEach(([k,re])=>{const i=head.findIndex(hd=>re.test(hd));if(i>=0&&!Object.values(map).includes(i))map[k]=i});
+    if(map.name==null){$('#im-prev',o).innerHTML='<div class="notice">No "name" column found in the first row.</div>';$('#im-go',o).disabled=true;return}
+    rows.slice(1).forEach(r=>{const x={};Object.entries(map).forEach(([k,i])=>x[k]=String(r[i]??'').trim());if(x.name){const d=K.build(x);items.push({d,dup:K.exists(d)})}});
+    const nNew=items.filter(i=>!i.dup).length;
+    $('#im-prev',o).innerHTML=`<div class="scroll-x"><table class="tbl"><thead><tr><th></th>${Object.keys(map).map(k=>`<th>${h(k)}</th>`).join('')}</tr></thead><tbody>${items.slice(0,60).map(i=>`<tr><td>${i.dup?'<span class="pill">already exists</span>':'<span class="pill good">new</span>'}</td>${Object.keys(map).map(k=>`<td>${h(String(i.d[k]??'')).slice(0,60)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="muted" style="font-size:.84rem">${nNew} new · ${items.length-nNew} already in the list (skipped)</div>`;
+    $('#im-go',o).disabled=!nNew;$('#im-go',o).textContent=nNew?`Import ${nNew}`:'Import'};
+  $('#im-text',o).oninput=preview;
+  $('#im-file',o).onclick=async()=>{const [f]=await pickFiles({accept:'.csv,.tsv,.txt,text/csv',multiple:false});if(!f)return;$('#im-name',o).textContent=f.name;$('#im-text',o).value=await f.text();preview()};
+  $('#im-go',o).onclick=async()=>{const todo=items.filter(i=>!i.dup);const b=$('#im-go',o);b.disabled=true;let n=0;
+    for(const i of todo){b.textContent=`Importing ${n+1} of ${todo.length}…`;try{await Store.put(K.col,uid(),{...i.d,updatedAt:new Date().toISOString()});n++}catch(e){toast('Stopped: '+(e.message||e.code),true);break}}
+    toast(n+' imported');closeModal()};
+}
 /* ----- products ----- */
 VIEWS.products=()=>{
-  const q=(S.params.q||'').toLowerCase();const list=S.products.filter(p=>!q||[p.name,p.desc,p.barcode].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
-  return `<div class="head"><div><h1>Products</h1><div class="sub">Saved items fill in descriptions, prices and photos on quotations</div></div><button class="btn primary" id="npd">${I.plus}Add product</button></div>
-  <input class="search" id="pq" placeholder="Search products or barcode" value="${h(S.params.q||'')}">
-  <div class="card list">${list.length?list.map(p=>`<button class="li" data-pd="${p.id}">${p.photo?img(p.photo,'style="width:36px;height:36px;border-radius:8px;object-fit:cover"'):'<span class="ico q">ITEM</span>'}<span style="min-width:0"><div class="t">${h(p.name)}</div><div class="s">${h(p.desc||'')}${p.barcode?' · <span class="num">'+h(p.barcode)+'</span>':''}</div></span><span class="r num">${money(p.price)}<div class="muted" style="font-size:.75rem">per ${h(p.unit||'pcs')}</div></span></button>`).join(''):`<div class="empty"><b>No products saved</b>Add the items you sell most so quotations fill in by themselves.</div>`}</div>`;
+  const q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'';
+  const cats=[...new Set(S.products.map(p=>p.category||'Other'))].sort();
+  const list=S.products.filter(p=>(!cat||(p.category||'Other')===cat)&&(!q||[p.name,p.desc,p.barcode,p.category].join(' ').toLowerCase().includes(q))).sort((a,b)=>String(a.category||'Other').localeCompare(String(b.category||'Other'))||a.name.localeCompare(b.name));
+  return `<div class="head"><div><h1>Products</h1><div class="sub">${S.products.length} items · saved items fill in descriptions, prices and photos</div></div><div class="row"><button class="btn" id="imp">Import</button><button class="btn primary" id="npd">${I.plus}Add product</button></div></div>
+  <div class="row"><input class="search" id="pq" placeholder="Search products, model or barcode" value="${h(S.params.q||'')}">${cats.length>1?`<select id="pcat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>`:''}</div>
+  <div class="card list">${list.length?list.map((p,k)=>`${(k===0||String(list[k-1].category||'Other')!==String(p.category||'Other'))?`<div class="pcat">${h(p.category||'Other')}</div>`:''}`+`<button class="li" data-pd="${p.id}">${p.photo?img(p.photo,'style="width:36px;height:36px;border-radius:8px;object-fit:cover"'):'<span class="ico q">ITEM</span>'}<span style="min-width:0"><div class="t">${h(p.name)}</div><div class="s">${h(p.desc||'')}${p.barcode?' · <span class="num">'+h(p.barcode)+'</span>':''}</div></span><span class="r num">${money(p.price)}<div class="muted" style="font-size:.75rem">per ${h(p.unit||'pcs')}</div></span></button>`).join(''):`<div class="empty"><b>No products saved</b>Add the items you sell most so quotations fill in by themselves.</div>`}</div>`;
 };
-VIEWS_AFTER.products=()=>{$('#npd').onclick=()=>productForm();$$('[data-pd]').forEach(b=>b.onclick=()=>productForm(S.products.find(p=>p.id===b.dataset.pd)));
+VIEWS_AFTER.products=()=>{$('#npd').onclick=()=>productForm();$('#imp').onclick=()=>importForm('products');$('#pcat')&&($('#pcat').onchange=e=>{S.params.cat=e.target.value;render()});$$('[data-pd]').forEach(b=>b.onclick=()=>productForm(S.products.find(p=>p.id===b.dataset.pd)));
   const pq=$('#pq');pq.oninput=()=>{S.params.q=pq.value;clearTimeout(pq._t);pq._t=setTimeout(()=>{render();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)}};
 function productForm(p){
   const e={unit:'pcs',...(p||{})};
   const o=modal(p?'Edit product':'New product',`<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><button class="photo" id="pd-ph" style="width:96px;height:96px;flex:none" type="button">${e.photo?img(e.photo):'+ Photo'}</button>
    <div class="grid grow"><label class="field"><span>Name</span><input id="pd-name" value="${h(e.name)}"></label><label class="field"><span>Description</span><textarea id="pd-desc">${h(e.desc)}</textarea></label></div></div>
    <div class="grid g3"><label class="field"><span>Price</span><input type="number" step="any" id="pd-price" value="${h(e.price||'')}"></label><label class="field"><span>Unit</span><input id="pd-unit" value="${h(e.unit)}"></label>
+   <label class="field"><span>Category</span><input id="pd-category" list="pd-cats" value="${h(e.category||'')}" placeholder="e.g. CCTV Cameras"><datalist id="pd-cats">${[...new Set(S.products.map(p=>p.category).filter(Boolean))].map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
    <label class="field"><span>Barcode / SKU</span><div class="row" style="flex-wrap:nowrap"><input id="pd-barcode" value="${h(e.barcode||'')}"><button class="btn" id="pd-scan" aria-label="Scan barcode">${I.scan}</button></div></label></div>`,
    `${p?'<button class="btn danger" id="pd-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="pd-save">Save product</button>`);
   $('#pd-ph',o).onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading photo…');e.photo=await storeImage(f,800);$('#pd-ph',o).innerHTML=img(e.photo)};
   $('#pd-scan',o).onclick=()=>openScanner(c=>{$('#pd-barcode',o).value=c},{title:'Scan product barcode'});
-  $('#pd-save',o).onclick=async()=>{const d={...e,name:$('#pd-name',o).value.trim(),desc:$('#pd-desc',o).value.trim(),price:+$('#pd-price',o).value||0,unit:$('#pd-unit',o).value.trim(),barcode:$('#pd-barcode',o).value.trim()};
+  $('#pd-save',o).onclick=async()=>{const d={...e,category:$('#pd-category',o).value.trim(),name:$('#pd-name',o).value.trim(),desc:$('#pd-desc',o).value.trim(),price:+$('#pd-price',o).value||0,unit:$('#pd-unit',o).value.trim(),barcode:$('#pd-barcode',o).value.trim()};
     if(!d.name){toast('Enter the product name.',true);return}if(await save('products',e.id||uid(),d,'Product saved'))closeModal()};
   $('#pd-del',o)&&($('#pd-del',o).onclick=async()=>{if(!await confirmBox('Delete product?',e.name+' will be removed from the list. Existing documents keep it.'))return;await Store.remove('products',e.id);closeModal()});
 }
