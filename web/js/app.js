@@ -450,8 +450,9 @@ async function downloadPdf(html,filename,merge=[]){
     const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);if(!e)return '';const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);const parts=[];while(w.nextNode())parts.push(w.currentNode.nodeValue.trim());return parts.filter(Boolean).join(' ').replace(/\s+/g,' ')};
     const meta={client:(first&&first.dataset.client)||'',site:(first&&first.dataset.site)||'',ref:(first&&first.dataset.ref)||'',title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
       total:tx('.tot .gr')||(first&&first.querySelector('.sum4 .dk')?tx('.sum4 .dk .k')+' '+tx('.sum4 .dk .v'):'')||(tx('.rcamt .rv')?'Amount '+tx('.rcamt .rv'):'')};
+    paginate(st.firstElementChild,mp?1123-MT-MB:1123);
     const w=html2pdf().set({margin:mp?[MT,0,MB,0]:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
-      jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging','.words','.info','figure']}}).from(st.firstElementChild);
+      jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:[]}}).from(st.firstElementChild);
     let bytes;
     if(mp){const pdf=await w.toPdf().get('pdf');decoratePages(pdf,meta,MT,MB);bytes=new Uint8Array(pdf.output('arraybuffer'))}
     else bytes=new Uint8Array(await w.outputPdf('arraybuffer'));
@@ -494,6 +495,24 @@ function decoratePages(pdf,meta,MT,MB){
     const right=i<n?(meta.total?meta.total+'  ·  continued':'Continued on next page'):(meta.number||String(c.website||'').split('·')[0].trim());
     pdf.setFont('helvetica',i<n?'bold':'normal');pdf.setTextColor(...(i<n?dark:grey));pdf.text(fit(right,250),R,fy,{align:'right'});
   }
+}
+// Page breaks: keep rows, totals, terms and signatures whole, and repeat table headings on new pages.
+function paginate(root,pageH){
+  const top0=()=>root.getBoundingClientRect().top;
+  const els=$$('.pdfdoc > .sheet, .sheet > *:not(table), .sheet > table > tbody > tr',root);
+  els.forEach((el,i)=>{
+    const r=el.getBoundingClientRect(),t=r.top-top0(),b=r.bottom-top0();
+    if(el.classList.contains('sheet')){ // each extra sheet (attachments) starts on a new page
+      if(i>0&&t%pageH>1){const sp=document.createElement('div');sp.style.height=(Math.ceil(t/pageH)*pageH-t)+'px';el.parentNode.insertBefore(sp,el)}return}
+    if(r.height>pageH*0.85)return;
+    if(Math.floor(t/pageH)===Math.floor((b-1)/pageH))return;
+    const pad=(Math.floor(t/pageH)+1)*pageH-t;
+    if(el.tagName==='TR'){
+      const sp=document.createElement('tr');sp.className='pgsp';sp.innerHTML=`<td colspan="20" style="height:${pad}px;padding:0;border:0;background:#fff"></td>`;
+      el.parentNode.insertBefore(sp,el);
+      const hd=el.closest('table').querySelector('thead tr');if(hd){const rh=hd.cloneNode(true);rh.className='rephead';el.parentNode.insertBefore(rh,el)}
+    }else{const gap=parseFloat(getComputedStyle(el.parentNode).rowGap)||0;const sp=document.createElement('div');sp.className='pgsp';sp.style.height=Math.max(0,pad-gap+6)+'px';el.parentNode.insertBefore(sp,el)}
+  });
 }
 async function openAttachment(a){
   const data=await loadImg(a.ref.split(':')[1]);if(!data){toast('Could not load this attachment.',true);return}

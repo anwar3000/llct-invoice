@@ -641,3 +641,5 @@ table.tbl{width:100%;border-collapse:collapse}
 /* Classic: no colour bars (print-friendly) */
 .sheet:not(.premium):not(.clean) .band{display:none}
 .sheet:not(.premium):not(.clean){padding-top:56px}
+.sheet .pgsp{flex:none;border:0!important;background:#fff!important}
+.sheet tr.rephead th{position:static}
