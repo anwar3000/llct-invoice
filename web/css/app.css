@@ -635,6 +635,9 @@ table.tbl{width:100%;border-collapse:collapse}
 .pcat{padding:10px 16px 6px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--sunk);border-top:1px solid var(--line)}
 .pcat:first-child{border-top:0}
 /* PDF export with running header/footer: page margins replace the sheet's own top/bottom space */
-.pdfdoc.mp .sheet{min-height:1049px;padding-top:4px;padding-bottom:2px}
-.pdfdoc.mp .sheet.clean{padding-top:8px;padding-bottom:6px}
+.pdfdoc.mp .sheet:not(.premium){min-height:1023px;padding-top:0;padding-bottom:0;gap:17px}
+.pdfdoc.mp .sheet.clean{padding-top:0;padding-bottom:0}
 .pdfdoc.mp .sheet .band,.pdfdoc.mp .sheet .ft{display:none}
+/* Classic: no colour bars (print-friendly) */
+.sheet:not(.premium):not(.clean) .band{display:none}
+.sheet:not(.premium):not(.clean){padding-top:56px}

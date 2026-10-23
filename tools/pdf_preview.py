@@ -11,7 +11,7 @@ stub = """const initializeApp=()=>({}),getAuth=()=>({}),onAuthStateChanged=()=>{
 const initializeFirestore=()=>({}),persistentLocalCache=()=>({}),persistentMultipleTabManager=()=>({}),collection=()=>({}),doc=()=>({}),getDoc=async()=>({exists:()=>false}),setDoc=async()=>{},deleteDoc=async()=>{},onSnapshot=()=>()=>{},query=()=>({}),where=()=>({}),runTransaction=async()=>1,getDocsFromServer=async()=>({docs:[]}),getDocFromServer=async()=>({exists:()=>false});const firebaseConfig={};"""
 test = """
 S.me={id:'u1',role:'admin',perms:{},name:'Anwar'};
-window.__make=async(style)=>{S.cfg.docStyle=style;const d={...__Q,id:'Q',number:'QTN231026418',date:'2026-10-23',validUntil:'2026-11-07',salesperson:'Anwar',contactName:'Anwar',contactMobile:'+971 50 803 1282',contactEmail:'anwar@llct.net'};
+window.__make=async(style,short)=>{S.cfg.docStyle=style;const d={...__Q,...(short?{items:__Q.items.slice(0,4),notes:''}:{}),id:'Q',number:'QTN231026418',date:'2026-10-23',validUntil:'2026-11-07',salesperson:'Anwar',contactName:'Anwar',contactMobile:'+971 50 803 1282',contactEmail:'anwar@llct.net'};
   let out=null;saveFile=async(bytes)=>{out=bytes};await downloadPdf(renderSheet(d),'x.pdf');
   let b='';for(let i=0;i<out.length;i+=0x8000)b+=String.fromCharCode.apply(null,out.subarray(i,i+0x8000));return btoa(b)};
 """.replace('__Q', json.dumps(q, ensure_ascii=False))
@@ -26,6 +26,8 @@ with sync_playwright() as p:
     pg = br.new_page(); pg.on('pageerror', lambda e: print('PAGE ERROR', e))
     pg.goto('file://' + path); pg.wait_for_timeout(3000)
     for st in ['classic', 'clean', 'premium']:
-        b64 = pg.evaluate("s=>__make(s)", st)
-        open(os.path.join(out, f'quote-{st}.pdf'), 'wb').write(base64.b64decode(b64)); print('wrote', st)
+        for short in (False, True):
+            b64 = pg.evaluate("([s,k])=>__make(s,k)", [st, short])
+            name = f"quote-{st}{'-short' if short else ''}.pdf"
+            open(os.path.join(out, name), 'wb').write(base64.b64decode(b64)); print('wrote', name)
     br.close()

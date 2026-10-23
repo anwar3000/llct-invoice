@@ -391,7 +391,7 @@ function renderSheet(d){
   const dl=d.delivery||{};
   const right=isDN?`<div class="sig"><div class="img">${dl.signature?`<img src="${h(dl.signature)}" alt="">`:''}</div><div class="ln"><b>${h(R.sign)}: ${h(dl.receiver||'')}</b>${dl.signedAt?`<br><i style="color:#2F8A57;font-style:normal">${h(R.ok)}</i>`:''}${hasGPS(dl.gps)?`<br><span class="m" style="font-size:9px">Signed at GPS ${fmtGPS(dl.gps)}</span>`:''}<br>${dl.receiverPhone?h(dl.receiverPhone)+' · ':''}${dl.signedAt?fdt(dl.signedAt):'Name, signature & date'}</div></div>`
     :`<div class="sig"><div class="img"></div><div class="ln"><b>${isQ?'Accepted by':'Received by'}</b><br>Name, signature, company stamp & date</div></div>`;
-  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number,isPrem()?subFor(d):'')}
+  return `<div class="sheet${docCls()}" data-client="${h(cl.name||'')}" data-site="${h(d.deliveryAddress||d.subject||'')}" data-ref="${h(d.ref||'')}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number,isPrem()?subFor(d):'')}
   <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
     ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div></div>
@@ -409,7 +409,7 @@ function renderSOA(cid,from,to){
   const x=soaData(cid,from,to),c=S.cfg,cl=x.c;
   const rows=[`<tr><td class="m">${fdate(from)}</td><td colspan="3"><b>Balance brought forward</b></td><td></td><td></td><td class="r m"><b>${money(x.open)}</b></td></tr>`]
     .concat(x.rows.map(r=>`<tr><td class="m">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="m">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r m">${r.dr?money(r.dr):''}</td><td class="r m">${r.cr?money(r.cr):''}</td><td class="r m">${money(r.bal)}</td></tr>`)).join('');
-  return `<div class="sheet${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('SOA','SOA'+ddmmyy(to)+String(cid).replace(/[^A-Za-z0-9]/g,'').slice(-4).toUpperCase(),'Statement of account · '+fdate(from)+' – '+fdate(to))}
+  return `<div class="sheet${docCls()}" data-client="${h(cl.name||'')}" data-site="${h('Statement '+fdate(from)+' – '+fdate(to))}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('SOA','SOA'+ddmmyy(to)+String(cid).replace(/[^A-Za-z0-9]/g,'').slice(-4).toUpperCase(),'Statement of account · '+fdate(from)+' – '+fdate(to))}
   <div class="meta"><div class="box"><div class="k">Customer</div><div class="cn">${h(cl.name)}</div><div style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div>
   <div class="box dg"><span>Period</span><span>${fdate(from)} – ${fdate(to)}</span><span>Statement date</span><span>${fdate(today())}</span><span>Currency</span><span>${h(c.currency)}</span>${cl.creditDays?`<span>Credit terms</span><span>${h(cl.creditDays)} days</span>`:''}</div></div>
   <div class="sum4"><div><div class="k">Opening balance</div><div class="v">${money(x.open)}</div></div><div><div class="k">Invoiced</div><div class="v">${money(x.invd)}</div></div><div><div class="k">Received</div><div class="v">${money(x.recd)}</div></div><div class="dk"><div class="k">Balance due</div><div class="v">${money(x.close)}</div></div></div>
@@ -445,10 +445,10 @@ async function downloadPdf(html,filename,merge=[]){
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;alignBrand(st);
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
     // Classic & Clean: leave room for a running header (pages 2+) and a footer on every page
-    const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=40,MB=34;
+    const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=60,MB=40;
     if(mp)st.firstElementChild.classList.add('mp');
     const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);if(!e)return '';const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);const parts=[];while(w.nextNode())parts.push(w.currentNode.nodeValue.trim());return parts.filter(Boolean).join(' ').replace(/\s+/g,' ')};
-    const meta={title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
+    const meta={client:(first&&first.dataset.client)||'',site:(first&&first.dataset.site)||'',ref:(first&&first.dataset.ref)||'',title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
       total:tx('.tot .gr')||(first&&first.querySelector('.sum4 .dk')?tx('.sum4 .dk .k')+' '+tx('.sum4 .dk .v'):'')||(tx('.rcamt .rv')?'Amount '+tx('.rcamt .rv'):'')};
     const w=html2pdf().set({margin:mp?[MT,0,MB,0]:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
       jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging','.words','.info','figure']}}).from(st.firstElementChild);
@@ -470,19 +470,29 @@ async function downloadPdf(html,filename,merge=[]){
 function decoratePages(pdf,meta,MT,MB){
   const c=S.cfg,W=794,H=1123,L=48,R=W-48,n=pdf.internal.getNumberOfPages();
   const rgb=hx=>{const m=String(hx||'#000').replace('#','');const v=parseInt(m.length===3?m.split('').map(x=>x+x).join(''):m,16);return [(v>>16)&255,(v>>8)&255,v&255]};
-  const brand=rgb(c.brand),dark=rgb(c.charcoal),classic=c.docStyle==='classic';
-  const fit=(t,max)=>{t=String(t||'');while(t.length>3&&pdf.getTextWidth(t)>max)t=t.slice(0,-2);return t};
+  const dark=rgb(c.charcoal),grey=[120,124,131],line=[200,203,209];
+  const fit=(t,max)=>{t=String(t||'');if(pdf.getTextWidth(t)<=max)return t;while(t.length>3&&pdf.getTextWidth(t+'…')>max)t=t.slice(0,-1);return t+'…'};
+  let bc='';try{bc=meta.number?barcodeData(meta.number):''}catch(e){}
+  // header boxes (pages 2+): [company · document] [client · site / ref] [barcode · number]
+  const y=12,hh=38,c1=L,c2=L+250,c3=R-190;
   for(let i=1;i<=n;i++){pdf.setPage(i);
-    if(classic){pdf.setFillColor(...brand);pdf.rect(0,0,W*0.66,6,'F');pdf.setFillColor(...dark);pdf.rect(W*0.66,0,W*0.34,6,'F')}
-    if(i>1){pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(fit(c.name,330),L,26);
-      pdf.setTextColor(...(classic?brand:dark));pdf.text(fit([meta.title,meta.number].filter(Boolean).join('  ·  ').toUpperCase(),330),R,26,{align:'right'});
-      pdf.setDrawColor(classic?brand[0]:200,classic?brand[1]:200,classic?brand[2]:200);pdf.setLineWidth(classic?1.2:.6);pdf.line(L,32,R,32)}
-    const fy=H-MB+22;pdf.setDrawColor(225,223,219);pdf.setLineWidth(.6);pdf.line(L,H-MB+8,R,H-MB+8);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(138,141,147);
+    if(i>1){
+      pdf.setDrawColor(...line);pdf.setLineWidth(.8);pdf.roundedRect(L,y,R-L,hh,3,3,'S');pdf.line(c2,y,c2,y+hh);pdf.line(c3,y,c3,y+hh);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(fit(c.name,c2-c1-20),c1+10,y+15);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...grey);pdf.text(fit(String(meta.title||'').toUpperCase(),c2-c1-20),c1+10,y+29);
+      pdf.setFontSize(6);pdf.setTextColor(...grey);pdf.text(meta.ref?'CLIENT  ·  REF '+fit(meta.ref,120):'CLIENT / SITE',c2+10,y+11);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(...dark);pdf.text(fit(meta.client||'—',c3-c2-20),c2+10,y+22);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...grey);pdf.text(fit(meta.site||'',c3-c2-20),c2+10,y+32);
+      if(bc){try{pdf.addImage(bc,'PNG',c3+12,y+5,R-c3-24,17)}catch(e){}}
+      pdf.setFont('courier','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(meta.number||'',(c3+R)/2,y+33,{align:'center'});
+    }
+    // footer (every page)
+    const fy=H-MB+24;pdf.setDrawColor(...line);pdf.setLineWidth(.6);pdf.line(L,H-MB+10,R,H-MB+10);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...grey);
     pdf.text(fit(c.name+(c.taxId?'  ·  '+c.taxIdLabel+' '+c.taxId:''),250),L,fy);
     pdf.setFont('helvetica','bold');pdf.setTextColor(...dark);pdf.text(`Page ${i} of ${n}`,W/2,fy,{align:'center'});
     const right=i<n?(meta.total?meta.total+'  ·  continued':'Continued on next page'):(meta.number||String(c.website||'').split('·')[0].trim());
-    pdf.setFont('helvetica',i<n?'bold':'normal');pdf.setTextColor(...(i<n?(classic?brand:dark):[138,141,147]));pdf.text(fit(right,250),R,fy,{align:'right'});
+    pdf.setFont('helvetica',i<n?'bold':'normal');pdf.setTextColor(...(i<n?dark:grey));pdf.text(fit(right,250),R,fy,{align:'right'});
   }
 }
 async function openAttachment(a){
@@ -1124,7 +1134,7 @@ function renderReceipt(p){
   if(p.chequeDate)det.push(['Cheque date',fdate(p.chequeDate)]);
   const by=nameOf(p.createdBy,'');if(by)det.push(['Received by',by]);
   const pdc=/pdc/i.test(p.method||'')||(p.chequeDate&&p.chequeDate>p.date);
-  return `<div class="sheet receipt${docCls()}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Receipt',p.receiptNo||'',isPrem()?'Thank you for your payment':'')}
+  return `<div class="sheet receipt${docCls()}" data-client="${h(cl.name||'')}" data-site="${h(inv?'Against '+inv.number:'Payment on account')}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead('Receipt',p.receiptNo||'',isPrem()?'Thank you for your payment':'')}
   <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">Received from</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.address,cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div></div>
     ${detHtml(det)}</div>
