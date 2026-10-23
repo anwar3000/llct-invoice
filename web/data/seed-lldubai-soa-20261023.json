@@ -1,0 +1,51 @@
+{
+ "id": "lldubai-soa-20261023",
+ "clients": [
+  {
+   "name": "LL Dubai Operations LLC",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Dubai Parks and Resorts\nSheikh Zayed Road (E11), Jebel Ali\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  }
+ ],
+ "legacy": [
+  {
+   "clientName": "LL Dubai Operations LLC",
+   "number": "INV259838",
+   "date": "2025-12-16",
+   "ref": "53493",
+   "subject": "Emergency panel",
+   "amount": 7371.0
+  },
+  {
+   "clientName": "LL Dubai Operations LLC",
+   "number": "INV259845",
+   "date": "2026-02-02",
+   "ref": "PROPCO-2019042",
+   "subject": "Water park CCTV",
+   "amount": 276328.5
+  },
+  {
+   "clientName": "LL Dubai Operations LLC",
+   "number": "INV259846",
+   "date": "2026-02-02",
+   "ref": "",
+   "subject": "Variation Water park",
+   "amount": 13387.5
+  }
+ ],
+ "payments": [
+  {
+   "clientName": "LL Dubai Operations LLC",
+   "invoiceNumber": "INV259845",
+   "amount": 138164.25,
+   "date": "2026-02-02",
+   "method": "Previous payment",
+   "note": "Paid before using the app"
+  }
+ ]
+}

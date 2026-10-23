@@ -199,7 +199,7 @@ function soaData(cid,from,to){
   const c=S.clients.find(x=>x.id===cid)||{};
   const tx=[];
   if(+c.openingBalance) tx.push({date:c.openingDate||'2000-01-01',kind:'Opening balance',no:'',ref:'',dr:+c.openingBalance,cr:0,open:true});
-  S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:d.legacy?'Invoice (previous)':'Invoice',no:d.number,ref:d.ref||'',dr:totals(d).total,cr:0,id:d.id,due:d.dueDate,legacy:!!d.legacy}));
+  S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:d.legacy?'Invoice (previous)':'Invoice',no:d.number,ref:[d.subject,d.ref].filter(Boolean).join(' · '),dr:totals(d).total,cr:0,id:d.id,due:d.dueDate,legacy:!!d.legacy}));
   S.payments.filter(p=>p.clientId===cid).forEach(p=>{const inv=S.docs.find(d=>d.id===p.invoiceId);tx.push({date:p.date,kind:(/credit|adjust/i.test(p.method||'')?'':'Payment · ')+(p.method||''),no:p.ref||'',ref:inv?'Against '+inv.number:(p.note||''),dr:0,cr:+p.amount||0,pid:p.id})});
   tx.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(b.dr-a.dr));
   let open=0;const rows=[];let bal;
@@ -1054,6 +1054,7 @@ function legacyForm(d){
   const paid=paidOn(d.id);
   const o=modal('Previous invoice',`<div class="grid g2">
     <label class="field"><span>Invoice no.</span><input id="lf-no" value="${h(d.number)}"></label><label class="field"><span>LPO / ref</span><input id="lf-ref" value="${h(d.ref||'')}"></label>
+    <label class="field" style="grid-column:1/-1"><span>Description</span><input id="lf-subj" value="${h(d.subject||'')}" placeholder="e.g. Water park CCTV"></label>
     <label class="field"><span>Date</span><input type="date" id="lf-date" value="${h(d.date)}"></label><label class="field"><span>Due date</span><input type="date" id="lf-due" value="${h(d.dueDate||'')}"></label>
     <label class="field"><span>Amount incl. VAT (${h(S.cfg.currency)})</span><input id="lf-amt" inputmode="decimal" value="${h(d.amount)}"></label><label class="field"><span>VAT included (optional)</span><input id="lf-vat" inputmode="decimal" value="${h(d.vat||'')}"></label>
     <label class="field" style="grid-column:1/-1"><span>Note</span><input id="lf-note" value="${h(d.notes||'')}"></label></div>
@@ -1062,7 +1063,7 @@ function legacyForm(d){
   $('#lf-save',o).onclick=async()=>{const no=$('#lf-no',o).value.trim(),amt=parseAmt($('#lf-amt',o).value),date=$('#lf-date',o).value;
     if(!no||!amt||!date){toast('Invoice no., date and amount are needed.',true);return}
     if(S.docs.some(x=>x.id!==d.id&&x.number===no)){toast('Number '+no+' is already used.',true);return}
-    const u={...d,number:no,ref:$('#lf-ref',o).value.trim(),date,dueDate:$('#lf-due',o).value||date,amount:amt,vat:parseAmt($('#lf-vat',o).value),notes:$('#lf-note',o).value.trim(),updatedAt:new Date().toISOString()};delete u.id;
+    const u={...d,number:no,ref:$('#lf-ref',o).value.trim(),subject:$('#lf-subj',o).value.trim(),date,dueDate:$('#lf-due',o).value||date,amount:amt,vat:parseAmt($('#lf-vat',o).value),notes:$('#lf-note',o).value.trim(),updatedAt:new Date().toISOString()};delete u.id;
     if(await save('docs',d.id,u,'Saved'))closeModal()};
   $('#lf-pay',o)&&($('#lf-pay',o).onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
   $('#lf-del',o)&&($('#lf-del',o).onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
@@ -1322,7 +1323,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1330,9 +1331,19 @@ async function runSeeds(){
       const seed=await (await fetch(url,{cache:'no-store'})).json();if(done[seed.id])continue;
       // read what is already there straight from the server, so nothing is added twice
       const names=async col=>new Set((await getDocsFromServer(collection(fdb,COL[col]))).docs.map(d=>String(d.data().name||'').trim().toLowerCase()));
-      const haveC=await names('clients'),haveP=await names('products');let nc=0,np=0;const now=new Date().toISOString();
-      for(const c of seed.clients||[]){if(haveC.has(c.name.trim().toLowerCase()))continue;
-        await setDoc(doc(fdb,COL.clients,uid()),{...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now});nc++}
+      const cMap=new Map((await getDocsFromServer(collection(fdb,COL.clients))).docs.map(d=>[String(d.data().name||'').trim().toLowerCase(),{...d.data(),id:d.id}]));
+      const haveC=new Set(cMap.keys()),haveP=await names('products');let nc=0,np=0;const now=new Date().toISOString();
+      for(const c of seed.clients||[]){const k=c.name.trim().toLowerCase();if(haveC.has(k))continue;const cid=uid();
+        const cd={...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now};await setDoc(doc(fdb,COL.clients,cid),cd);cMap.set(k,{...cd,id:cid});haveC.add(k);nc++}
+      // previous invoices (kept with their original numbers) and payments already received
+      const dMap=new Map();let nl=0,npay=0;
+      if((seed.legacy||[]).length||(seed.payments||[]).length)(await getDocsFromServer(collection(fdb,COL.docs))).docs.forEach(d=>dMap.set(String(d.data().number||''),d.id));
+      for(const L of seed.legacy||[]){if(dMap.has(L.number))continue;const cl=cMap.get(String(L.clientName||'').trim().toLowerCase());if(!cl)continue;const id=uid();
+        await setDoc(doc(fdb,COL.docs,id),{type:'invoice',legacy:true,number:L.number,date:L.date,dueDate:L.dueDate||addDays(L.date,+cl.creditDays||S.cfg.dueDays),ref:L.ref||'',subject:L.subject||'',
+          amount:+L.amount,vat:+L.vat||0,items:[],clientId:cl.id,client:clientSnap(cl),notes:L.notes||'Previous invoice, entered manually',createdBy:S.me.id,createdByName:S.me.name,createdAt:now,updatedAt:now});dMap.set(L.number,id);nl++}
+      for(const P of seed.payments||[]){const invId=dMap.get(P.invoiceNumber);const cl=cMap.get(String(P.clientName||'').trim().toLowerCase());if(!cl)continue;
+        await setDoc(doc(fdb,COL.payments,uid()),{clientId:cl.id,invoiceId:invId||'',amount:+P.amount,date:P.date,method:P.method||'Previous payment',ref:P.ref||'',note:P.note||'Paid before using the app',createdBy:S.me.id,createdAt:now,updatedAt:now});npay++}
+      if(nl)setTimeout(()=>toast(`${nl} previous invoice${nl===1?'':'s'} and ${npay} payment${npay===1?'':'s'} added`),5200);
       for(const p of seed.products||[]){if(haveP.has(p.name.trim().toLowerCase()))continue;
         await setDoc(doc(fdb,COL.products,uid()),{...p,createdBy:S.me.id,createdAt:now,updatedAt:now});np++}
       const made=[];
