@@ -505,7 +505,7 @@ function paginate(root,pageH){
     if(el.classList.contains('sheet')){ // each extra sheet (attachments) starts on a new page
       if(i>0&&t%pageH>1){const sp=document.createElement('div');sp.style.height=(Math.ceil(t/pageH)*pageH-t)+'px';el.parentNode.insertBefore(sp,el)}return}
     if(r.height<2||r.height>pageH*0.85)return;
-    if(Math.floor(t/pageH)===Math.floor((b+8)/pageH))return; // keep 8px clear of the page edge
+    if(Math.floor(t/pageH)===Math.floor((b-1)/pageH))return;
     const pad=(Math.floor(t/pageH)+1)*pageH-t;
     if(el.tagName==='TR'){
       const sp=document.createElement('tr');sp.className='pgsp';sp.innerHTML=`<td colspan="20" style="height:${pad}px;padding:0;border:0;background:#fff"></td>`;
