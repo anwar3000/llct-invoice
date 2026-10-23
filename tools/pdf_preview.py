@@ -30,4 +30,14 @@ with sync_playwright() as p:
             b64 = pg.evaluate("([s,k])=>__make(s,k)", [st, short])
             name = f"quote-{st}{'-short' if short else ''}.pdf"
             open(os.path.join(out, name), 'wb').write(base64.b64decode(b64)); print('wrote', name)
+    # delivery note with stamp, signatures and a proof photo (classic)
+    b64 = pg.evaluate('''async()=>{S.cfg.docStyle='classic';S.cfg.stamp='assets/logo.png';S.cfg.signature='assets/icon-192.png';S.cfg.gps='25.255461,55.339173';
+      const d={id:'D1',type:'delivery',number:'DLN231026465',date:'2026-10-23',client:{name:'Agility Logistics',address:'Jebel Ali Free Zone (South Zone)\\nPO Box 17713\\nDubai, United Arab Emirates',phone:'+971 4 813 1222',email:'dubai@agility.com'},
+       gps:{lat:9.575836,lng:77.94433},contactName:'Anwar Hussain',contactMobile:'0508031282',terms:'Goods received in good condition. Please check serial numbers against this note.',
+       items:[{name:'Dahua 4MP IR Turret IP Camera',desc:'WizSense, 2.8 mm fixed lens, IR 30 m, built-in mic, IP67, PoE',qty:2,unit:'pcs',serials:['8902080000333','608116-039-0237731'],status:'Delivered'}],
+       attachments:[{ref:'assets/icon-512.png',kind:'image',caption:'Delivered at site',inPdf:true,size:'M'}],
+       delivery:{receiver:'Marco',receiverPhone:'08855223648',signature:'assets/logo.png',signedAt:'2026-10-24T00:12:00',deliveredBy:'u1',deliveredByName:'Anwar Hussain',gps:{lat:9.57584,lng:77.94433}}};
+      let out=null;saveFile=async(bytes)=>{out=bytes};await downloadPdf(renderSheet(d)+renderAnnex(d),'x.pdf');
+      let b='';for(let i=0;i<out.length;i+=0x8000)b+=String.fromCharCode.apply(null,out.subarray(i,i+0x8000));return btoa(b)}''')
+    open(os.path.join(out, 'dn-classic.pdf'), 'wb').write(base64.b64decode(b64)); print('wrote dn-classic.pdf')
     br.close()

@@ -662,3 +662,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium.soa .ptbar{padding-top:0}
 .sheet.premium.soa tbody td{padding-top:7px;padding-bottom:7px}
 .sheet.premium.soa .sig .img{height:56px}
+/* signatures & stamp always stay inside their box (no bleed across page breaks) */
+.sheet .sig .img{overflow:hidden}
+.sheet .sig .img img{max-height:100%!important;width:auto;object-fit:contain}
+.sheet:not(.premium):not(.soa) .sig .img{height:70px}
