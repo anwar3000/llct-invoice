@@ -666,3 +666,4 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .sig .img{overflow:hidden}
 .sheet .sig .img img{max-height:100%!important;width:auto;object-fit:contain}
 .sheet:not(.premium):not(.soa) .sig .img{height:70px}
+.pdfdoc.mp .sheet:not(.premium){padding-bottom:14px}
