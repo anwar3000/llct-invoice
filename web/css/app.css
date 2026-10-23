@@ -646,3 +646,19 @@ table.tbl{width:100%;border-collapse:collapse}
 /* dates and amounts never wrap in PDF tables */
 .sheet table td:first-child.m,.sheet table td.m.r,.sheet table td.r.m{white-space:nowrap}
 .sheet.receipt tbody td:nth-child(2){white-space:nowrap}
+/* SOA: compact so a normal statement fits on one page */
+.sheet.soa,.pdfdoc.mp .sheet.soa:not(.premium){gap:12px}
+.sheet.soa .meta{gap:16px}
+.sheet.soa .sum4>div{padding:8px 12px!important}
+.sheet.soa .sum4 .v{font-size:13px}
+.sheet.soa .aging>div{padding:6px 10px!important}
+.sheet.soa tbody td{padding-top:7px;padding-bottom:7px}
+.sheet.soa .hh{margin-bottom:4px}
+.sheet.soa .sigs{padding-top:4px}
+.sheet.soa .sig .img{height:50px}
+.sheet.soa .sig .img img.stampimg{max-height:50px}
+.sheet.soa .sig .img img.sigimg{max-height:44px}
+.sheet.premium.soa .cbox{padding:12px 16px}
+.sheet.premium.soa .ptbar{padding-top:0}
+.sheet.premium.soa tbody td{padding-top:7px;padding-bottom:7px}
+.sheet.premium.soa .sig .img{height:56px}
