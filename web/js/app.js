@@ -511,7 +511,13 @@ function paginate(root,pageH){
       const sp=document.createElement('tr');sp.className='pgsp';sp.innerHTML=`<td colspan="20" style="height:${pad}px;padding:0;border:0;background:#fff"></td>`;
       el.parentNode.insertBefore(sp,el);
       const hd=el.closest('table').querySelector('thead tr');if(hd){const rh=hd.cloneNode(true);rh.className='rephead';el.parentNode.insertBefore(rh,el)}
-    }else{const gap=parseFloat(getComputedStyle(el.parentNode).rowGap)||0;const sp=document.createElement('div');sp.className='pgsp';sp.style.height=Math.max(0,pad-gap+6)+'px';el.parentNode.insertBefore(sp,el)}
+    }else{
+      // signatures never sit alone: take the terms / bank block (or amount in words) to the new page with them
+      let target=el,tt=t;
+      if(el.classList.contains('sigs')){let pv=el.previousElementSibling;while(pv&&(pv.classList.contains('pgsp')||pv.getBoundingClientRect().height<2))pv=pv.previousElementSibling;
+        if(pv&&pv.matches('.info,.words,.svc')){const pt=pv.getBoundingClientRect().top-top0();if(b-pt<pageH*0.8){target=pv;tt=pt}}}
+      const pad2=(Math.floor(tt/pageH)+1)*pageH-tt;
+      const gap=parseFloat(getComputedStyle(target.parentNode).rowGap)||0;const sp=document.createElement('div');sp.className='pgsp';sp.style.height=Math.max(0,pad2-gap+6)+'px';target.parentNode.insertBefore(sp,target)}
   });
 }
 async function openAttachment(a){
