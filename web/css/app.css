@@ -668,6 +668,6 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet:not(.premium):not(.soa):not(.clean) .sig .img{height:70px}
 .pdfdoc.mp .sheet:not(.premium):not(.clean){padding-bottom:10px}
 /* signatures follow the terms directly; only the footer stays at the bottom of the page */
-.sheet .sigs{margin-top:0}
+.sheet .sigs{margin-top:0;padding-top:2px!important}
 .sheet .ft{margin-top:auto}
 .sheet.premium .pft{margin:auto -48px 0}
