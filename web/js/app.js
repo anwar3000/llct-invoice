@@ -447,7 +447,7 @@ async function downloadPdf(html,filename,merge=[]){
     // Classic & Clean: leave room for a running header (pages 2+) and a footer on every page
     const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=40,MB=34;
     if(mp)st.firstElementChild.classList.add('mp');
-    const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);return e?e.textContent.replace(/\s+/g,' ').trim():''};
+    const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);if(!e)return '';const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);const parts=[];while(w.nextNode())parts.push(w.currentNode.nodeValue.trim());return parts.filter(Boolean).join(' ').replace(/\s+/g,' ')};
     const meta={title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
       total:tx('.tot .gr')||(first&&first.querySelector('.sum4 .dk')?tx('.sum4 .dk .k')+' '+tx('.sum4 .dk .v'):'')||(tx('.rcamt .rv')?'Amount '+tx('.rcamt .rv'):'')};
     const w=html2pdf().set({margin:mp?[MT,0,MB,0]:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
