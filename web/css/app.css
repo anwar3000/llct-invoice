@@ -643,3 +643,6 @@ table.tbl{width:100%;border-collapse:collapse}
 /* summary tiles & ageing: only the outer boxes get borders */
 .sheet .sum4>div>div,.sheet .aging>div>div{border:0!important;padding:0!important;background:none!important;border-radius:0!important}
 .sheet .sum4>div>.v{margin-top:3px}
+/* dates and amounts never wrap in PDF tables */
+.sheet table td:first-child.m,.sheet table td.m.r,.sheet table td.r.m{white-space:nowrap}
+.sheet.receipt tbody td:nth-child(2){white-space:nowrap}

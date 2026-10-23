@@ -413,7 +413,7 @@ function renderSOA(cid,from,to){
   <div class="meta"><div class="box"><div class="k">Customer</div><div class="cn">${h(cl.name)}</div><div style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div></div>
   <div class="box dg"><span>Period</span><span>${fdate(from)} – ${fdate(to)}</span><span>Statement date</span><span>${fdate(today())}</span><span>Currency</span><span>${h(c.currency)}</span>${cl.creditDays?`<span>Credit terms</span><span>${h(cl.creditDays)} days</span>`:''}</div></div>
   <div class="sum4"><div><div class="k">Opening balance</div><div class="v">${money(x.open)}</div></div><div><div class="k">Invoiced</div><div class="v">${money(x.invd)}</div></div><div><div class="k">Received</div><div class="v">${money(x.recd)}</div></div><div class="dk"><div class="k">Balance due</div><div class="v">${money(x.close)}</div></div></div>
-  <table><thead><tr><th style="width:84px">Date</th><th>Transaction</th><th style="width:110px">Number</th><th>Reference</th><th class="r" style="width:86px">Debit</th><th class="r" style="width:86px">Credit</th><th class="r" style="width:96px">Balance</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th style="width:100px">Date</th><th>Transaction</th><th style="width:110px">Number</th><th>Reference</th><th class="r" style="width:86px">Debit</th><th class="r" style="width:86px">Credit</th><th class="r" style="width:96px">Balance</th></tr></thead><tbody>${rows}</tbody></table>
   <div><div class="hh">Ageing of balance as of ${fdate(to)}</div>
   <div class="aging">${[['Current',x.ag.cur],['1–30 days',x.ag.a30],['31–60 days',x.ag.a60],['61–90 days',x.ag.a90],['Over 90',x.ag.a90p],['Total due',x.close]].map(([k,v])=>`<div><div class="k">${k}</div><div class="m">${money(v)}</div></div>`).join('')}</div></div>
   ${c.bank?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}
@@ -1147,7 +1147,7 @@ function renderReceipt(p){
   let alloc='';
   if(inv){const tot=totals(inv).total;const before=r2(S.payments.filter(x=>x.invoiceId===inv.id&&x.id!==p.id&&(x.date<p.date||(x.date===p.date&&(x.createdAt||x.updatedAt||'')<(p.createdAt||p.updatedAt||'')))).reduce((s,x)=>s+(+x.amount||0),0));
     const bal=r2(tot-before-amt);
-    alloc=`<table><thead><tr><th>Invoice</th><th>Invoice date</th><th class="r">Invoice total</th><th class="r">Paid before</th><th class="r">This payment</th><th class="r">Balance due</th></tr></thead>
+    alloc=`<table><thead><tr><th>Invoice</th><th style="width:100px">Invoice date</th><th class="r">Invoice total</th><th class="r">Paid before</th><th class="r">This payment</th><th class="r">Balance due</th></tr></thead>
      <tbody><tr><td><div class="it">${h(inv.number)}</div>${inv.ref?`<div class="idesc">${h(inv.ref)}</div>`:''}</td><td>${fdate(inv.date)}</td><td class="r m">${money(tot)}</td><td class="r m">${money(before)}</td><td class="r m b">${money(amt)}</td><td class="r m b">${money(Math.max(bal,0))}</td></tr></tbody></table>`}
   else alloc=`<table><thead><tr><th>Applied to</th><th class="r">Amount</th></tr></thead><tbody><tr><td><div class="it">Payment on account</div><div class="idesc">Not linked to a single invoice</div></td><td class="r m b">${money(amt)}</td></tr></tbody></table>`;
   // client balance straight after this payment (same-day payments counted in the order they were recorded)
