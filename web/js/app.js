@@ -504,7 +504,7 @@ function paginate(root,pageH){
     const r=el.getBoundingClientRect(),t=r.top-top0(),b=r.bottom-top0();
     if(el.classList.contains('sheet')){ // each extra sheet (attachments) starts on a new page
       if(i>0&&t%pageH>1){const sp=document.createElement('div');sp.style.height=(Math.ceil(t/pageH)*pageH-t)+'px';el.parentNode.insertBefore(sp,el)}return}
-    if(r.height>pageH*0.85)return;
+    if(r.height<2||r.height>pageH*0.85)return;
     if(Math.floor(t/pageH)===Math.floor((b-1)/pageH))return;
     const pad=(Math.floor(t/pageH)+1)*pageH-t;
     if(el.tagName==='TR'){
