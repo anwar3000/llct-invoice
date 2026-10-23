@@ -444,9 +444,17 @@ async function downloadPdf(html,filename,merge=[]){
     await Promise.all($$('img[data-ref^="img:"]',st).map(async i=>{i.src=(await loadImg(i.dataset.ref.slice(4)))||BLANK}));
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;alignBrand(st);
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
-    const w=html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+    // Classic & Clean: leave room for a running header (pages 2+) and a footer on every page
+    const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=40,MB=34;
+    if(mp)st.classList.add('mp');
+    const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);return e?e.textContent.replace(/\s+/g,' ').trim():''};
+    const meta={title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
+      total:tx('.tot .gr')||(first&&first.querySelector('.sum4 .dk')?tx('.sum4 .dk .k')+' '+tx('.sum4 .dk .v'):'')||(tx('.rcamt .rv')?'Amount '+tx('.rcamt .rv'):'')};
+    const w=html2pdf().set({margin:mp?[MT,0,MB,0]:0,filename,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
       jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling']},pagebreak:{mode:['css','legacy'],avoid:['tr','.foot','.sigs','.aging','.words','.info','figure']}}).from(st.firstElementChild);
-    let bytes=new Uint8Array(await w.outputPdf('arraybuffer'));
+    let bytes;
+    if(mp){const pdf=await w.toPdf().get('pdf');decoratePages(pdf,meta,MT,MB);bytes=new Uint8Array(pdf.output('arraybuffer'))}
+    else bytes=new Uint8Array(await w.outputPdf('arraybuffer'));
     if(merge.length){
       if(!window.PDFLib)toast('Attached PDFs were skipped: the PDF joiner did not load.',true);
       else{const out=await PDFLib.PDFDocument.load(bytes);let bad=0;
@@ -457,6 +465,25 @@ async function downloadPdf(html,filename,merge=[]){
     await saveFile(bytes,filename,'application/pdf','Send or save PDF');
   }catch(e){if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Could not create the PDF: '+(e.message||e),true)}
   finally{st.remove()}
+}
+// Running header / footer drawn straight onto each PDF page (Classic & Clean styles)
+function decoratePages(pdf,meta,MT,MB){
+  const c=S.cfg,W=794,H=1123,L=48,R=W-48,n=pdf.internal.getNumberOfPages();
+  const rgb=hx=>{const m=String(hx||'#000').replace('#','');const v=parseInt(m.length===3?m.split('').map(x=>x+x).join(''):m,16);return [(v>>16)&255,(v>>8)&255,v&255]};
+  const brand=rgb(c.brand),dark=rgb(c.charcoal),classic=c.docStyle==='classic';
+  const fit=(t,max)=>{t=String(t||'');while(t.length>3&&pdf.getTextWidth(t)>max)t=t.slice(0,-2);return t};
+  for(let i=1;i<=n;i++){pdf.setPage(i);
+    if(classic){pdf.setFillColor(...brand);pdf.rect(0,0,W*0.66,6,'F');pdf.setFillColor(...dark);pdf.rect(W*0.66,0,W*0.34,6,'F')}
+    if(i>1){pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(fit(c.name,330),L,26);
+      pdf.setTextColor(...(classic?brand:dark));pdf.text(fit([meta.title,meta.number].filter(Boolean).join('  ·  ').toUpperCase(),330),R,26,{align:'right'});
+      pdf.setDrawColor(classic?brand[0]:200,classic?brand[1]:200,classic?brand[2]:200);pdf.setLineWidth(classic?1.2:.6);pdf.line(L,32,R,32)}
+    const fy=H-MB+22;pdf.setDrawColor(225,223,219);pdf.setLineWidth(.6);pdf.line(L,H-MB+8,R,H-MB+8);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(138,141,147);
+    pdf.text(fit(c.name+(c.taxId?'  ·  '+c.taxIdLabel+' '+c.taxId:''),250),L,fy);
+    pdf.setFont('helvetica','bold');pdf.setTextColor(...dark);pdf.text(`Page ${i} of ${n}`,W/2,fy,{align:'center'});
+    const right=i<n?(meta.total?meta.total+'  ·  continued':'Continued on next page'):(meta.number||String(c.website||'').split('·')[0].trim());
+    pdf.setFont('helvetica',i<n?'bold':'normal');pdf.setTextColor(...(i<n?(classic?brand:dark):[138,141,147]));pdf.text(fit(right,250),R,fy,{align:'right'});
+  }
 }
 async function openAttachment(a){
   const data=await loadImg(a.ref.split(':')[1]);if(!data){toast('Could not load this attachment.',true);return}

@@ -634,3 +634,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .rcamt .stamp{border-color:var(--b);color:var(--b)}
 .pcat{padding:10px 16px 6px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--sunk);border-top:1px solid var(--line)}
 .pcat:first-child{border-top:0}
+/* PDF export with running header/footer: page margins replace the sheet's own top/bottom space */
+.pdf-stage.mp .sheet{min-height:1049px;padding-top:4px;padding-bottom:2px}
+.pdf-stage.mp .sheet.clean{padding-top:8px;padding-bottom:6px}
+.pdf-stage.mp .sheet .band,.pdf-stage.mp .sheet .ft{display:none}

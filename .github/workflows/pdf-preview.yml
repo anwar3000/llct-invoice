@@ -1,0 +1,32 @@
+name: PDF preview
+
+# Manual check of PDF page layout: renders sample documents through the app's real export
+# and pushes them to the 'ci-preview' branch. Does not affect the app.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Render sample PDFs
+        run: |
+          pip install playwright==1.48.0
+          python -m playwright install --with-deps chromium
+          python tools/pdf_preview.py out
+      - name: Publish to ci-preview branch
+        run: |
+          git config user.name "pdf-preview"; git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan ci-preview
+          git rm -rf --cached . >/dev/null
+          git add -f out/*.pdf
+          git commit -m "PDF preview $(date -u +%F' '%T)"
+          git push -f origin ci-preview
