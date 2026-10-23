@@ -186,8 +186,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet .dg span:nth-child(even){text-align:right;font-weight:600;color:var(--c)}
 .sheet .subj{font-weight:600;color:var(--c);font-size:12px;padding-left:10px;border-left:3px solid var(--b)}
 .sheet .subj:before{content:"Subject  ";font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#8a8d93;font-weight:600}
-.sheet table{width:100%;border-collapse:collapse}
-.sheet thead th{background:transparent;color:var(--c);font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:9px 8px;text-align:left;border-top:1px solid #e3e1dd;border-bottom:2px solid var(--c)}
+.sheet table{width:100%;border-collapse:collapse}.sheet thead th,.sheet tr.rephead th{background:transparent;color:var(--c);font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:9px 8px;text-align:left;border-top:1px solid #e3e1dd;border-bottom:2px solid var(--c)}
 .sheet tbody td{padding:11px 8px;border-bottom:1px solid #ecebe8;vertical-align:top}
 .sheet tbody tr:last-child td{border-bottom:1px solid #cfd2d8}
 .sheet tbody tr{page-break-inside:avoid;break-inside:avoid}
@@ -361,8 +360,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.clean .gps{font-family:var(--f-body);font-size:9.5px;color:#555}
 .sheet.clean .gps b{font-size:9.5px;letter-spacing:0;color:#6b6b6b;font-weight:400}
 .sheet.clean .subj{border-left:0;padding-left:0;font-size:10.5px;font-weight:400;color:#111}
-.sheet.clean .subj:before{content:"Subject: ";font-size:10.5px;letter-spacing:0;text-transform:none;color:#6b6b6b;font-weight:400}
-.sheet.clean thead th{color:#111;font-size:9.5px;letter-spacing:0;text-transform:none;font-weight:700;padding:0 6px 6px;border-top:0;border-bottom:1px solid #111}
+.sheet.clean .subj:before{content:"Subject: ";font-size:10.5px;letter-spacing:0;text-transform:none;color:#6b6b6b;font-weight:400}.sheet.clean thead th,.sheet.clean tr.rephead th{color:#111;font-size:9.5px;letter-spacing:0;text-transform:none;font-weight:700;padding:0 6px 6px;border-top:0;border-bottom:1px solid #111}
 .sheet.clean tbody td{padding:9px 6px;border-bottom:1px solid #e3e3e3}
 .sheet.clean tbody tr:last-child td{border-bottom:1px solid #111}
 .sheet.clean td.n{color:#6b6b6b;font-size:10px}
@@ -465,9 +463,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .gps b{color:var(--b)}
 .sheet.premium .subj{border-left:3px solid var(--b);padding-left:14px;font-size:12.5px;font-weight:700;font-style:italic;color:var(--c)}
 .sheet.premium .subj:before{content:"SUBJECT";font-style:normal;font-size:10px;letter-spacing:.16em;color:#6b7280;font-weight:600;margin-right:16px}
-.sheet.premium table{border-radius:7px 7px 0 0;overflow:hidden}
-.sheet.premium thead th{background:var(--c);color:#fff;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:12px 10px;border:0}
-.sheet.premium thead th small{font-size:8px;opacity:.75;letter-spacing:.06em}
+.sheet.premium table{border-radius:7px 7px 0 0;overflow:hidden}.sheet.premium thead th,.sheet.premium tr.rephead th{background:var(--c);color:#fff;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:12px 10px;border:0}.sheet.premium thead th small,.sheet.premium tr.rephead th small{font-size:8px;opacity:.75;letter-spacing:.06em}
 .sheet.premium tbody td{padding:12px 10px;border-bottom:1px solid #e3e6eb}
 .sheet.premium tbody tr:last-child td{border-bottom:1px solid #cfd4dc}
 .sheet.premium tbody td:first-child{background:#f4f5f7;color:#6b7280}
@@ -534,8 +530,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.premium .pul{margin:7px 0 8px}
 .sheet.premium .nb img.bc{height:40px}
 .sheet.premium .cbox{padding:15px 18px}
-.sheet.premium .pr{padding:7px 6px}
-.sheet.premium thead th{padding:10px 10px}
+.sheet.premium .pr{padding:7px 6px}.sheet.premium thead th,.sheet.premium tr.rephead th{padding:10px 10px}
 .sheet.premium tbody td{padding:10px 10px}
 .sheet.premium .foot{align-items:end}
 .sheet.premium .fl{gap:10px}
@@ -570,8 +565,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet.f-gothic{--f-body:"LL Gothic","Century Gothic","URW Gothic",Futura,"Segoe UI",Arial,sans-serif;--f-display:var(--f-body);--f-mono:var(--f-body);font-size:10px;line-height:1.5;font-variant-numeric:tabular-nums}
 .sheet.f-gothic .nb .no{letter-spacing:.06em;font-weight:700}
 .sheet.f-gothic .it{font-weight:700}
-.sheet.f-gothic .idesc,.sheet.f-gothic .terms,.sheet.f-gothic .tl{font-size:9px}
-.sheet.f-gothic thead th{font-size:8.5px}
+.sheet.f-gothic .idesc,.sheet.f-gothic .terms,.sheet.f-gothic .tl{font-size:9px}.sheet.f-gothic thead th,.sheet.f-gothic tr.rephead th{font-size:8.5px}
 .sheet.clean.f-gothic .tbar .dt{font-size:20px;font-weight:700}
 .sheet.clean.f-gothic .co .nm{font-size:12px}
 .sheet.classic.f-gothic .ttl .dt,.sheet.f-gothic .tbar .dt{font-size:20px}
@@ -643,3 +637,6 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet:not(.premium):not(.clean){padding-top:56px}
 .sheet .pgsp{flex:none;border:0!important;background:#fff!important}
 .sheet tr.rephead th{position:static}
+.sheet tr.rephead th{text-align:left}
+.sheet tr.rephead th.r{text-align:right}
+.sheet tr.rephead th.c{text-align:center}
