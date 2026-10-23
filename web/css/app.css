@@ -665,5 +665,5 @@ table.tbl{width:100%;border-collapse:collapse}
 /* signatures & stamp always stay inside their box (no bleed across page breaks) */
 .sheet .sig .img{overflow:hidden}
 .sheet .sig .img img{max-height:100%!important;width:auto;object-fit:contain}
-.sheet:not(.premium):not(.soa) .sig .img{height:70px}
+.sheet:not(.premium):not(.soa):not(.clean) .sig .img{height:70px}
 .pdfdoc.mp .sheet:not(.premium):not(.clean){padding-bottom:10px}
