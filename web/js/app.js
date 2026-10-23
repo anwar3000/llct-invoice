@@ -446,7 +446,7 @@ async function downloadPdf(html,filename,merge=[]){
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
     // Classic & Clean: leave room for a running header (pages 2+) and a footer on every page
     const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=40,MB=34;
-    if(mp)st.classList.add('mp');
+    if(mp)st.firstElementChild.classList.add('mp');
     const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);return e?e.textContent.replace(/\s+/g,' ').trim():''};
     const meta={title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
       total:tx('.tot .gr')||(first&&first.querySelector('.sum4 .dk')?tx('.sum4 .dk .k')+' '+tx('.sum4 .dk .v'):'')||(tx('.rcamt .rv')?'Amount '+tx('.rcamt .rv'):'')};
