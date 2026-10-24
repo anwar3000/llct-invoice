@@ -290,6 +290,10 @@ service cloud.firestore {
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
       allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
+    // Accounts: income & expenditure, admins only.
+    match /inv_ledger/{id} {
+      allow read, write: if isAdmin();
+    }
     // Each user's own contact details, printed on documents they create.
     match /inv_profiles/{uid} {
       allow read: if invOn();

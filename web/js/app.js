@@ -66,13 +66,13 @@ const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={ledger:[],petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={ledger:'inv_ledger',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -249,6 +249,7 @@ const I={
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>',
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/></svg>',
+ book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A1.5 1.5 0 015.5 3H20v15H5.5A1.5 1.5 0 004 19.5z"/><path d="M4 19.5A1.5 1.5 0 005.5 21H20v-3M8 7h8M8 11h6"/></svg>',
  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9v.01M18 15v.01"/></svg>',
  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg>',
  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.6 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
@@ -534,7 +535,7 @@ function navItems(){
   if(can('clients')||can('reports'))n.push(['clients','Clients & SOA',I.users]);
   if(can('payments')||can('reports'))n.push(['payments','Payments',I.cash]);
   if(can('clients'))n.push(['products','Products',I.box]);
-  if(isAdmin()){n.push(['sep']);n.push(['staff','Staff & access',I.shield]);n.push(['settings','Company & template',I.gear])}
+  if(isAdmin()){n.push(['accounts','Accounts',I.book]);n.push(['sep']);n.push(['staff','Staff & access',I.shield]);n.push(['settings','Company & template',I.gear])}
   return n;
 }
 function render(){
@@ -1245,6 +1246,107 @@ function productForm(p){
   $('#pd-del',o)&&($('#pd-del',o).onclick=async()=>{if(!await confirmBox('Delete product?',e.name+' will be removed from the list. Existing documents keep it.'))return;await Store.remove('products',e.id);closeModal()});
 }
 
+/* ----- accounts (admin only): income & expenditure ----- */
+const ACC_CAT={
+  income:['Cheque deposit','Cash deposit','Bank transfer received','Customer payment','Owner / capital','Refund received','Other income'],
+  expense:['Petty cash given','Purchase / supplier payment','Salaries & wages','Rent','Utilities (DEWA)','Fuel & transport','Vehicle','Visa & government fees','Telecom & internet','Tools & equipment','Office expenses','Subcontractor','Bank charges','Other expense']};
+const ACC_ACCOUNTS=['Cash','WIO Bank','RAK Bank'];
+const ACC_METHODS=['Cash','Cheque','Bank transfer','Card','Online'];
+function accRange(){const p=S.params.per||'month',t=today();
+  if(p==='month')return [t.slice(0,8)+'01',t];
+  if(p==='last'){const d=new Date(t.slice(0,8)+'01T00:00:00');d.setMonth(d.getMonth()-1);const f=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);return [f,addDays(t.slice(0,8)+'01',-1)]}
+  if(p==='year')return [t.slice(0,4)+'-01-01',t];
+  if(p==='all')return ['2000-01-01','2999-12-31'];
+  return [S.params.af||t.slice(0,8)+'01',S.params.at||t]}
+// manual entries + petty cash handed out in the attendance app (shown as expenses)
+function accEntries(){
+  const man=S.ledger.map(e=>({...e,src:'acc'}));
+  const pet=S.params.nopetty?[]:S.petty.filter(x=>x.status!=='rejected').map(x=>({id:'pt_'+x.id,src:'petty',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Petty cash given',
+    party:x.employeeName||'',givenBy:x.createdByName||'',account:'Cash',method:'Cash',note:[x.note,x.siteName].filter(Boolean).join(' · ')}));
+  return man.concat(pet);
+}
+VIEWS.accounts=()=>{
+  if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
+  const [from,to]=accRange(),tab=S.params.at2||'all',q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'',acct=S.params.acct||'';
+  const all=accEntries().filter(e=>e.date>=from&&e.date<=to&&(!acct||e.account===acct));
+  const inc=r2(all.filter(e=>e.type==='income').reduce((s2,e)=>s2+(+e.amount||0),0)),exp=r2(all.filter(e=>e.type==='expense').reduce((s2,e)=>s2+(+e.amount||0),0));
+  const petty=r2(all.filter(e=>e.category==='Petty cash given').reduce((s2,e)=>s2+(+e.amount||0),0));
+  const coll=r2(S.payments.filter(p=>p.date>=from&&p.date<=to&&!/credit|adjust|previous/i.test(p.method||'')).reduce((s2,p)=>s2+(+p.amount||0),0));
+  const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.ref,e.account,e.givenBy].join(' ').toLowerCase().includes(q)))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+(+e.amount||0));
+  const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:1;
+  const accts=[...new Set(ACC_ACCOUNTS.concat(S.ledger.map(e=>e.account).filter(Boolean)))];
+  const allCats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
+  let lastDate='';
+  return `<div class="head"><div><h1>Accounts</h1><div class="sub">Income & expenditure · ${fdate(from)} – ${fdate(to)}</div></div>
+   <div class="row"><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
+  <div class="row"><div class="seg">${[['month','This month'],['last','Last month'],['year','This year'],['all','All'],['custom','Custom']].map(([k,l])=>`<button class="${(S.params.per||'month')===k?'on':''}" data-per="${k}">${l}</button>`).join('')}</div>
+   ${(S.params.per)==='custom'?`<input type="date" id="ac-f" value="${from}" style="width:auto"><input type="date" id="ac-t" value="${to}" style="width:auto">`:''}
+   <select id="ac-acct" style="width:auto"><option value="">All accounts</option>${accts.map(a=>`<option ${a===acct?'selected':''}>${h(a)}</option>`).join('')}</select></div>
+  <div class="kpis"><div class="card kpi"><span class="label">Income</span><span class="v" style="color:var(--good)">${money(inc)}</span></div>
+   <div class="card kpi"><span class="label">Expenses</span><span class="v" style="color:var(--bad)">${money(exp)}</span><span class="muted" style="font-size:.76rem">incl. petty cash ${money(petty)}</span></div>
+   <div class="card kpi hl"><span class="label">Net</span><span class="v">${money(inc-exp)}<small>${h(S.cfg.currency)}</small></span></div>
+   <div class="card kpi"><span class="label">Customer collections</span><span class="v">${money(coll)}</span><span class="muted" style="font-size:.76rem">from Payments (not added above)</span></div></div>
+  ${cats.length?`<div class="card pad"><h3 style="margin-bottom:10px">Where the money went</h3><div class="acbars">${cats.slice(0,8).map(([k,v])=>`<button class="acbar" data-cat="${h(k)}"><span class="t">${h(k)}</span><span class="b"><i style="width:${Math.max(2,v/maxC*100)}%"></i></span><span class="num">${money(v)}</span></button>`).join('')}</div></div>`:''}
+  <div class="row"><div class="seg">${[['all','All'],['income','Income'],['expense','Expenses']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-at2="${k}">${l}</button>`).join('')}</div>
+   <select id="ac-cat" style="width:auto"><option value="">All categories</option>${allCats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>
+   <span class="grow"></span><input class="search" id="ac-q" placeholder="Search party, note, reference" value="${h(S.params.q||'')}"></div>
+  <div class="card list">${list.length?list.map(e=>{const hd=e.date!==lastDate?`<div class="pcat">${fdate(e.date)}</div>`:'';lastDate=e.date;
+    return hd+`<button class="li" data-ac="${h(e.id)}"><span class="ico ${e.type==='income'?'d':'p'}" style="${e.type==='expense'?'background:var(--bad-soft);color:var(--bad)':''}">${e.type==='income'?'IN':'OUT'}</span>
+      <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${h([e.account,e.method!==e.account?e.method:'',e.ref,e.givenBy?'given by '+e.givenBy:'',e.note].filter(Boolean).join(' · '))}${e.src==='petty'?' · <span class="pill">attendance app</span>':''}${e.receipt?' · 📎':''}</div></span>
+      <span class="r num" style="color:${e.type==='income'?'var(--good)':'var(--bad)'}">${e.type==='income'?'+':'−'}${money(e.amount)}</span></button>`}).join('')
+    :`<div class="empty"><b>No entries for this period</b>Add income such as cheque or cash deposits, and expenses such as petty cash, supplier payments and salaries.</div>`}</div>
+  <label class="check"><input type="checkbox" id="ac-pt" ${S.params.nopetty?'':'checked'}>Include petty cash given in the attendance app (${S.petty.length} entries)</label>`;
+};
+VIEWS_AFTER.accounts=()=>{
+  if(!isAdmin())return;
+  const set=(k,v)=>{S.params[k]=v;render()};
+  $$('[data-per]').forEach(b=>b.onclick=()=>set('per',b.dataset.per));
+  $$('[data-at2]').forEach(b=>b.onclick=()=>set('at2',b.dataset.at2));
+  $$('[data-cat]').forEach(b=>b.onclick=()=>{S.params.at2='expense';set('cat',b.dataset.cat)});
+  $('#ac-f')&&($('#ac-f').onchange=e=>set('af',e.target.value));$('#ac-t')&&($('#ac-t').onchange=e=>set('at',e.target.value));
+  $('#ac-acct').onchange=e=>set('acct',e.target.value);$('#ac-cat').onchange=e=>set('cat',e.target.value);
+  $('#ac-pt').onchange=e=>set('nopetty',!e.target.checked);
+  const q=$('#ac-q');q.oninput=()=>{S.params.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#ac-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
+  $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});
+  $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;if(id.startsWith('pt_')){toast('This petty cash entry comes from the attendance app. Edit it there.');return}accForm(S.ledger.find(e=>e.id===id))});
+  $('#ac-csv').onclick=()=>{const [f,t]=accRange();const rows=accEntries().filter(e=>e.date>=f&&e.date<=t).sort((a,b)=>a.date.localeCompare(b.date));
+    const esc=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+    const csv=[['Date','Type','Category','Account','Method','Paid to / Received from','Given by','Reference','VAT','Amount','Note','Source']].concat(rows.map(e=>[e.date,e.type,e.category,e.account,e.method,e.party,e.givenBy||'',e.ref||'',e.vat||'',(e.type==='expense'?-1:1)*(+e.amount||0),e.note||'',e.src==='petty'?'Attendance app':'Accounts'])).map(r=>r.map(esc).join(',')).join('\n');
+    saveFile(new TextEncoder().encode('\uFEFF'+csv),`Accounts ${f} to ${t}.csv`,'text/csv','Save accounts').catch(()=>{})};
+};
+function accForm(pre={}){
+  const e={date:today(),account:'Cash',method:'Cash',givenBy:S.me.name||'',...pre};const isInc=e.type==='income';
+  const staff=Object.values(S.users).filter(u=>u.active!==false).map(u=>u.name).filter(Boolean).sort();
+  const parties=[...new Set(S.ledger.map(x=>x.party).concat(S.clients.map(c=>c.name)).filter(Boolean))].sort();
+  const accts=[...new Set(ACC_ACCOUNTS.concat(S.ledger.map(x=>x.account).filter(Boolean)))];
+  const o=modal((e.id?'Edit ':'New ')+(isInc?'income':'expense'),`<div class="grid g2">
+    <label class="field"><span>Type</span><select id="af-type"><option value="expense" ${!isInc?'selected':''}>Expense (money out)</option><option value="income" ${isInc?'selected':''}>Income (money in)</option></select></label>
+    <label class="field"><span>Date</span><input type="date" id="af-date" value="${h(e.date)}"></label>
+    <label class="field"><span>Category</span><input id="af-cat" list="af-cats" value="${h(e.category||'')}" placeholder="Choose or type"><datalist id="af-cats"></datalist></label>
+    <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input id="af-amt" inputmode="decimal" value="${h(e.amount||'')}"></label>
+    <label class="field"><span>Account</span><input id="af-acct" list="af-accts" value="${h(e.account||'')}"><datalist id="af-accts">${accts.map(a=>`<option value="${h(a)}">`).join('')}</datalist></label>
+    <label class="field"><span>Method</span><select id="af-meth">${ACC_METHODS.map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
+    <label class="field" style="grid-column:1/-1"><span id="af-party-l">${isInc?'Received from':'Paid to'}</span><input id="af-party" list="af-parties" value="${h(e.party||'')}" placeholder="Supplier, staff member, client or bank"><datalist id="af-parties">${parties.concat(staff).map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
+    <label class="field" id="af-gb-w"><span>Given by</span><input id="af-gb" list="af-staff" value="${h(e.givenBy||'')}"><datalist id="af-staff">${staff.map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
+    <label class="field"><span>Reference (cheque / bill / invoice no.)</span><input id="af-ref" value="${h(e.ref||'')}"></label>
+    <label class="field"><span>VAT included (optional)</span><input id="af-vat" inputmode="decimal" value="${h(e.vat||'')}"></label>
+    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="af-note" value="${h(e.note||'')}"></label>
+    <div style="grid-column:1/-1" class="row"><button class="btn" id="af-rc" type="button">${I.plus}${e.receipt?'Replace':'Attach'} receipt photo</button><span id="af-rcv">${e.receipt?img(e.receipt,'style="height:48px;border-radius:6px"'):''}</span></div></div>`,
+    `${e.id?'<button class="btn danger" id="af-del">Delete</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="af-save">Save</button>`);
+  const sync=()=>{const inc=$('#af-type',o).value==='income';$('#af-cats',o).innerHTML=ACC_CAT[inc?'income':'expense'].map(c=>`<option value="${h(c)}">`).join('');
+    $('#af-party-l',o).textContent=inc?'Received from':'Paid to';$('#af-gb-w',o).hidden=inc||!/petty/i.test($('#af-cat',o).value)};
+  $('#af-type',o).onchange=sync;$('#af-cat',o).oninput=sync;sync();
+  $('#af-rc',o).onclick=async()=>{const [f]=await pickFiles({multiple:false});if(!f)return;try{toast('Uploading…');e.receipt=await storeAttachmentImage(f);$('#af-rcv',o).innerHTML=img(e.receipt,'style="height:48px;border-radius:6px"')}catch(x){toast('Upload failed: '+(x.message||x.code),true)}};
+  $('#af-save',o).onclick=async()=>{const d={...e,type:$('#af-type',o).value,date:$('#af-date',o).value,category:$('#af-cat',o).value.trim(),amount:parseAmt($('#af-amt',o).value),account:$('#af-acct',o).value.trim()||'Cash',
+      method:$('#af-meth',o).value,party:$('#af-party',o).value.trim(),givenBy:$('#af-gb-w',o).hidden?'':$('#af-gb',o).value.trim(),ref:$('#af-ref',o).value.trim(),vat:parseAmt($('#af-vat',o).value),note:$('#af-note',o).value.trim(),updatedAt:new Date().toISOString()};
+    delete d.id;delete d.src;if(!e.id){d.createdBy=S.me.id;d.createdAt=d.updatedAt}
+    if(!d.date||!(d.amount>0)){toast('Enter the date and an amount above zero.',true);return}if(!d.category){toast('Choose a category.',true);return}
+    if(await save('ledger',e.id||uid(),d,'Saved'))closeModal()};
+  $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed.'))return;try{await Store.remove('ledger',e.id);toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
+}
+
 /* ----- staff & access (admin) ----- */
 VIEWS.staff=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
@@ -1392,11 +1494,13 @@ function startData(){
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
+  if(isAdmin()){Store.sub('ledger',r=>{S.ledger=r;if(S.view==='accounts')soon()});
+    Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
 onAuthStateChanged(auth,async u=>{
-  Store.stop();S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
+  Store.stop();S.ledger=[];S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
   if(!u){S.me={id:null,role:'login',perms:{}};loginScreen();return}
   S.me={id:u.uid,role:'loading',perms:{},name:''};render();
   try{
