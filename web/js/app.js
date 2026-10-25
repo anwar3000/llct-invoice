@@ -1271,11 +1271,14 @@ function accRange(){const p=S.params.per||'month',t=today();
 function accEntries(){
   const man=S.acct.map(e=>({...e,src:'manual',type:e.type==='income'?'income':'expense',amount:+e.amount||0,method:e.method||'Cash'}));
   const pet=S.petty.filter(x=>x.type==='credit'&&x.status!=='rejected').map(x=>({id:'petty_'+x.id,src:'petty',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Petty cash given',
-    method:'Cash',party:x.employeeName||'',note:[x.note,x.createdByName?'given by '+x.createdByName:''].filter(Boolean).join(' · '),siteName:x.siteName||''}));
+    method:'Cash',party:x.employeeName||'',note:[x.note,x.createdByName?'given by '+x.createdByName:''].filter(Boolean).join(' · '),siteId:x.siteId||'',siteName:x.siteName||''}));
   const drv=S.drv.map(x=>({id:'drv_'+x.id,src:'driver',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Driver payment',method:x.method||'Cash',
     party:x.employeeName||'',note:[x.note,x.createdBy?'by '+x.createdBy:''].filter(Boolean).join(' · ')}));
-  return man.concat(pet,drv);
+  return man.concat(pet,drv).map(withProject);
 }
+// Entries saved with only a site (the attendance app's earlier "Site / project" box) take that site's project.
+function projectOfSite(siteId){const si=siteId&&S.sites.find(x=>x.id===siteId);return si&&si.projectId?S.projects[si.projectId]||null:null}
+function withProject(e){if(e.projectId)return e;const p=projectOfSite(e.siteId);return p?{...e,projectId:p.id,projectName:[p.code,p.name].filter(Boolean).join(' · ')}:e}
 // Cash and bank balance at the end of a day: opening balance + everything from the opening date on.
 function accBalance(upto){const o=S.acctOpen||{};const out={cash:0,bank:0,set:!!o.date};
   if(o.date&&o.date<=upto){out.cash=+o.cash||0;out.bank=+o.bank||0}const start=o.date||'2000-01-01';
@@ -1355,6 +1358,7 @@ function savedParties(type){const saved=(S.acctParties&&S.acctParties[PARTY_KEY(
   return [...seen.values()].sort((a,b)=>a.localeCompare(b))}
 function accForm(pre={}){
   const e={date:today(),...pre};const isInc=e.type==='income';e.method=e.method||(isInc?'Cheque':'Cash');
+  if(!e.projectId){const sp=projectOfSite(e.siteId);if(sp)e.projectId=sp.id}
   let file=null;
   const o=modal((e.id?'Edit ':'Add ')+(isInc?'income':'expense'),`<div class="grid g2">
     <label class="field"><span>Date</span><input type="date" id="af-date" value="${h(e.date)}"></label>
@@ -1382,6 +1386,7 @@ function accForm(pre={}){
     $$('[data-unsave]',o).forEach(b=>b.onclick=async()=>{const n=b.dataset.unsave;try{await setDoc(doc(fdb,COL.acctSettings,'parties'),{[PARTY_KEY(e.type)]:arrayRemove(n)},{merge:true});
       S.acctParties={...S.acctParties,[PARTY_KEY(e.type)]:((S.acctParties||{})[PARTY_KEY(e.type)]||[]).filter(x=>x!==n)};sug()}catch(x){toast('Could not remove: '+(x.message||x.code),true)}})};
   $('#af-party',o).oninput=sug;sug();
+  $('#af-site',o).onchange=()=>{const sp=projectOfSite($('#af-site',o).value);if(sp&&!$('#af-proj',o).value)$('#af-proj',o).value=sp.id};
   $('#af-proj',o).onchange=()=>{const pr=S.projects[$('#af-proj',o).value];const ss=$('#af-site',o);if(pr&&Array.isArray(pr.siteIds)&&pr.siteIds.length===1&&!ss.value)ss.value=pr.siteIds[0]};
   $('#af-rc',o).onclick=async()=>{const [f]=await pickFiles({multiple:false,accept:'image/*,application/pdf'});if(!f)return;
     try{if(/pdf/i.test(f.type)){const d=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});if(d.length*.75>700*1024)throw new Error('PDF is larger than 700 KB');file={name:f.name,mime:'application/pdf',base64:d.split(',')[1]}}
