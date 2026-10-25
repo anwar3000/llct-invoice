@@ -46,6 +46,9 @@ jobs:
           # camera for live barcode scanning
           sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' android/app/src/main/AndroidManifest.xml
           grep -n "permission\|feature" android/app/src/main/AndroidManifest.xml
+          # keyboard pushes the screen up instead of covering forms
+          grep -q windowSoftInputMode android/app/src/main/AndroidManifest.xml || perl -0pi -e 's#(<activity\b)#$1 android:windowSoftInputMode="adjustResize"#' android/app/src/main/AndroidManifest.xml
+          grep -n "windowSoftInputMode" android/app/src/main/AndroidManifest.xml
           # version from build number so updates install over older ones
           sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]+\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
           grep -nE "versionCode|versionName" android/app/build.gradle

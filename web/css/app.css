@@ -686,3 +686,16 @@ table.tbl{width:100%;border-collapse:collapse}
 .lgseen button{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);background:var(--card,#fff);border-radius:10px;padding:9px 11px;cursor:pointer;font:inherit;font-size:.82rem;color:inherit}
 .lgseen button:hover{border-color:var(--brand)}
 .lgseen .muted{font-size:.74rem}
+
+/* saved supplier / payer chips */
+.psug{display:flex;flex-wrap:wrap;gap:6px;margin-top:-6px}
+.pchip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--sunk);overflow:hidden}
+.pchip button{border:0;background:none;font:inherit;font-size:.8rem;padding:6px 10px;cursor:pointer;color:inherit}
+.pchip button.x{padding:6px 9px 6px 2px;color:var(--muted)}
+/* phones: pop-ups become a sheet that sits right above the keyboard */
+@media (max-width:700px){
+  .overlay{align-items:flex-end;padding:0;bottom:auto;height:100%}
+  .modal,.modal.wide{width:100%;max-height:100%;border-radius:16px 16px 0 0}
+  .modal .body{padding:14px 16px}
+  .modal footer{padding:10px 16px max(10px,env(safe-area-inset-bottom,0px))}
+}

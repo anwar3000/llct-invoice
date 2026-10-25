@@ -2,7 +2,7 @@
 // Uses the same Firebase project and staff logins as LLCT Attendance.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction, getDocsFromServer, getDocFromServer, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction, getDocsFromServer, getDocFromServer, serverTimestamp, writeBatch, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp=initializeApp(firebaseConfig);
@@ -66,7 +66,7 @@ const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={logins:[],acct:[],drv:[],acctOpen:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
@@ -273,6 +273,13 @@ function modal(title,body,foot,wide,id='ov'){
   o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-x]'))o.remove()});
   document.body.appendChild(o);return o;
 }
+// Phones: pop-ups sit as a sheet on top of the keyboard, and the field being typed in is scrolled into view.
+(function keyboardSafe(){const vv=window.visualViewport;
+  const fit=()=>{if(!vv)return;$$('.overlay').forEach(o=>{if(window.innerWidth>700){o.style.top='';o.style.height='';return}o.style.top=vv.offsetTop+'px';o.style.height=vv.height+'px'})};
+  if(vv){vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}
+  new MutationObserver(fit).observe(document.body,{childList:true});
+  document.addEventListener('focusin',ev=>{const t=ev.target;if(!t.closest||!t.closest('.modal')||!/INPUT|SELECT|TEXTAREA/.test(t.tagName))return;
+    setTimeout(()=>{fit();t.scrollIntoView({block:'center',behavior:'smooth'})},280)});})();
 function closeModal(){const o=$('#ov');if(o)o.remove()}
 function confirmBox(title,text,okLabel='Delete'){return new Promise(res=>{const o=modal(title,`<p style="margin:0">${h(text)}</p>`,`<button class="btn" data-x>Cancel</button><button class="btn primary" id="ok">${h(okLabel)}</button>`);
   $('#ok',o).onclick=()=>{closeModal();res(true)};o.addEventListener('click',e=>{if(e.target.closest('[data-x]')||e.target===o)res(false)})})}
@@ -1277,14 +1284,14 @@ function accBalance(upto){const o=S.acctOpen||{};const out={cash:0,bank:0,set:!!
 const SRC_PILL={petty:'petty cash · attendance',driver:'driver payment · attendance'};
 VIEWS.accounts=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
-  const [from,to]=accRange(),tab=S.params.at2||'all',q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'',mf=S.params.mf||'';
-  const all=accEntries().filter(e=>e.date>=from&&e.date<=to&&(!mf||(mf==='bank')===isBankM(e.method)));
+  const [from,to]=accRange(),tab=S.params.at2||'all',q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'',mf=S.params.mf||'',pj=S.params.pj||'';
+  const all=accEntries().filter(e=>e.date>=from&&e.date<=to&&(!mf||(mf==='bank')===isBankM(e.method))&&(!pj||e.projectId===pj));
   const sum=a=>r2(a.reduce((t,e)=>t+e.amount,0));
   const inc=sum(all.filter(e=>e.type==='income')),exp=sum(all.filter(e=>e.type==='expense'));
   const auto=sum(all.filter(e=>e.src!=='manual'));
   const bal=accBalance(to>today()?today():to);
   const coll=r2(S.payments.filter(p=>p.date>=from&&p.date<=to&&!/credit|adjust|previous/i.test(p.method||'')).reduce((t,p)=>t+(+p.amount||0),0));
-  const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.reference,e.bank,e.siteName,e.method].join(' ').toLowerCase().includes(q)))
+  const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.reference,e.bank,e.siteName,e.projectName,e.method].join(' ').toLowerCase().includes(q)))
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+e.amount);
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:1;
@@ -1295,7 +1302,8 @@ VIEWS.accounts=()=>{
    <div class="row"><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
   <div class="row"><div class="seg">${[['month','This month'],['last','Last month'],['year','This year'],['all','All'],['custom','Custom']].map(([k,l])=>`<button class="${(S.params.per||'month')===k?'on':''}" data-per="${k}">${l}</button>`).join('')}</div>
    ${(S.params.per)==='custom'?`<input type="date" id="ac-f" value="${from}" style="width:auto"><input type="date" id="ac-t" value="${to}" style="width:auto">`:''}
-   <div class="seg">${[['','Cash & bank'],['cash','Cash'],['bank','Bank / cheque']].map(([k,l])=>`<button class="${mf===k?'on':''}" data-mf="${k}">${l}</button>`).join('')}</div></div>
+   <div class="seg">${[['','Cash & bank'],['cash','Cash'],['bank','Bank / cheque']].map(([k,l])=>`<button class="${mf===k?'on':''}" data-mf="${k}">${l}</button>`).join('')}</div>
+   ${projList().length?`<select id="ac-pj" style="width:auto;max-width:220px"><option value="">All projects</option>${projList().map(x=>`<option value="${h(x.id)}" ${x.id===pj?'selected':''}>${h(projLabel(x))}</option>`).join('')}</select>`:''}</div>
   <div class="kpis"><div class="card kpi"><span class="label">Income</span><span class="v" style="color:var(--good)">${money(inc)}</span><span class="muted" style="font-size:.76rem">Customer payments in invoicing: ${money(coll)}</span></div>
    <div class="card kpi"><span class="label">Expenses</span><span class="v" style="color:var(--bad)">${money(exp)}</span><span class="muted" style="font-size:.76rem">incl. petty cash &amp; drivers ${money(auto)}</span></div>
    <div class="card kpi"><span class="label">Net for period</span><span class="v" style="color:${inc-exp<0?'var(--bad)':'inherit'}">${money(inc-exp)}</span></div>
@@ -1308,7 +1316,7 @@ VIEWS.accounts=()=>{
   ${outside&&S.params.per!=='all'?`<div class="notice">${outside} more ${outside===1?'entry is':'entries are'} dated outside ${fdate(from)} – ${fdate(to)}. <button class="btn sm" data-per="all">Show all dates</button></div>`:''}
   <div class="card list">${list.length?list.map(e=>{const hd=e.date!==lastDate?`<div class="pcat">${fdate(e.date)}</div>`:'';lastDate=e.date;
     return hd+`<button class="li" data-ac="${h(e.id)}"><span class="ico ${e.type==='income'?'d':'p'}" style="${e.type==='expense'?'background:var(--bad-soft);color:var(--bad)':''}">${e.type==='income'?'IN':'OUT'}</span>
-      <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${h([e.method,e.bank,e.reference,e.siteName,e.note].filter(Boolean).join(' · '))}${SRC_PILL[e.src]?` · <span class="pill">${SRC_PILL[e.src]}</span>`:''}${e.hasFile?' · 📎':''}</div></span>
+      <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${e.projectName?`<b>${h(e.projectName)}</b> · `:''}${h([e.method,e.bank,e.reference,e.siteName,e.note].filter(Boolean).join(' · '))}${SRC_PILL[e.src]?` · <span class="pill">${SRC_PILL[e.src]}</span>`:''}${e.hasFile?' · 📎':''}</div></span>
       <span class="r num" style="color:${e.type==='income'?'var(--good)':'var(--bad)'}">${e.type==='income'?'+':'−'}${money(e.amount)}</span></button>`}).join('')
     :`<div class="empty"><b>No entries for this period</b>Add income such as cheque or cash deposits, and expenses such as supplier payments and salaries. Petty cash and driver payments from the attendance app appear here by themselves.</div>`}</div>`;
 };
@@ -1320,7 +1328,7 @@ VIEWS_AFTER.accounts=()=>{
   $$('[data-at2]').forEach(b=>b.onclick=()=>set('at2',b.dataset.at2));
   $$('[data-cat]').forEach(b=>b.onclick=()=>{S.params.at2='expense';set('cat',b.dataset.cat)});
   $('#ac-f')&&($('#ac-f').onchange=e=>set('af',e.target.value));$('#ac-t')&&($('#ac-t').onchange=e=>set('at',e.target.value));
-  $('#ac-cat').onchange=e=>set('cat',e.target.value);
+  $('#ac-cat').onchange=e=>set('cat',e.target.value);$('#ac-pj')&&($('#ac-pj').onchange=e=>set('pj',e.target.value));
   const q=$('#ac-q');q.oninput=()=>{S.params.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#ac-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
   $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});$('#ac-open').onclick=openingForm;
   $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;
@@ -1329,7 +1337,7 @@ VIEWS_AFTER.accounts=()=>{
     accForm(S.acct.find(e=>e.id===id))});
   $('#ac-csv').onclick=()=>{const [f,t]=accRange();const rows=accEntries().filter(e=>e.date>=f&&e.date<=t).sort((a,b)=>a.date.localeCompare(b.date));
     const esc=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-    const csv=[['Date','Type','Category','Method','Paid to / Received from','Reference','Bank','Cheque date','Site','Amount','Note','Source']].concat(rows.map(e=>[e.date,e.type,e.category,e.method,e.party,e.reference||'',e.bank||'',e.chequeDate||'',e.siteName||'',(e.type==='expense'?-1:1)*e.amount,e.note||'',{manual:'Accounts',petty:'Petty cash',driver:'Driver payment'}[e.src]])).map(r=>r.map(esc).join(',')).join('\n');
+    const csv=[['Date','Type','Category','Method','Paid to / Received from','Reference','Bank','Cheque date','Project','Site','Amount','Note','Source']].concat(rows.map(e=>[e.date,e.type,e.category,e.method,e.party,e.reference||'',e.bank||'',e.chequeDate||'',e.projectName||'',e.siteName||'',(e.type==='expense'?-1:1)*e.amount,e.note||'',{manual:'Accounts',petty:'Petty cash',driver:'Driver payment'}[e.src]])).map(r=>r.map(esc).join(',')).join('\n');
     saveFile(new TextEncoder().encode('﻿'+csv),`Accounts ${f} to ${t}.csv`,'text/csv','Save accounts').catch(()=>{})};
 };
 async function readAcctFile(id){const s2=await getDoc(doc(fdb,COL.acctFiles,id));return s2.exists()?s2.data():null}
@@ -1337,26 +1345,44 @@ async function showAcctFile(e){try{toast('Opening…');const f=await readAcctFil
   if(/pdf/i.test(f.mime||'')){await saveFile(dataToBytes('data:application/pdf;base64,'+f.base64),f.name||'receipt.pdf','application/pdf','Open receipt');return}
   modal(h(f.name||'Receipt'),`<img src="data:${h(f.mime||'image/jpeg')};base64,${f.base64}" alt="" style="max-width:100%;border-radius:8px">`,'<button class="btn" data-x>Close</button>')}
   catch(x){toast('Could not open: '+(x.message||x.code),true)}}
+const projList=()=>Object.values(S.projects||{}).filter(x=>x&&x.name).sort((a,b)=>((a.status||'active')!=='active')-((b.status||'active')!=='active')||String(a.name).localeCompare(String(b.name)));
+const projLabel=x=>[x.code,x.name].filter(Boolean).join(' · ')+((x.status&&x.status!=='active')?' ('+x.status+')':'');
+// Saved names: suppliers / payees for expenses, payers for income. Shared with the attendance app.
+const PARTY_KEY=t=>t==='income'?'receivedFrom':'paidTo';
+function savedParties(type){const saved=(S.acctParties&&S.acctParties[PARTY_KEY(type)])||[];
+  const used=S.acct.filter(x=>x.type===type).map(x=>x.party);const extra=type==='income'?S.clients.map(c=>c.name):[];
+  const seen=new Map();saved.concat(used,extra).forEach(n=>{n=String(n||'').trim();if(n&&!seen.has(n.toLowerCase()))seen.set(n.toLowerCase(),n)});
+  return [...seen.values()].sort((a,b)=>a.localeCompare(b))}
 function accForm(pre={}){
   const e={date:today(),...pre};const isInc=e.type==='income';e.method=e.method||(isInc?'Cheque':'Cash');
-  const parties=[...new Set(S.acct.map(x=>x.party).concat(S.clients.map(c=>c.name),Object.values(S.users).map(u=>u.name)).filter(Boolean))].sort();
   let file=null;
   const o=modal((e.id?'Edit ':'Add ')+(isInc?'income':'expense'),`<div class="grid g2">
     <label class="field"><span>Date</span><input type="date" id="af-date" value="${h(e.date)}"></label>
     <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input id="af-amt" inputmode="decimal" value="${h(e.amount||'')}" style="font-weight:700;color:${isInc?'var(--good)':'var(--bad)'}"></label>
     <label class="field"><span>Category</span><input id="af-cat" list="af-cats" value="${h(e.category||ACC_CAT[e.type][0])}"><datalist id="af-cats">${ACC_CAT[e.type].map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
-    <label class="field"><span>${isInc?'Received from (client / bank / owner)':'Paid to (supplier / party)'}</span><input id="af-party" list="af-parties" value="${h(e.party||'')}"><datalist id="af-parties">${parties.map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
+    <label class="field"><span>${isInc?'Received from (client / bank / owner)':'Paid to (supplier / party)'}</span><input id="af-party" value="${h(e.party||'')}" autocomplete="off" placeholder="${isInc?'Type or pick':'Type a supplier or pick a saved one'}"></label>
+    <div class="psug" id="af-sug" style="grid-column:1/-1"></div>
     <label class="field"><span>Method</span><select id="af-meth">${ACC_METHODS.map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
     <label class="field"><span id="af-ref-l">Reference</span><input id="af-ref" value="${h(e.reference||'')}"></label>
     <label class="field af-chq"><span>Bank</span><input id="af-bank" value="${h(e.bank||'')}" placeholder="e.g. RAK Bank"></label>
     <label class="field af-chq"><span>Cheque date</span><input type="date" id="af-cdate" value="${h(e.chequeDate||'')}"></label>
-    <label class="field"><span>Site / project (optional)</span><select id="af-site"><option value="">—</option>${S.sites.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(x=>`<option value="${h(x.id)}" ${x.id===e.siteId?'selected':''}>${h(x.name)}</option>`).join('')}</select></label>
+    <label class="field"><span>Project (optional)</span><select id="af-proj"><option value="">—</option>${projList().map(x=>`<option value="${h(x.id)}" ${x.id===e.projectId?'selected':''}>${h(projLabel(x))}</option>`).join('')}</select></label>
+    <label class="field"><span>Site (optional)</span><select id="af-site"><option value="">—</option>${S.sites.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(x=>`<option value="${h(x.id)}" ${x.id===e.siteId?'selected':''}>${h(x.name)}</option>`).join('')}</select></label>
     <div class="field"><span>Receipt / invoice / cheque copy</span><div class="row"><button class="btn sm" id="af-rc" type="button">${I.plus}${e.hasFile?'Replace':'Attach'}</button>
       ${e.hasFile?`<button class="btn sm" id="af-view" type="button">View</button><button class="btn sm ghost" id="af-rm" type="button" style="color:var(--bad)">Remove</button>`:''}<span id="af-rcv" class="muted" style="font-size:.8rem"></span></div></div>
     <label class="field" style="grid-column:1/-1"><span>Note</span><input id="af-note" value="${h(e.note||'')}" placeholder="${isInc?'e.g. Project ABC — 2nd payment':'e.g. Cement 50 bags, invoice 1234'}"></label></div>`,
     `${e.id?'<button class="btn danger" id="af-del">Delete</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="af-save">${e.id?'Save':'Add '+(isInc?'income':'expense')}</button>`);
   const sync=()=>{const m=$('#af-meth',o).value,chq=m==='Cheque';$$('.af-chq',o).forEach(x=>x.hidden=!chq);$('#af-ref-l',o).textContent=chq?'Cheque no.':m==='Cash'?'Receipt / voucher no.':'Transaction ref.'};
   $('#af-meth',o).onchange=sync;sync();
+  const sug=()=>{const t=$('#af-party',o).value.trim().toLowerCase();const saved=new Set(((S.acctParties||{})[PARTY_KEY(e.type)]||[]).map(x=>String(x).toLowerCase()));
+    const list=savedParties(e.type).filter(n=>!t||n.toLowerCase().includes(t)).filter(n=>n.toLowerCase()!==t).slice(0,14);
+    $('#af-sug',o).innerHTML=list.map(n=>`<span class="pchip"><button type="button" data-pick="${h(n)}">${h(n)}</button>${saved.has(n.toLowerCase())?`<button type="button" class="x" data-unsave="${h(n)}" aria-label="Remove ${h(n)} from saved list">×</button>`:''}</span>`).join('')
+      +(list.length?'':`<span class="muted" style="font-size:.78rem">${t?'New name — it will be saved for next time.':'Names you enter are saved here for next time.'}</span>`);
+    $$('[data-pick]',o).forEach(b=>b.onclick=()=>{$('#af-party',o).value=b.dataset.pick;sug()});
+    $$('[data-unsave]',o).forEach(b=>b.onclick=async()=>{const n=b.dataset.unsave;try{await setDoc(doc(fdb,COL.acctSettings,'parties'),{[PARTY_KEY(e.type)]:arrayRemove(n)},{merge:true});
+      S.acctParties={...S.acctParties,[PARTY_KEY(e.type)]:((S.acctParties||{})[PARTY_KEY(e.type)]||[]).filter(x=>x!==n)};sug()}catch(x){toast('Could not remove: '+(x.message||x.code),true)}})};
+  $('#af-party',o).oninput=sug;sug();
+  $('#af-proj',o).onchange=()=>{const pr=S.projects[$('#af-proj',o).value];const ss=$('#af-site',o);if(pr&&Array.isArray(pr.siteIds)&&pr.siteIds.length===1&&!ss.value)ss.value=pr.siteIds[0]};
   $('#af-rc',o).onclick=async()=>{const [f]=await pickFiles({multiple:false,accept:'image/*,application/pdf'});if(!f)return;
     try{if(/pdf/i.test(f.type)){const d=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});if(d.length*.75>700*1024)throw new Error('PDF is larger than 700 KB');file={name:f.name,mime:'application/pdf',base64:d.split(',')[1]}}
       else{let d=await compress(f,1600,.82);if(d.length*.75>700*1024)d=await compress(f,1200,.7);if(d.length*.75>700*1024)d=await compress(f,900,.6);file={name:f.name.replace(/\.[^.]+$/,'')+'.jpg',mime:'image/jpeg',base64:d.split(',')[1]}}
@@ -1365,13 +1391,14 @@ function accForm(pre={}){
   $('#af-rm',o)&&($('#af-rm',o).onclick=async()=>{try{const b=writeBatch(fdb);b.update(doc(fdb,COL.acct,e.id),{hasFile:false,fileName:'',fileMime:''});b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();e.hasFile=false;$('#af-rm',o).remove();$('#af-view',o)&&$('#af-view',o).remove();$('#af-rcv',o).textContent='Removed'}catch(x){toast('Could not remove: '+(x.message||x.code),true)}});
   $('#af-save',o).onclick=async()=>{const date=$('#af-date',o).value,amount=r2(parseAmt($('#af-amt',o).value)),category=$('#af-cat',o).value.trim(),method=$('#af-meth',o).value,chq=method==='Cheque';
     if(!date||!(amount>0)||!category){toast('Date, amount and category are required.',true);return}
-    const siteId=$('#af-site',o).value,site=S.sites.find(x=>x.id===siteId);
-    const body={type:e.type,date,amount,category,party:$('#af-party',o).value.trim(),method,reference:$('#af-ref',o).value.trim(),bank:chq?$('#af-bank',o).value.trim():'',chequeDate:chq?$('#af-cdate',o).value:'',
-      siteId,siteName:site?site.name||'':'',note:$('#af-note',o).value.trim(),month:date.slice(0,7),
+    const siteId=$('#af-site',o).value,site=S.sites.find(x=>x.id===siteId),projectId=$('#af-proj',o).value,proj=S.projects[projectId];const party=$('#af-party',o).value.trim();
+    const body={type:e.type,date,amount,category,party,method,reference:$('#af-ref',o).value.trim(),bank:chq?$('#af-bank',o).value.trim():'',chequeDate:chq?$('#af-cdate',o).value:'',
+      siteId,siteName:site?site.name||'':'',projectId,projectName:proj?[proj.code,proj.name].filter(Boolean).join(' · '):'',note:$('#af-note',o).value.trim(),month:date.slice(0,7),
       ...(file?{hasFile:true,fileName:file.name,fileMime:file.mime}:{}),
       ...(e.id?{editedBy:S.me.name||'',editedAt:serverTimestamp()}:{createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()})};
     const ref=e.id?doc(fdb,COL.acct,e.id):doc(collection(fdb,COL.acct));const btn=$('#af-save',o);btn.disabled=true;
-    try{const b=writeBatch(fdb);b.set(ref,body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,ref.id),file);await b.commit();toast(e.id?'Saved':(isInc?'Income':'Expense')+' added');closeModal()}
+    try{const b=writeBatch(fdb);b.set(ref,body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,ref.id),file);
+      if(party)b.set(doc(fdb,COL.acctSettings,'parties'),{[PARTY_KEY(e.type)]:arrayUnion(party)},{merge:true});await b.commit();toast(e.id?'Saved':(isInc?'Income':'Expense')+' added');closeModal()}
     catch(x){btn.disabled=false;toast(/permission/i.test(x.code||x.message||'')?'Not allowed — publish the latest Firestore rules.':'Save failed: '+(x.message||x.code),true)}};
   $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed from the accounts in both apps.'))return;
     try{const b=writeBatch(fdb);b.delete(doc(fdb,COL.acct,e.id));if(e.hasFile)b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
@@ -1616,13 +1643,13 @@ function startData(){
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){const ra=()=>{if(S.view==='accounts')soon()};
-    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});
+    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
 onAuthStateChanged(auth,async u=>{
-  Store.stop();S.logins=[];S.acct=[];S.drv=[];S.acctOpen={};S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
+  Store.stop();S.logins=[];S.acct=[];S.drv=[];S.acctOpen={};S.acctParties={};S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
   if(!u){S.me={id:null,role:'login',perms:{}};loginScreen();return}
   S.me={id:u.uid,role:'loading',perms:{},name:''};render();
   try{
