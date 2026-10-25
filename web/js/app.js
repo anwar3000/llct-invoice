@@ -66,13 +66,13 @@ const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={ledger:[],petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={logins:[],ledger:[],petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={ledger:'inv_ledger',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={logins:'inv_logins',ledger:'inv_ledger',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -249,6 +249,7 @@ const I={
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>',
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A1.5 1.5 0 015.5 3H20v15H5.5A1.5 1.5 0 004 19.5z"/><path d="M4 19.5A1.5 1.5 0 005.5 21H20v-3M8 7h8M8 11h6"/></svg>',
  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9v.01M18 15v.01"/></svg>',
  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg>',
@@ -535,7 +536,7 @@ function navItems(){
   if(can('clients')||can('reports'))n.push(['clients','Clients & SOA',I.users]);
   if(can('payments')||can('reports'))n.push(['payments','Payments',I.cash]);
   if(can('clients'))n.push(['products','Products',I.box]);
-  if(isAdmin()){n.push(['accounts','Accounts',I.book]);n.push(['sep']);n.push(['staff','Staff & access',I.shield]);n.push(['settings','Company & template',I.gear])}
+  if(isAdmin()){n.push(['accounts','Accounts',I.book]);n.push(['logins','Login log',I.clock]);n.push(['sep']);n.push(['staff','Staff & access',I.shield]);n.push(['settings','Company & template',I.gear])}
   return n;
 }
 function render(){
@@ -568,9 +569,9 @@ function tabbar(cur){
 function bindCommon(root){
   $$('[data-go]',root).forEach(b=>b.onclick=()=>go(b.dataset.go));
   $$('[data-new]',root).forEach(b=>b.onclick=newMenu);
-  $$('[data-logout]',root).forEach(b=>b.onclick=()=>signOut(auth));
+  $$('[data-logout]',root).forEach(b=>b.onclick=logOut);
   $$('[data-myinfo]',root).forEach(b=>b.onclick=profileForm);
-  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();signOut(auth)};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
+  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
   $$('[data-open]',root).forEach(b=>b.onclick=()=>go('view',{id:b.dataset.open}));
 }
 function newMenu(){
@@ -1348,6 +1349,47 @@ function accForm(pre={}){
 }
 
 /* ----- staff & access (admin) ----- */
+const LG_EV={login:['Signed in','good'],open:['Opened app','brand'],logout:['Signed out',''],denied:['Refused','bad']};
+const ftime=iso=>iso?new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+function lastSeen(id){const l=S.logins.filter(x=>x.uid===id&&x.event!=='logout'&&x.event!=='denied').sort((a,b)=>b.at.localeCompare(a.at))[0];return l?'last in '+fdate(l.date)+' '+ftime(l.at):''}
+VIEWS.logins=()=>{
+  if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
+  const per=S.params.lp||'7',who=S.params.lu||'',ev=S.params.le||'';
+  const from=per==='today'?today():addDays(today(),-(+per-1));
+  const all=S.logins.filter(x=>x.date>=from);
+  const list=all.filter(x=>(!who||x.uid===who)&&(!ev||x.event===ev)).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const people=[...new Map(S.logins.map(x=>[x.uid,x.name])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  const ins=all.filter(x=>x.event==='login'||x.event==='open');
+  const last={};S.logins.filter(x=>x.event==='login'||x.event==='open').forEach(x=>{if(!last[x.uid]||x.at>last[x.uid].at)last[x.uid]=x});
+  const lastL=Object.values(last).sort((a,b)=>b.at.localeCompare(a.at));
+  const dev=x=>[x.app,x.model,x.os,x.browser].filter(Boolean).join(' · ');
+  let lastDate='';
+  return `<div class="head"><div><h1>Login log</h1><div class="sub">Who signed in to invoicing, when and from which device</div></div>
+   <div class="row"><button class="btn" id="lg-csv">${I.pdf}Export</button></div></div>
+  <div class="row"><div class="seg">${[['today','Today'],['7','7 days'],['30','30 days'],['120','120 days']].map(([k,l])=>`<button class="${per===k?'on':''}" data-lp="${k}">${l}</button>`).join('')}</div>
+   <select id="lg-u" style="width:auto"><option value="">Everyone</option>${people.map(([id,n])=>`<option value="${h(id)}" ${id===who?'selected':''}>${h(n||id)}</option>`).join('')}</select>
+   <select id="lg-e" style="width:auto"><option value="">All events</option>${Object.entries(LG_EV).map(([k,[l]])=>`<option value="${k}" ${k===ev?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="kpis"><div class="card kpi"><span class="label">Sign-ins &amp; opens</span><span class="v">${ins.length}</span></div>
+   <div class="card kpi"><span class="label">People</span><span class="v">${new Set(ins.map(x=>x.uid)).size}</span></div>
+   <div class="card kpi"><span class="label">Devices</span><span class="v">${new Set(ins.map(x=>x.device).filter(Boolean)).size}</span></div>
+   <div class="card kpi"><span class="label">Refused</span><span class="v" style="${all.some(x=>x.event==='denied')?'color:var(--bad)':''}">${all.filter(x=>x.event==='denied').length}</span><span class="muted" style="font-size:.76rem">signed in without access</span></div></div>
+  ${lastL.length?`<div class="card pad"><h3 style="margin-bottom:8px">Last seen</h3><div class="lgseen">${lastL.map(x=>`<button data-lu="${h(x.uid)}"><b>${h(x.name||'—')}</b><span>${fdate(x.date)} · ${ftime(x.at)}</span><span class="muted">${h(dev(x))}</span></button>`).join('')}</div></div>`:''}
+  <div class="card list">${list.length?list.map(x=>{const hd=x.date!==lastDate?`<div class="pcat">${fdate(x.date)}</div>`:'';lastDate=x.date;const [l,c]=LG_EV[x.event]||[x.event,''];
+    return hd+`<div class="li" style="cursor:default"><span class="ico q num" style="font-size:.72rem">${ftime(x.at)}</span>
+      <span style="min-width:0"><div class="t">${h(x.name||'—')} <span class="pill ${c}">${h(l)}</span></div>
+      <div class="s" style="white-space:normal">${h([dev(x),x.screen,x.reason].filter(Boolean).join(' · '))}${hasGPS(x.gps)?` · <a href="https://maps.google.com/?q=${x.gps.lat},${x.gps.lng}" target="_blank" rel="noopener">📍 ${fmtGPS(x.gps)}</a>`:''}</div></span><span></span></div>`}).join('')
+    :`<div class="empty"><b>No sign-ins in this period</b>Each sign-in, app open and sign-out is recorded here from now on.</div>`}</div>
+  <div class="muted" style="font-size:.78rem">Kept for 120 days on screen. Location is added only when that phone or browser has already allowed location for this app. Wrong-password attempts are not recorded, because nothing can be saved before a login succeeds.</div>`;
+};
+VIEWS_AFTER.logins=()=>{
+  $$('[data-lp]').forEach(b=>b.onclick=()=>{S.params.lp=b.dataset.lp;render()});
+  $$('[data-lu]').forEach(b=>b.onclick=()=>{S.params.lu=b.dataset.lu;render()});
+  $('#lg-u')&&($('#lg-u').onchange=e=>{S.params.lu=e.target.value;render()});
+  $('#lg-e')&&($('#lg-e').onchange=e=>{S.params.le=e.target.value;render()});
+  $('#lg-csv')&&($('#lg-csv').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const rows=[['Date','Time','Name','Event','App','Device model','OS','Browser','Screen','GPS','Reason','Device ID']].concat(S.logins.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))).map(x=>[x.date,ftime(x.at),x.name,(LG_EV[x.event]||[x.event])[0],x.app,x.model,x.os,x.browser,x.screen,hasGPS(x.gps)?fmtGPS(x.gps):'',x.reason,x.device]));
+    saveFile(new TextEncoder().encode('\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')),'LLCT login log '+today()+'.csv','text/csv','Save login log').catch(()=>{})});
+};
 VIEWS.staff=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
   const people=Object.values(S.users).filter(u=>u.id!==S.me.id&&u.active!==false).sort((a,b)=>(a.role==='admin')-(b.role==='admin')||String(a.name).localeCompare(String(b.name)));
@@ -1356,7 +1398,7 @@ VIEWS.staff=()=>{
   <div class="card">${people.length?people.map(u=>{const a=S.access[u.id]||{};const p=a.perms||{};const on=a.enabled!==false&&!!S.access[u.id];
    if(u.role==='admin')return `<div class="pad row" style="border-top:1px solid var(--line)"><b class="grow">${h(u.name)}</b><span class="pill brand">Admin · full access</span></div>`;
    return `<div class="pad" style="border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px" data-u="${u.id}">
-    <div class="row"><div class="grow" style="min-width:0"><b>${h(u.name||'Unnamed')}</b><div class="muted" style="font-size:.8rem">${h([u.designation,u.loginId].filter(Boolean).join(' · '))}</div></div>
+    <div class="row"><div class="grow" style="min-width:0"><b>${h(u.name||'Unnamed')}</b><div class="muted" style="font-size:.8rem">${h([u.designation,u.loginId,lastSeen(u.id)].filter(Boolean).join(' · '))}</div></div>
      <label class="check"><input type="checkbox" data-on ${on?'checked':''}>Invoicing access</label></div>
     <div class="perm-grid" ${on?'':'hidden'}>${PERMS.map(([k,l])=>`<label class="check"><input type="checkbox" data-perm="${k}" ${p[k]?'checked':''}>${l}</label>`).join('')}</div>
     <div class="row"><span class="grow"></span><button class="btn sm primary" data-savestaff>Save access</button></div></div>`}).join(''):`<div class="empty"><b>No staff found</b>Create staff logins in the attendance dashboard first.</div>`}</div>`;
@@ -1473,16 +1515,39 @@ function loginScreen(){
     <div id="lf-err" class="pill bad" hidden style="text-transform:none;padding:8px 10px;border-radius:8px"></div>
     <button class="btn primary" id="lf-go">Sign in</button></form></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#lf-go'),er=$('#lf-err');b.disabled=true;er.hidden=true;
-    try{await signInWithEmailAndPassword(auth,loginToEmail($('#lf-id').value),$('#lf-pw').value)}
+    try{try{sessionStorage.setItem('ll_fresh','1')}catch(_){}await signInWithEmailAndPassword(auth,loginToEmail($('#lf-id').value),$('#lf-pw').value)}
     catch(x){er.hidden=false;er.textContent=/invalid|wrong|not-found|credential/i.test(x.code||'')?'Login ID or password is wrong.':/network/i.test(x.code||'')?'No internet connection.':'Could not sign in ('+(x.code||x.message)+').';b.disabled=false}};
 }
 function messageScreen(title,text,retry){
   $('#app').innerHTML=`<div class="loading"><div class="card pad" style="max-width:420px;text-align:center;display:flex;flex-direction:column;gap:10px"><h2>${h(title)}</h2><p class="muted" style="margin:0">${text}</p>
    <div class="row" style="justify-content:center">${retry?'<button class="btn primary" id="ms-retry">Check again</button>':''}<button class="btn" id="ms-out">Sign out</button></div></div></div>`;
-  $('#ms-out').onclick=()=>signOut(auth);if(retry)$('#ms-retry').onclick=()=>location.reload();
+  $('#ms-out').onclick=logOut;if(retry)$('#ms-retry').onclick=()=>location.reload();
 }
 const busyViews=['edit','deliver','settings'];
 let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.includes(S.view))render()},80)};
+/* ----- login log ----- */
+function deviceId(){try{let d=localStorage.getItem('ll_dev');if(!d){d=uid();localStorage.setItem('ll_dev',d)}return d}catch(e){return ''}}
+async function deviceInfo(){const u=navigator.userAgent||'';let m;
+  let os=(m=/Android ([\d.]+)/.exec(u))?'Android '+m[1]:/iPhone|iPad|iPod/.test(u)?'iOS':/Windows/.test(u)?'Windows':/Mac OS X/.test(u)?'Mac':/CrOS/.test(u)?'ChromeOS':/Linux/.test(u)?'Linux':'Other';
+  const br=/Edg\//.test(u)?'Edge':/OPR\//.test(u)?'Opera':/SamsungBrowser/.test(u)?'Samsung Internet':/Firefox\//.test(u)?'Firefox':/Chrome\//.test(u)?'Chrome':/Safari\//.test(u)?'Safari':'Browser';
+  let model=(m=/Android [\d.]+; ([^;)]+)/.exec(u))&&m[1]!=='K'?m[1].trim():'';
+  try{if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){const v=await Promise.race([navigator.userAgentData.getHighEntropyValues(['model','platformVersion']),new Promise(r=>setTimeout(()=>r({}),1500))]);if(v.model)model=v.model}}catch(e){}
+  const app=isNative()?'Android app':'Web';
+  return {app,os,browser:app==='Web'?br:'',model,screen:`${screen.width}×${screen.height}`,ua:u.slice(0,300)}}
+// Location only when the person already allowed it, so signing in never pops up a request.
+async function quietGPS(){try{if(!navigator.permissions||!navigator.geolocation)return null;const st=await navigator.permissions.query({name:'geolocation'});if(st.state!=='granted')return null;
+  const g=await Promise.race([getGPS(),new Promise(r=>setTimeout(()=>r(null),8000))]);return hasGPS(g)?{lat:g.lat,lng:g.lng,acc:g.acc}:null}catch(e){return null}}
+async function logEvent(event,extra){try{
+  const id=uid(),now=new Date(),d={uid:auth.currentUser?auth.currentUser.uid:S.me.id,name:S.me.name||'',role:S.me.role||'',event,at:now.toISOString(),date:today(),device:deviceId(),...(await deviceInfo()),...(extra||{})};
+  if(!d.uid)return;const w=Store.put('logins',id,d);
+  if(event!=='logout')quietGPS().then(g=>{if(g)Store.put('logins',id,{...d,gps:g}).catch(()=>{})});await w}catch(e){console.warn('login log',e)}}
+function logSession(){let fresh=false;try{fresh=sessionStorage.getItem('ll_fresh')==='1';sessionStorage.removeItem('ll_fresh')}catch(e){}
+  if(fresh)return logEvent('login');
+  // re-opened with a saved login: record at most once per 30 minutes per device
+  try{const k='ll_open_'+S.me.id,t=+localStorage.getItem(k)||0;if(Date.now()-t<30*6e4)return;localStorage.setItem(k,String(Date.now()))}catch(e){}
+  return logEvent('open')}
+async function logOut(){await Promise.race([logEvent('logout'),new Promise(r=>setTimeout(r,1500))]);signOut(auth)}
+
 function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
   Store.sub('sites',r=>{S.sites=r},null,true);
@@ -1494,26 +1559,27 @@ function startData(){
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
+  if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){Store.sub('ledger',r=>{S.ledger=r;if(S.view==='accounts')soon()});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
 onAuthStateChanged(auth,async u=>{
-  Store.stop();S.ledger=[];S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
+  Store.stop();S.logins=[];S.ledger=[];S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
   if(!u){S.me={id:null,role:'login',perms:{}};loginScreen();return}
   S.me={id:u.uid,role:'loading',perms:{},name:''};render();
   try{
     const usr=await Store.get('users',u.uid);
-    if(!usr||usr.active===false){messageScreen('Access turned off','This login is not active. Ask your admin.');return}
+    if(!usr||usr.active===false){S.me.name=(usr&&usr.name)||u.email;logEvent('denied',{reason:'Login not active'});messageScreen('Access turned off','This login is not active. Ask your admin.');return}
     S.me.name=usr.name||u.email;
     const pr=await Store.get('profiles',u.uid).catch(()=>null);
     S.me.profile={mobile:(pr&&pr.mobile)||usr.phone||'',email:(pr&&pr.email)||(usr.email&&!/staff\.attendance\.app$/i.test(usr.email)?usr.email:'')};
     if(usr.role==='admin')S.me.role='admin';
     else{const a=await Store.get('access',u.uid).catch(()=>null);
-      if(!a||a.enabled===false){messageScreen('No invoicing access yet',`Signed in as <b>${h(S.me.name)}</b>. Ask the admin to turn on invoicing access for you in Staff &amp; access.`,true);return}
+      if(!a||a.enabled===false){logEvent('denied',{reason:'No invoicing access'});messageScreen('No invoicing access yet',`Signed in as <b>${h(S.me.name)}</b>. Ask the admin to turn on invoicing access for you in Staff &amp; access.`,true);return}
       S.me.role='employee';S.me.perms=a.perms||{}}
   }catch(e){messageScreen('Could not load your account',h(e.code||e.message)+'<br>Check your internet connection and the Firestore rules.',true);return}
-  S.view='home';S.params={};render();startData();
+  S.view='home';S.params={};render();startData();logSession();
 });
 window.addEventListener('resize',()=>$$('.preview-wrap').forEach(fitPreview));

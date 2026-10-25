@@ -290,6 +290,11 @@ service cloud.firestore {
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
       allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
+    // Login log: everyone records their own sign-ins; only admins can see them.
+    match /inv_logins/{id} {
+      allow read, delete: if isAdmin();
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+    }
     // Accounts: income & expenditure, admins only.
     match /inv_ledger/{id} {
       allow read, write: if isAdmin();
