@@ -2,7 +2,7 @@
 // Uses the same Firebase project and staff logins as LLCT Attendance.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction, getDocsFromServer, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction, getDocsFromServer, getDocFromServer, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp=initializeApp(firebaseConfig);
@@ -66,13 +66,13 @@ const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={logins:[],ledger:[],petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={logins:[],acct:[],drv:[],acctOpen:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={logins:'inv_logins',ledger:'inv_ledger',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -1247,105 +1247,143 @@ function productForm(p){
   $('#pd-del',o)&&($('#pd-del',o).onclick=async()=>{if(!await confirmBox('Delete product?',e.name+' will be removed from the list. Existing documents keep it.'))return;await Store.remove('products',e.id);closeModal()});
 }
 
-/* ----- accounts (admin only): income & expenditure ----- */
+/* ----- accounts (admin only) — the SAME books as the attendance app (acctEntries) ----- */
+// Categories and methods match LLCT Attendance exactly, so entries made in either app look the same.
 const ACC_CAT={
-  income:['Cheque deposit','Cash deposit','Bank transfer received','Customer payment','Owner / capital','Refund received','Other income'],
-  expense:['Petty cash given','Purchase / supplier payment','Salaries & wages','Rent','Utilities (DEWA)','Fuel & transport','Vehicle','Visa & government fees','Telecom & internet','Tools & equipment','Office expenses','Subcontractor','Bank charges','Other expense']};
-const ACC_ACCOUNTS=['Cash','WIO Bank','RAK Bank'];
-const ACC_METHODS=['Cash','Cheque','Bank transfer','Card','Online'];
+  income:['Cheque deposit','Cash deposit','Bank transfer received','Client payment','Owner capital','Loan received','Refund received','Other income'],
+  expense:['Purchase','Supplier payment','Salaries & wages','Labour supply','Rent','Utilities','Fuel','Vehicle & maintenance','Transport','Tools & equipment','Materials','Visa & PRO','Office expenses','Bank charges','Other expense']};
+const ACC_METHODS=['Cash','Cheque','Bank transfer','Card','Online / app'];
+const isBankM=m=>!!m&&m!=='Cash';
 function accRange(){const p=S.params.per||'month',t=today();
   if(p==='month')return [t.slice(0,8)+'01',t];
   if(p==='last'){const d=new Date(t.slice(0,8)+'01T00:00:00');d.setMonth(d.getMonth()-1);const f=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);return [f,addDays(t.slice(0,8)+'01',-1)]}
   if(p==='year')return [t.slice(0,4)+'-01-01',t];
   if(p==='all')return ['2000-01-01','2999-12-31'];
   return [S.params.af||t.slice(0,8)+'01',S.params.at||t]}
-// manual entries + petty cash handed out in the attendance app (shown as expenses)
+// Manual entries + the automatic lines the attendance app adds: petty cash given to staff, and driver payments.
 function accEntries(){
-  const man=S.ledger.map(e=>({...e,src:'acc'}));
-  const pet=S.params.nopetty?[]:S.petty.filter(x=>x.status!=='rejected').map(x=>({id:'pt_'+x.id,src:'petty',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Petty cash given',
-    party:x.employeeName||'',givenBy:x.createdByName||'',account:'Cash',method:'Cash',note:[x.note,x.siteName].filter(Boolean).join(' · ')}));
-  return man.concat(pet);
+  const man=S.acct.map(e=>({...e,src:'manual',type:e.type==='income'?'income':'expense',amount:+e.amount||0,method:e.method||'Cash'}));
+  const pet=S.petty.filter(x=>x.type==='credit'&&x.status!=='rejected').map(x=>({id:'petty_'+x.id,src:'petty',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Petty cash given',
+    method:'Cash',party:x.employeeName||'',note:[x.note,x.createdByName?'given by '+x.createdByName:''].filter(Boolean).join(' · '),siteName:x.siteName||''}));
+  const drv=S.drv.map(x=>({id:'drv_'+x.id,src:'driver',type:'expense',date:x.date||'',amount:+x.amount||0,category:'Driver payment',method:x.method||'Cash',
+    party:x.employeeName||'',note:[x.note,x.createdBy?'by '+x.createdBy:''].filter(Boolean).join(' · ')}));
+  return man.concat(pet,drv);
 }
+// Cash and bank balance at the end of a day: opening balance + everything from the opening date on.
+function accBalance(upto){const o=S.acctOpen||{};const out={cash:0,bank:0,set:!!o.date};
+  if(o.date&&o.date<=upto){out.cash=+o.cash||0;out.bank=+o.bank||0}const start=o.date||'2000-01-01';
+  accEntries().forEach(e=>{if(e.date>=start&&e.date<=upto){out[isBankM(e.method)?'bank':'cash']+=e.type==='income'?e.amount:-e.amount}});
+  out.cash=r2(out.cash);out.bank=r2(out.bank);return out}
+const SRC_PILL={petty:'petty cash · attendance',driver:'driver payment · attendance'};
 VIEWS.accounts=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
-  const [from,to]=accRange(),tab=S.params.at2||'all',q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'',acct=S.params.acct||'';
-  const all=accEntries().filter(e=>e.date>=from&&e.date<=to&&(!acct||e.account===acct));
-  const inc=r2(all.filter(e=>e.type==='income').reduce((s2,e)=>s2+(+e.amount||0),0)),exp=r2(all.filter(e=>e.type==='expense').reduce((s2,e)=>s2+(+e.amount||0),0));
-  const petty=r2(all.filter(e=>e.category==='Petty cash given').reduce((s2,e)=>s2+(+e.amount||0),0));
-  const coll=r2(S.payments.filter(p=>p.date>=from&&p.date<=to&&!/credit|adjust|previous/i.test(p.method||'')).reduce((s2,p)=>s2+(+p.amount||0),0));
-  const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.ref,e.account,e.givenBy].join(' ').toLowerCase().includes(q)))
-    .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-  const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+(+e.amount||0));
+  const [from,to]=accRange(),tab=S.params.at2||'all',q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'',mf=S.params.mf||'';
+  const all=accEntries().filter(e=>e.date>=from&&e.date<=to&&(!mf||(mf==='bank')===isBankM(e.method)));
+  const sum=a=>r2(a.reduce((t,e)=>t+e.amount,0));
+  const inc=sum(all.filter(e=>e.type==='income')),exp=sum(all.filter(e=>e.type==='expense'));
+  const auto=sum(all.filter(e=>e.src!=='manual'));
+  const bal=accBalance(to>today()?today():to);
+  const coll=r2(S.payments.filter(p=>p.date>=from&&p.date<=to&&!/credit|adjust|previous/i.test(p.method||'')).reduce((t,p)=>t+(+p.amount||0),0));
+  const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.reference,e.bank,e.siteName,e.method].join(' ').toLowerCase().includes(q)))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+e.amount);
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:1;
-  const accts=[...new Set(ACC_ACCOUNTS.concat(S.ledger.map(e=>e.account).filter(Boolean)))];
   const allCats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
   let lastDate='';
-  return `<div class="head"><div><h1>Accounts</h1><div class="sub">Income & expenditure · ${fdate(from)} – ${fdate(to)}</div></div>
+  return `<div class="head"><div><h1>Accounts</h1><div class="sub">Same accounts as the attendance app · ${fdate(from)} – ${fdate(to)}</div></div>
    <div class="row"><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
   <div class="row"><div class="seg">${[['month','This month'],['last','Last month'],['year','This year'],['all','All'],['custom','Custom']].map(([k,l])=>`<button class="${(S.params.per||'month')===k?'on':''}" data-per="${k}">${l}</button>`).join('')}</div>
    ${(S.params.per)==='custom'?`<input type="date" id="ac-f" value="${from}" style="width:auto"><input type="date" id="ac-t" value="${to}" style="width:auto">`:''}
-   <select id="ac-acct" style="width:auto"><option value="">All accounts</option>${accts.map(a=>`<option ${a===acct?'selected':''}>${h(a)}</option>`).join('')}</select></div>
-  <div class="kpis"><div class="card kpi"><span class="label">Income</span><span class="v" style="color:var(--good)">${money(inc)}</span></div>
-   <div class="card kpi"><span class="label">Expenses</span><span class="v" style="color:var(--bad)">${money(exp)}</span><span class="muted" style="font-size:.76rem">incl. petty cash ${money(petty)}</span></div>
-   <div class="card kpi hl"><span class="label">Net</span><span class="v">${money(inc-exp)}<small>${h(S.cfg.currency)}</small></span></div>
-   <div class="card kpi"><span class="label">Customer collections</span><span class="v">${money(coll)}</span><span class="muted" style="font-size:.76rem">from Payments (not added above)</span></div></div>
+   <div class="seg">${[['','Cash & bank'],['cash','Cash'],['bank','Bank / cheque']].map(([k,l])=>`<button class="${mf===k?'on':''}" data-mf="${k}">${l}</button>`).join('')}</div></div>
+  <div class="kpis"><div class="card kpi"><span class="label">Income</span><span class="v" style="color:var(--good)">${money(inc)}</span><span class="muted" style="font-size:.76rem">Customer payments in invoicing: ${money(coll)}</span></div>
+   <div class="card kpi"><span class="label">Expenses</span><span class="v" style="color:var(--bad)">${money(exp)}</span><span class="muted" style="font-size:.76rem">incl. petty cash &amp; drivers ${money(auto)}</span></div>
+   <div class="card kpi"><span class="label">Net for period</span><span class="v" style="color:${inc-exp<0?'var(--bad)':'inherit'}">${money(inc-exp)}</span></div>
+   <button class="card kpi hl" id="ac-open" style="text-align:left;cursor:pointer;font:inherit;border:0"><span class="label">Balance ${fdate(to>today()?today():to)}</span>
+     ${bal.set?`<span class="v" style="font-size:1.05rem">Cash ${money(bal.cash)}</span><span class="v" style="font-size:1.05rem">Bank ${money(bal.bank)}</span>`:`<span style="font-size:.85rem;opacity:.85">Set the opening balance to see cash in hand and bank balance →</span>`}</button></div>
   ${cats.length?`<div class="card pad"><h3 style="margin-bottom:10px">Where the money went</h3><div class="acbars">${cats.slice(0,8).map(([k,v])=>`<button class="acbar" data-cat="${h(k)}"><span class="t">${h(k)}</span><span class="b"><i style="width:${Math.max(2,v/maxC*100)}%"></i></span><span class="num">${money(v)}</span></button>`).join('')}</div></div>`:''}
   <div class="row"><div class="seg">${[['all','All'],['income','Income'],['expense','Expenses']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-at2="${k}">${l}</button>`).join('')}</div>
    <select id="ac-cat" style="width:auto"><option value="">All categories</option>${allCats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>
    <span class="grow"></span><input class="search" id="ac-q" placeholder="Search party, note, reference" value="${h(S.params.q||'')}"></div>
   <div class="card list">${list.length?list.map(e=>{const hd=e.date!==lastDate?`<div class="pcat">${fdate(e.date)}</div>`:'';lastDate=e.date;
     return hd+`<button class="li" data-ac="${h(e.id)}"><span class="ico ${e.type==='income'?'d':'p'}" style="${e.type==='expense'?'background:var(--bad-soft);color:var(--bad)':''}">${e.type==='income'?'IN':'OUT'}</span>
-      <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${h([e.account,e.method!==e.account?e.method:'',e.ref,e.givenBy?'given by '+e.givenBy:'',e.note].filter(Boolean).join(' · '))}${e.src==='petty'?' · <span class="pill">attendance app</span>':''}${e.receipt?' · 📎':''}</div></span>
+      <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${h([e.method,e.bank,e.reference,e.siteName,e.note].filter(Boolean).join(' · '))}${SRC_PILL[e.src]?` · <span class="pill">${SRC_PILL[e.src]}</span>`:''}${e.hasFile?' · 📎':''}</div></span>
       <span class="r num" style="color:${e.type==='income'?'var(--good)':'var(--bad)'}">${e.type==='income'?'+':'−'}${money(e.amount)}</span></button>`}).join('')
-    :`<div class="empty"><b>No entries for this period</b>Add income such as cheque or cash deposits, and expenses such as petty cash, supplier payments and salaries.</div>`}</div>
-  <label class="check"><input type="checkbox" id="ac-pt" ${S.params.nopetty?'':'checked'}>Include petty cash given in the attendance app (${S.petty.length} entries)</label>`;
+    :`<div class="empty"><b>No entries for this period</b>Add income such as cheque or cash deposits, and expenses such as supplier payments and salaries. Petty cash and driver payments from the attendance app appear here by themselves.</div>`}</div>`;
 };
 VIEWS_AFTER.accounts=()=>{
   if(!isAdmin())return;
   const set=(k,v)=>{S.params[k]=v;render()};
   $$('[data-per]').forEach(b=>b.onclick=()=>set('per',b.dataset.per));
+  $$('[data-mf]').forEach(b=>b.onclick=()=>set('mf',b.dataset.mf));
   $$('[data-at2]').forEach(b=>b.onclick=()=>set('at2',b.dataset.at2));
   $$('[data-cat]').forEach(b=>b.onclick=()=>{S.params.at2='expense';set('cat',b.dataset.cat)});
   $('#ac-f')&&($('#ac-f').onchange=e=>set('af',e.target.value));$('#ac-t')&&($('#ac-t').onchange=e=>set('at',e.target.value));
-  $('#ac-acct').onchange=e=>set('acct',e.target.value);$('#ac-cat').onchange=e=>set('cat',e.target.value);
-  $('#ac-pt').onchange=e=>set('nopetty',!e.target.checked);
+  $('#ac-cat').onchange=e=>set('cat',e.target.value);
   const q=$('#ac-q');q.oninput=()=>{S.params.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#ac-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
-  $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});
-  $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;if(id.startsWith('pt_')){toast('This petty cash entry comes from the attendance app. Edit it there.');return}accForm(S.ledger.find(e=>e.id===id))});
+  $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});$('#ac-open').onclick=openingForm;
+  $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;
+    if(id.startsWith('petty_')){toast('Petty cash given to staff comes from the attendance app (Petty cash). Change it there.');return}
+    if(id.startsWith('drv_')){toast('Driver payments come from the attendance app (Trips). Change them there.');return}
+    accForm(S.acct.find(e=>e.id===id))});
   $('#ac-csv').onclick=()=>{const [f,t]=accRange();const rows=accEntries().filter(e=>e.date>=f&&e.date<=t).sort((a,b)=>a.date.localeCompare(b.date));
     const esc=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-    const csv=[['Date','Type','Category','Account','Method','Paid to / Received from','Given by','Reference','VAT','Amount','Note','Source']].concat(rows.map(e=>[e.date,e.type,e.category,e.account,e.method,e.party,e.givenBy||'',e.ref||'',e.vat||'',(e.type==='expense'?-1:1)*(+e.amount||0),e.note||'',e.src==='petty'?'Attendance app':'Accounts'])).map(r=>r.map(esc).join(',')).join('\n');
-    saveFile(new TextEncoder().encode('\uFEFF'+csv),`Accounts ${f} to ${t}.csv`,'text/csv','Save accounts').catch(()=>{})};
+    const csv=[['Date','Type','Category','Method','Paid to / Received from','Reference','Bank','Cheque date','Site','Amount','Note','Source']].concat(rows.map(e=>[e.date,e.type,e.category,e.method,e.party,e.reference||'',e.bank||'',e.chequeDate||'',e.siteName||'',(e.type==='expense'?-1:1)*e.amount,e.note||'',{manual:'Accounts',petty:'Petty cash',driver:'Driver payment'}[e.src]])).map(r=>r.map(esc).join(',')).join('\n');
+    saveFile(new TextEncoder().encode('﻿'+csv),`Accounts ${f} to ${t}.csv`,'text/csv','Save accounts').catch(()=>{})};
 };
+async function readAcctFile(id){const s2=await getDoc(doc(fdb,COL.acctFiles,id));return s2.exists()?s2.data():null}
+async function showAcctFile(e){try{toast('Opening…');const f=await readAcctFile(e.id);if(!f||!f.base64){toast('Receipt copy not found.',true);return}
+  if(/pdf/i.test(f.mime||'')){await saveFile(dataToBytes('data:application/pdf;base64,'+f.base64),f.name||'receipt.pdf','application/pdf','Open receipt');return}
+  modal(h(f.name||'Receipt'),`<img src="data:${h(f.mime||'image/jpeg')};base64,${f.base64}" alt="" style="max-width:100%;border-radius:8px">`,'<button class="btn" data-x>Close</button>')}
+  catch(x){toast('Could not open: '+(x.message||x.code),true)}}
 function accForm(pre={}){
-  const e={date:today(),account:'Cash',method:'Cash',givenBy:S.me.name||'',...pre};const isInc=e.type==='income';
-  const staff=Object.values(S.users).filter(u=>u.active!==false).map(u=>u.name).filter(Boolean).sort();
-  const parties=[...new Set(S.ledger.map(x=>x.party).concat(S.clients.map(c=>c.name)).filter(Boolean))].sort();
-  const accts=[...new Set(ACC_ACCOUNTS.concat(S.ledger.map(x=>x.account).filter(Boolean)))];
-  const o=modal((e.id?'Edit ':'New ')+(isInc?'income':'expense'),`<div class="grid g2">
-    <label class="field"><span>Type</span><select id="af-type"><option value="expense" ${!isInc?'selected':''}>Expense (money out)</option><option value="income" ${isInc?'selected':''}>Income (money in)</option></select></label>
+  const e={date:today(),...pre};const isInc=e.type==='income';e.method=e.method||(isInc?'Cheque':'Cash');
+  const parties=[...new Set(S.acct.map(x=>x.party).concat(S.clients.map(c=>c.name),Object.values(S.users).map(u=>u.name)).filter(Boolean))].sort();
+  let file=null;
+  const o=modal((e.id?'Edit ':'Add ')+(isInc?'income':'expense'),`<div class="grid g2">
     <label class="field"><span>Date</span><input type="date" id="af-date" value="${h(e.date)}"></label>
-    <label class="field"><span>Category</span><input id="af-cat" list="af-cats" value="${h(e.category||'')}" placeholder="Choose or type"><datalist id="af-cats"></datalist></label>
-    <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input id="af-amt" inputmode="decimal" value="${h(e.amount||'')}"></label>
-    <label class="field"><span>Account</span><input id="af-acct" list="af-accts" value="${h(e.account||'')}"><datalist id="af-accts">${accts.map(a=>`<option value="${h(a)}">`).join('')}</datalist></label>
+    <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input id="af-amt" inputmode="decimal" value="${h(e.amount||'')}" style="font-weight:700;color:${isInc?'var(--good)':'var(--bad)'}"></label>
+    <label class="field"><span>Category</span><input id="af-cat" list="af-cats" value="${h(e.category||ACC_CAT[e.type][0])}"><datalist id="af-cats">${ACC_CAT[e.type].map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
+    <label class="field"><span>${isInc?'Received from (client / bank / owner)':'Paid to (supplier / party)'}</span><input id="af-party" list="af-parties" value="${h(e.party||'')}"><datalist id="af-parties">${parties.map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
     <label class="field"><span>Method</span><select id="af-meth">${ACC_METHODS.map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
-    <label class="field" style="grid-column:1/-1"><span id="af-party-l">${isInc?'Received from':'Paid to'}</span><input id="af-party" list="af-parties" value="${h(e.party||'')}" placeholder="Supplier, staff member, client or bank"><datalist id="af-parties">${parties.concat(staff).map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
-    <label class="field" id="af-gb-w"><span>Given by</span><input id="af-gb" list="af-staff" value="${h(e.givenBy||'')}"><datalist id="af-staff">${staff.map(x=>`<option value="${h(x)}">`).join('')}</datalist></label>
-    <label class="field"><span>Reference (cheque / bill / invoice no.)</span><input id="af-ref" value="${h(e.ref||'')}"></label>
-    <label class="field"><span>VAT included (optional)</span><input id="af-vat" inputmode="decimal" value="${h(e.vat||'')}"></label>
-    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="af-note" value="${h(e.note||'')}"></label>
-    <div style="grid-column:1/-1" class="row"><button class="btn" id="af-rc" type="button">${I.plus}${e.receipt?'Replace':'Attach'} receipt photo</button><span id="af-rcv">${e.receipt?img(e.receipt,'style="height:48px;border-radius:6px"'):''}</span></div></div>`,
-    `${e.id?'<button class="btn danger" id="af-del">Delete</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="af-save">Save</button>`);
-  const sync=()=>{const inc=$('#af-type',o).value==='income';$('#af-cats',o).innerHTML=ACC_CAT[inc?'income':'expense'].map(c=>`<option value="${h(c)}">`).join('');
-    $('#af-party-l',o).textContent=inc?'Received from':'Paid to';$('#af-gb-w',o).hidden=inc||!/petty/i.test($('#af-cat',o).value)};
-  $('#af-type',o).onchange=sync;$('#af-cat',o).oninput=sync;sync();
-  $('#af-rc',o).onclick=async()=>{const [f]=await pickFiles({multiple:false});if(!f)return;try{toast('Uploading…');e.receipt=await storeAttachmentImage(f);$('#af-rcv',o).innerHTML=img(e.receipt,'style="height:48px;border-radius:6px"')}catch(x){toast('Upload failed: '+(x.message||x.code),true)}};
-  $('#af-save',o).onclick=async()=>{const d={...e,type:$('#af-type',o).value,date:$('#af-date',o).value,category:$('#af-cat',o).value.trim(),amount:parseAmt($('#af-amt',o).value),account:$('#af-acct',o).value.trim()||'Cash',
-      method:$('#af-meth',o).value,party:$('#af-party',o).value.trim(),givenBy:$('#af-gb-w',o).hidden?'':$('#af-gb',o).value.trim(),ref:$('#af-ref',o).value.trim(),vat:parseAmt($('#af-vat',o).value),note:$('#af-note',o).value.trim(),updatedAt:new Date().toISOString()};
-    delete d.id;delete d.src;if(!e.id){d.createdBy=S.me.id;d.createdAt=d.updatedAt}
-    if(!d.date||!(d.amount>0)){toast('Enter the date and an amount above zero.',true);return}if(!d.category){toast('Choose a category.',true);return}
-    if(await save('ledger',e.id||uid(),d,'Saved'))closeModal()};
-  $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed.'))return;try{await Store.remove('ledger',e.id);toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
+    <label class="field"><span id="af-ref-l">Reference</span><input id="af-ref" value="${h(e.reference||'')}"></label>
+    <label class="field af-chq"><span>Bank</span><input id="af-bank" value="${h(e.bank||'')}" placeholder="e.g. RAK Bank"></label>
+    <label class="field af-chq"><span>Cheque date</span><input type="date" id="af-cdate" value="${h(e.chequeDate||'')}"></label>
+    <label class="field"><span>Site / project (optional)</span><select id="af-site"><option value="">—</option>${S.sites.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(x=>`<option value="${h(x.id)}" ${x.id===e.siteId?'selected':''}>${h(x.name)}</option>`).join('')}</select></label>
+    <div class="field"><span>Receipt / invoice / cheque copy</span><div class="row"><button class="btn sm" id="af-rc" type="button">${I.plus}${e.hasFile?'Replace':'Attach'}</button>
+      ${e.hasFile?`<button class="btn sm" id="af-view" type="button">View</button><button class="btn sm ghost" id="af-rm" type="button" style="color:var(--bad)">Remove</button>`:''}<span id="af-rcv" class="muted" style="font-size:.8rem"></span></div></div>
+    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="af-note" value="${h(e.note||'')}" placeholder="${isInc?'e.g. Project ABC — 2nd payment':'e.g. Cement 50 bags, invoice 1234'}"></label></div>`,
+    `${e.id?'<button class="btn danger" id="af-del">Delete</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="af-save">${e.id?'Save':'Add '+(isInc?'income':'expense')}</button>`);
+  const sync=()=>{const m=$('#af-meth',o).value,chq=m==='Cheque';$$('.af-chq',o).forEach(x=>x.hidden=!chq);$('#af-ref-l',o).textContent=chq?'Cheque no.':m==='Cash'?'Receipt / voucher no.':'Transaction ref.'};
+  $('#af-meth',o).onchange=sync;sync();
+  $('#af-rc',o).onclick=async()=>{const [f]=await pickFiles({multiple:false,accept:'image/*,application/pdf'});if(!f)return;
+    try{if(/pdf/i.test(f.type)){const d=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});if(d.length*.75>700*1024)throw new Error('PDF is larger than 700 KB');file={name:f.name,mime:'application/pdf',base64:d.split(',')[1]}}
+      else{let d=await compress(f,1600,.82);if(d.length*.75>700*1024)d=await compress(f,1200,.7);if(d.length*.75>700*1024)d=await compress(f,900,.6);file={name:f.name.replace(/\.[^.]+$/,'')+'.jpg',mime:'image/jpeg',base64:d.split(',')[1]}}
+      $('#af-rcv',o).textContent='✓ '+file.name}catch(x){file=null;toast(x.message||'Could not read the file',true)}};
+  $('#af-view',o)&&($('#af-view',o).onclick=()=>showAcctFile(e));
+  $('#af-rm',o)&&($('#af-rm',o).onclick=async()=>{try{const b=writeBatch(fdb);b.update(doc(fdb,COL.acct,e.id),{hasFile:false,fileName:'',fileMime:''});b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();e.hasFile=false;$('#af-rm',o).remove();$('#af-view',o)&&$('#af-view',o).remove();$('#af-rcv',o).textContent='Removed'}catch(x){toast('Could not remove: '+(x.message||x.code),true)}});
+  $('#af-save',o).onclick=async()=>{const date=$('#af-date',o).value,amount=r2(parseAmt($('#af-amt',o).value)),category=$('#af-cat',o).value.trim(),method=$('#af-meth',o).value,chq=method==='Cheque';
+    if(!date||!(amount>0)||!category){toast('Date, amount and category are required.',true);return}
+    const siteId=$('#af-site',o).value,site=S.sites.find(x=>x.id===siteId);
+    const body={type:e.type,date,amount,category,party:$('#af-party',o).value.trim(),method,reference:$('#af-ref',o).value.trim(),bank:chq?$('#af-bank',o).value.trim():'',chequeDate:chq?$('#af-cdate',o).value:'',
+      siteId,siteName:site?site.name||'':'',note:$('#af-note',o).value.trim(),month:date.slice(0,7),
+      ...(file?{hasFile:true,fileName:file.name,fileMime:file.mime}:{}),
+      ...(e.id?{editedBy:S.me.name||'',editedAt:serverTimestamp()}:{createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()})};
+    const ref=e.id?doc(fdb,COL.acct,e.id):doc(collection(fdb,COL.acct));const btn=$('#af-save',o);btn.disabled=true;
+    try{const b=writeBatch(fdb);b.set(ref,body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,ref.id),file);await b.commit();toast(e.id?'Saved':(isInc?'Income':'Expense')+' added');closeModal()}
+    catch(x){btn.disabled=false;toast(/permission/i.test(x.code||x.message||'')?'Not allowed — publish the latest Firestore rules.':'Save failed: '+(x.message||x.code),true)}};
+  $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed from the accounts in both apps.'))return;
+    try{const b=writeBatch(fdb);b.delete(doc(fdb,COL.acct,e.id));if(e.hasFile)b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
+}
+function openingForm(){const op=S.acctOpen||{};
+  const o=modal('Opening balance',`<p class="muted" style="margin:0 0 10px">Cash in hand and bank balance on the day you start keeping accounts. Shared with the attendance app.</p><div class="grid g2">
+    <label class="field" style="grid-column:1/-1"><span>As at date</span><input type="date" id="ob-d" value="${h(op.date||today().slice(0,8)+'01')}"></label>
+    <label class="field"><span>Cash in hand (${h(S.cfg.currency)})</span><input id="ob-c" inputmode="decimal" value="${h(op.cash??'')}"></label>
+    <label class="field"><span>Bank balance (${h(S.cfg.currency)})</span><input id="ob-b" inputmode="decimal" value="${h(op.bank??'')}"></label>
+    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="ob-n" value="${h(op.note||'')}"></label></div>`,
+    `<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="ob-s">Save</button>`);
+  $('#ob-s',o).onclick=async()=>{const d=$('#ob-d',o).value;if(!d){toast('Choose the date.',true);return}
+    try{await setDoc(doc(fdb,COL.acctSettings,'opening'),{date:d,cash:r2(parseAmt($('#ob-c',o).value)),bank:r2(parseAmt($('#ob-b',o).value)),note:$('#ob-n',o).value.trim(),updatedBy:S.me.name||'',updatedAt:serverTimestamp()});toast('Opening balance saved');closeModal()}
+    catch(x){toast('Could not save: '+(x.message||x.code),true)}};
 }
 
 /* ----- staff & access (admin) ----- */
@@ -1560,13 +1598,14 @@ function startData(){
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
-  if(isAdmin()){Store.sub('ledger',r=>{S.ledger=r;if(S.view==='accounts')soon()});
+  if(isAdmin()){const ra=()=>{if(S.view==='accounts')soon()};
+    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
 onAuthStateChanged(auth,async u=>{
-  Store.stop();S.logins=[];S.ledger=[];S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
+  Store.stop();S.logins=[];S.acct=[];S.drv=[];S.acctOpen={};S.petty=[];S.sites=[];S.projects={};S.docs=[];S.clients=[];S.products=[];S.payments=[];S.users={};S.access={};
   if(!u){S.me={id:null,role:'login',perms:{}};loginScreen();return}
   S.me={id:u.uid,role:'loading',perms:{},name:''};render();
   try{

@@ -1,10 +1,11 @@
 rules_version = '2';
 
 // COMBINED RULES for the shared Firebase project: LLCT Attendance + LLCT Invoicing.
+// Both apps use ONE Firebase project, so they share this ONE rules file.
 // Paste the WHOLE file into Firebase Console → Firestore Database → Rules → Publish.
+// (Publishing only part of it would switch off the other app.)
 
-// Security rules for LLCT Attendance (mobile app + web dashboard).
-// Paste into Firebase Console → Firestore Database → Rules → Publish.
+// ======================================================== LLCT Attendance
 //
 // Roles (users/{uid}.role):
 //   admin    – everything, including accounts (petty cash, budgets) and staff logins
@@ -22,6 +23,8 @@ service cloud.firestore {
     function isManagement() { return isActive() && (role() == 'admin' || role() == 'manager'); }
     // Document clerk: uses the Documents Portal only — can view/download IDs and submit changes for admin approval.
     function isDocs() { return isActive() && role() == 'docs'; }
+    // Admin can let a person view & download everyone's ID documents (and see the staff list) in the app.
+    function canIds() { return isActive() && me().get('canViewIds', false) == true; }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
     function owns() { return isActive() && resource.data.employeeId == request.auth.uid; }
     function createsOwn() { return isActive() && request.resource.data.employeeId == request.auth.uid; }
@@ -30,10 +33,12 @@ service cloud.firestore {
     // ---------------------------------------------------------------- users
     match /users/{uid} {
       // Staff can see the list of company drivers (to pick one for a ride).
-      allow read: if isSelf(uid) || isManagement() || isDocs() || (isActive() && resource.data.get('isDriver', false) == true);
+      allow read: if isSelf(uid) || isManagement() || isDocs() || canIds() || (isActive() && resource.data.get('isDriver', false) == true);
       allow create, delete: if isAdmin();
       // Admins edit profiles; staff may only update their own live location.
-      allow update: if isAdmin() || (isSelf(uid) && isActive() && onlyChanges(['lastLocation']));
+      // Staff may update their own live location, and their own mobile number / email.
+      allow update: if isAdmin() || (isSelf(uid) && isActive()
+                      && onlyChanges(['lastLocation', 'phone', 'contactEmail', 'contactUpdatedAt']));
 
       // GPS trail while on duty
       match /track/{pointId} {
@@ -67,7 +72,8 @@ service cloud.firestore {
     // ------------------------------------------------------------ driver trips
     // Drivers start/stop trips from the app; GPS route points are stored under each trip.
     match /trips/{id} {
-      allow read: if isManagement() || owns();
+      // A driver can also see staff rides taken with them (they count in the driver's account).
+      allow read: if isManagement() || owns() || (isActive() && resource.data.get('driverId', '') == request.auth.uid);
       // kind: 'driver' (a driver's own paid trip — driver profile only), 'taxi' or 'withDriver' (an employee's ride).
       allow create: if createsOwn() && request.resource.data.status == 'active'
                     && (request.resource.data.get('kind', 'driver') in ['taxi', 'withDriver']
@@ -76,7 +82,7 @@ service cloud.firestore {
                       && request.resource.data.employeeId == request.auth.uid
                       && onlyChanges(['distanceM', 'pointsCount', 'lastLat', 'lastLng', 'lastAt', 'endAt', 'endLat', 'endLng',
                            'endSiteId', 'endSiteName', 'siteId', 'siteName', 'durationMin', 'ratePerKm', 'cost', 'status',
-                           'note', 'endTz', 'endServer', 'costEntered', 'costEditedAt']))
+                           'note', 'endTz', 'endServer', 'costEntered', 'costEditedAt', 'vehicle']))
                     // A driver can enter / change the cost of their own trip at any time (flagged for admin).
                     || (owns() && resource.data.get('kind', 'driver') == 'driver'
                         && request.resource.data.employeeId == request.auth.uid
@@ -99,6 +105,17 @@ service cloud.firestore {
     match /driverPayments/{id} {
       allow read: if isAdmin() || owns();
       allow write: if isAdmin();
+    }
+
+    // Company accounts: income & expense entries and their receipt copies (admin only).
+    match /acctEntries/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /acctFiles/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /acctSettings/{id} {
+      allow read, write: if isAdmin();
     }
 
     // Claims on a place / site name so the same new site can't be added twice (first one wins).
@@ -197,12 +214,12 @@ service cloud.firestore {
     // Passport / Emirates ID / SIRA numbers & expiry for staff and external workers.
     // Management sees everything; each employee can view and update their own.
     match /idInfo/{ownerId} {
-      allow read: if isManagement() || isDocs() || (isSelf(ownerId) && isActive());
+      allow read: if isManagement() || isDocs() || canIds() || (isSelf(ownerId) && isActive());
       allow write: if isManagement() || (isSelf(ownerId) && isActive()
                       && request.resource.data.ownerType == 'staff'
                       && request.resource.data.keys().hasOnly(['ownerType', 'name', 'updatedAt', 'nationality',
                            'passportNo', 'passportExpiry', 'eidNo', 'eidExpiry', 'siraNo', 'siraExpiry',
-                           'visaNo', 'visaExpiry', 'labourCardNo', 'labourCardExpiry', 'idNotes']));
+                           'visaNo', 'visaExpiry', 'mccNo', 'mccExpiry', 'labourCardNo', 'labourCardExpiry', 'idNotes']));
     }
     // Scanned copies (max 2 MB each), stored in chunks inside Firestore.
     function ownsFile(fileId) {
@@ -214,7 +231,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/idFiles/$(fileId)).data.uploadedById == request.auth.uid;
     }
     match /idFiles/{fileId} {
-      allow read: if isManagement() || isDocs() || (isActive() && resource.data.ownerId == request.auth.uid);
+      allow read: if isManagement() || isDocs() || canIds() || (isActive() && resource.data.ownerId == request.auth.uid);
       allow create: if isManagement()
                     || (isActive() && request.resource.data.ownerId == request.auth.uid
                         && request.resource.data.ownerType == 'staff' && request.resource.data.size <= 2097152)
@@ -224,13 +241,28 @@ service cloud.firestore {
       allow delete: if isManagement() || (isActive() && resource.data.ownerId == request.auth.uid)
                     || (isDocs() && resource.data.pending == true && resource.data.uploadedById == request.auth.uid);
       match /chunks/{n} {
-        allow read: if isManagement() || isDocs() || ownsFile(fileId);
+        allow read: if isManagement() || isDocs() || canIds() || ownsFile(fileId);
         allow create: if isManagement() || (isActive()
                         && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.ownerId == request.auth.uid)
                       || (isDocs() && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.uploadedById == request.auth.uid
                         && getAfter(/databases/$(database)/documents/idFiles/$(fileId)).data.pending == true);
         allow update: if isManagement();
         allow delete: if isManagement() || ownsFile(fileId) || pendingByMe(fileId);
+      }
+    }
+
+    // ------------------------------------------- company documents
+    // Trade licenses, Chamber of Commerce, WC insurance… Management manages; people allowed to view IDs can view.
+    match /companyDocs/{id} {
+      allow read: if isManagement() || canIds();
+      allow write: if isManagement();
+    }
+    match /companyFiles/{fileId} {
+      allow read: if isManagement() || canIds();
+      allow write: if isManagement();
+      match /chunks/{n} {
+        allow read: if isManagement() || canIds();
+        allow write: if isManagement();
       }
     }
 
@@ -290,14 +322,14 @@ service cloud.firestore {
       allow create: if invHas(type) && request.resource.data.last is int && request.resource.data.last >= 1;
       allow update: if invHas(type) && request.resource.data.last is int && request.resource.data.last > resource.data.last;
     }
+    // Accounts: income & expenditure, admins only.
+    match /inv_ledger/{id} {
+      allow read, write: if isAdmin();
+    }
     // Login log: everyone records their own sign-ins; only admins can see them.
     match /inv_logins/{id} {
       allow read, delete: if isAdmin();
       allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
-    }
-    // Accounts: income & expenditure, admins only.
-    match /inv_ledger/{id} {
-      allow read, write: if isAdmin();
     }
     // Each user's own contact details, printed on documents they create.
     match /inv_profiles/{uid} {
