@@ -72,7 +72,7 @@ const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.p
 const isAdmin=()=>S.me.role==='admin';
 
 /* ================= Firebase store ================= */
-const COL={logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -1289,6 +1289,7 @@ VIEWS.accounts=()=>{
   const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+e.amount);
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:1;
   const allCats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
+  const outside=accEntries().filter(e=>(e.date<from||e.date>to)&&e.src==='manual').length;
   let lastDate='';
   return `<div class="head"><div><h1>Accounts</h1><div class="sub">Same accounts as the attendance app · ${fdate(from)} – ${fdate(to)}</div></div>
    <div class="row"><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
@@ -1304,6 +1305,7 @@ VIEWS.accounts=()=>{
   <div class="row"><div class="seg">${[['all','All'],['income','Income'],['expense','Expenses']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-at2="${k}">${l}</button>`).join('')}</div>
    <select id="ac-cat" style="width:auto"><option value="">All categories</option>${allCats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>
    <span class="grow"></span><input class="search" id="ac-q" placeholder="Search party, note, reference" value="${h(S.params.q||'')}"></div>
+  ${outside&&S.params.per!=='all'?`<div class="notice">${outside} more ${outside===1?'entry is':'entries are'} dated outside ${fdate(from)} – ${fdate(to)}. <button class="btn sm" data-per="all">Show all dates</button></div>`:''}
   <div class="card list">${list.length?list.map(e=>{const hd=e.date!==lastDate?`<div class="pcat">${fdate(e.date)}</div>`:'';lastDate=e.date;
     return hd+`<button class="li" data-ac="${h(e.id)}"><span class="ico ${e.type==='income'?'d':'p'}" style="${e.type==='expense'?'background:var(--bad-soft);color:var(--bad)':''}">${e.type==='income'?'IN':'OUT'}</span>
       <span style="min-width:0"><div class="t">${h(e.category||'—')}${e.party?' · '+h(e.party):''}</div><div class="s">${h([e.method,e.bank,e.reference,e.siteName,e.note].filter(Boolean).join(' · '))}${SRC_PILL[e.src]?` · <span class="pill">${SRC_PILL[e.src]}</span>`:''}${e.hasFile?' · 📎':''}</div></span>
@@ -1374,6 +1376,21 @@ function accForm(pre={}){
   $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed from the accounts in both apps.'))return;
     try{const b=writeBatch(fdb);b.delete(doc(fdb,COL.acct,e.id));if(e.hasFile)b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
 }
+// Entries saved by the earlier invoicing Accounts (inv_ledger, e.g. from an older app install) are moved
+// into the shared accounts (acctEntries) with the same id, so nothing is counted twice.
+const OLD_CAT={'Purchase / supplier payment':'Supplier payment','Utilities (DEWA)':'Utilities','Fuel & transport':'Fuel','Vehicle':'Vehicle & maintenance','Visa & government fees':'Visa & PRO','Customer payment':'Client payment','Owner / capital':'Owner capital'};
+let moving=false;
+async function moveOldLedger(rows){if(moving||!isAdmin())return;moving=true;let n=0;
+  try{for(const e of rows){
+    const user=S.users[e.createdBy];const note=[e.note,e.givenBy?'given by '+e.givenBy:'',+e.vat?'VAT '+money(e.vat):''].filter(Boolean).join(' · ');
+    const body={type:e.type==='income'?'income':'expense',date:e.date||today(),amount:r2(+e.amount||0),category:OLD_CAT[e.category]||e.category||'Other expense',party:e.party||'',
+      method:e.method||'Cash',reference:e.ref||'',bank:e.account&&e.account!=='Cash'?e.account:'',chequeDate:'',siteId:'',siteName:'',note,month:(e.date||today()).slice(0,7),
+      createdBy:(user&&user.name)||S.me.name||'',createdById:e.createdBy||S.me.id,createdAt:serverTimestamp(),movedFrom:'invoicing'};
+    let file=null;
+    if(e.receipt&&String(e.receipt).startsWith('img:')){try{const im=await Store.get('images',e.receipt.slice(4));if(im&&im.data){file={base64:String(im.data).split(',')[1],mime:'image/jpeg',name:'receipt.jpg'};Object.assign(body,{hasFile:true,fileName:'receipt.jpg',fileMime:'image/jpeg'})}}catch(x){}}
+    const b=writeBatch(fdb);b.set(doc(fdb,COL.acct,e.id),body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,e.id),file);b.delete(doc(fdb,COL.ledger,e.id));await b.commit();n++}
+    if(n)toast(`${n} earlier account ${n===1?'entry':'entries'} moved into the shared accounts`)}
+  catch(x){console.warn('move ledger',x)}finally{moving=false}}
 function openingForm(){const op=S.acctOpen||{};
   const o=modal('Opening balance',`<p class="muted" style="margin:0 0 10px">Cash in hand and bank balance on the day you start keeping accounts. Shared with the attendance app.</p><div class="grid g2">
     <label class="field" style="grid-column:1/-1"><span>As at date</span><input type="date" id="ob-d" value="${h(op.date||today().slice(0,8)+'01')}"></label>
@@ -1599,7 +1616,7 @@ function startData(){
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){const ra=()=>{if(S.view==='accounts')soon()};
-    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});
+    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
