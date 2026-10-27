@@ -637,6 +637,9 @@ const VIEWS={},VIEWS_AFTER={};
 const docSite=d=>(d.siteName||(d.type==='delivery'&&d.deliveryAddress?String(d.deliveryAddress).split('\n')[0]:'')||'').trim();
 const siteLine=d=>{const st=docSite(d);return st&&st!==(d.client&&d.client.name)?`<div class="s site">${I.pin}${h(st)}</div>`:''};
 const docFile=d=>`${d.number} ${(d.client&&d.client.name)||''}${docSite(d)&&docSite(d)!==(d.client&&d.client.name)?' - '+docSite(d):''}.pdf`.replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();
+const docText=d=>[d.number,d.client&&d.client.name,docSite(d),d.deliveryAddress,d.ref,d.subject,d.createdByName,d.technician,docTitle(d),
+  ...(d.items||[]).flatMap(i=>[i.name,i.desc,...(i.serials||[])])].filter(Boolean).join(' ').toLowerCase();
+const docMatch=(d,q)=>q.split(/\s+/).filter(Boolean).every(w=>docText(d).includes(w));
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
   return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
@@ -664,18 +667,21 @@ VIEWS.home=()=>{
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row ovbtns">${boxes.map(t=>`<button class="btn" data-box="${t}">${I.doc||''}${DOC_TABS[t].p}</button>`).join('')}</div></div>
   ${(()=>{const dr=getDraft();if(!dr||!dr.ed)return '';const e=dr.ed;const nm=e.type==='delivery'?rep(e).t:TYPE[e.type].t;
     return `<div class="notice row" style="align-items:center"><span class="grow"><b>Unfinished ${h(nm.toLowerCase())}</b> ${h(e.number||'')}${e.client&&e.client.name?' · '+h(e.client.name):''} — not saved yet (${ago(new Date(dr.at).toISOString())})</span><button class="btn sm primary" id="dr-go">Continue</button><button class="btn sm ghost" id="dr-x">Discard</button></div>`})()}
-  ${money4?`<div class="hilites">
+  <div class="gsearch"><input type="search" class="search" id="ovq" placeholder="Search all documents — number, client, site, LPO, item, serial no…" value="${h(S.params.oq||'')}" autocomplete="off"></div>
+  ${(()=>{const q=(S.params.oq||'').trim().toLowerCase();if(!q)return '';const res=docs.filter(d=>docMatch(d,q)).sort(newestFirst);
+    return `<div class="card"><div class="pad row"><h2 class="grow" style="font-size:1rem">${res.length} document${res.length===1?'':'s'} found</h2><button class="btn sm ghost" id="ovq-x">Clear</button></div><div class="list">${res.slice(0,40).map(docRow).join('')||'<div class="empty" style="padding:18px"><b>Nothing found</b>Try part of the number, the client or site name, or a serial number.</div>'}</div>${res.length>40?'<div class="pad muted" style="font-size:.8rem">Showing the latest 40. Type more to narrow down.</div>':''}</div>`})()}
+  ${money4&&!(S.params.oq||'').trim()?`<div class="hilites">
     <button class="hl-card hl-navy" data-go="clients"><span class="hl-l">Receivable</span><span class="hl-v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span class="hl-s">${overdue.length?`<b>${overdue.length}</b> invoice${overdue.length===1?'':'s'} overdue`:'Nothing overdue'}</span></button>
     <button class="hl-card hl-blue" data-box="invoice"><span class="hl-l">Invoiced this month</span><span class="hl-v">${money(monthInv)}</span><span class="hl-s">${(n=>`${n} invoice${n===1?'':'s'}`)(inv.filter(d=>(d.date||'').startsWith(ym)).length)}</span></button>
     <button class="hl-card hl-green" data-go="payments"><span class="hl-l">Received this month</span><span class="hl-v">${money(monthRec)}</span><span class="hl-s">${(n=>`${n} payment${n===1?'':'s'}`)(S.payments.filter(p=>(p.date||'').startsWith(ym)).length)}</span></button>
     <button class="hl-card hl-orange" data-go="deliveries"><span class="hl-l">Pending deliveries</span><span class="hl-v">${pend.length}</span><span class="hl-s">${pend.filter(d=>(d.reportType||'delivery')!=='delivery').length} service / call-out</span></button>
   </div>`:''}
 
-  <div class="actgrid">${boxes.map(recentBox).join('')}</div>
-  ${pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
-  ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
+  ${(S.params.oq||'').trim()?'':`<div class="actgrid">${boxes.map(recentBox).join('')}</div>`}
+  ${!(S.params.oq||'').trim()&&pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
+  ${!(S.params.oq||'').trim()&&money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
-VIEWS_AFTER.home=()=>($('#dr-go')&&($('#dr-go').onclick=resumeDraft),$('#dr-x')&&($('#dr-x').onclick=async()=>{if(await confirmBox('Discard the unsaved document?','What you typed will be lost.','Discard')){clearDraft();render()}}),$$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
+VIEWS_AFTER.home=()=>($('#ovq')&&(()=>{const i=$('#ovq');i.oninput=()=>{S.params.oq=i.value;clearTimeout(i._t);i._t=setTimeout(()=>{const p=i.selectionStart;render();const n=$('#ovq');n.focus();n.setSelectionRange(p,p)},220)};$('#ovq-x')&&($('#ovq-x').onclick=()=>{S.params.oq='';render()})})(),$('#dr-go')&&($('#dr-go').onclick=resumeDraft),$('#dr-x')&&($('#dr-x').onclick=async()=>{if(await confirmBox('Discard the unsaved document?','What you typed will be lost.','Discard')){clearDraft();render()}}),$$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
 
 // Document lists: quotations, invoices, service reports (incl. call-out), delivery notes — newest first.
 const DOC_TABS={
@@ -688,11 +694,11 @@ const canNew=t=>t==='service'||t==='delivery'?can('delivery'):can(t);
 VIEWS.docs=()=>{
   const tabs=Object.keys(DOC_TABS).filter(t=>DOC_TABS[t].ok()||visibleDocs().some(DOC_TABS[t].f));
   const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
-  const list=visibleDocs().filter(T.f).filter(d=>!q||[d.number,d.client&&d.client.name,docSite(d),d.ref,d.subject,d.createdByName].join(' ').toLowerCase().includes(q)).sort(newestFirst);
+  const list=visibleDocs().filter(T.f).filter(d=>!q||docMatch(d,q)).sort(newestFirst);
   const money_=tab==='quotation'||tab==='invoice';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
   return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
    ${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div>
-  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, site, LPO, person…" value="${h(S.params.q||'')}"></div>
+  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, site, LPO, item, serial no, person…" value="${h(S.params.q||'')}"></div>
   <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button above to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
