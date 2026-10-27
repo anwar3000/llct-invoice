@@ -736,3 +736,6 @@ table.tbl{width:100%;border-collapse:collapse}
 .actbox-h{width:100%;border:0;background:none;font:inherit;color:inherit;cursor:pointer;text-align:left;align-items:center}
 .actbox-h:hover h2{color:var(--brand)}
 @media (max-width:800px){.actgrid{grid-template-columns:1fr}}
+.li .r .byline{display:block;font-size:.72rem;color:var(--muted);margin-top:3px;text-align:right}
+.ovbtns{display:grid;grid-template-columns:repeat(2,auto);gap:8px}
+@media (max-width:700px){.ovbtns{grid-template-columns:1fr 1fr;width:100%}.ovbtns .btn{justify-content:center}}

@@ -594,8 +594,8 @@ function newMenu(){
   const opts=[];
   if(can('quotation'))opts.push(['quotation','Quotation','Price offer with product photos']);
   if(can('invoice'))opts.push(['invoice','Invoice','Bill a client, track payment']);
-  if(can('delivery'))opts.push(['delivery','Delivery note','Items, serial numbers and signature']);
   if(can('delivery'))opts.push(['service','Service report','Technician visit, work done and customer sign-off']);
+  if(can('delivery'))opts.push(['delivery','Delivery note','Items, serial numbers and signature']);
   if(can('payments'))opts.push(['payment','Payment received','Record money from a client']);
   if(!opts.length){toast('You don\'t have permission to create documents.',true);return}
   const o=modal('Create new',`<div class="list card">${opts.map(([k,t,s])=>`<button class="li" data-k="${k}"><span class="ico ${k==='payment'?'p':k==='service'?TYPE.delivery.c:TYPE[k].c}">${k==='payment'?'PAY':k==='service'?REPORT.service.a:TYPE[k].a}</span><span style="min-width:0"><div class="t">${t}</div><div class="s">${s}</div></span><span></span></button>`).join('')}</div>`);
@@ -607,7 +607,7 @@ const VIEWS={},VIEWS_AFTER={};
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
   return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
-  <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span></span></button>`;
+  <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span>${d.createdByName?`<small class="byline">${h(d.createdByName)}</small>`:''}</span></button>`;
 }
 VIEWS.home=()=>{
   const ym=today().slice(0,7);const docs=visibleDocs();
@@ -628,7 +628,7 @@ VIEWS.home=()=>{
     return `<div class="card actbox"><button class="pad row actbox-h" data-box="${t}" type="button"><h2 class="grow" style="font-size:1rem">${T.p}</h2><span class="muted" style="font-size:.78rem">${docs.filter(T.f).length} · open all ›</span></button>
       <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
-  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row">${can('quotation')?`<button class="btn" data-q="quotation">${I.plus}Quotation</button>`:''}${can('invoice')?`<button class="btn" data-q="invoice">${I.plus}Invoice</button>`:''}${can('delivery')?`<button class="btn" data-q="service">${I.plus}Service report</button><button class="btn primary" data-q="delivery">${I.plus}Delivery note</button>`:''}</div></div>
+  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row ovbtns">${boxes.map(t=>`<button class="btn" data-box="${t}">${I.doc||''}${DOC_TABS[t].p}</button>`).join('')}</div></div>
 
   <div class="actgrid">${boxes.map(recentBox).join('')}</div>
   ${money4?`<div class="kpis"><div class="card kpi hl"><span class="label">Receivable</span><span class="v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span style="font-size:.78rem;color:#bbb">${overdue.length} invoice${overdue.length===1?'':'s'} overdue</span></div>
