@@ -618,14 +618,14 @@ VIEWS.home=()=>{
   const pend=docs.filter(d=>d.type==='delivery'&&!(d.delivery&&d.delivery.signedAt));
   const overdue=inv.filter(d=>invStatus(d)[0].includes('overdue'));
   // Recent activity: three boxes — delivery/service reports, quotations, invoices — newest first, with who made each.
-  const boxes=[['delivery','Delivery notes & reports','deliveries'],['quotation','Quotations','docs'],['invoice','Invoices','docs']].filter(([t])=>can(t)||can('viewAll')||(t==='delivery'&&seesAllDN())||docs.some(d=>d.type===t));
+  const boxes=['quotation','invoice','service','delivery'].filter(t=>DOC_TABS[t].ok()||docs.some(DOC_TABS[t].f));
   const actRow=d=>{const sg=d.delivery&&d.delivery.signedAt;const t=lastTouched(d);const [st,k]=docStatus(d);
     const who=d.createdByName||(S.users[d.createdBy]||{}).name||'';
     return `<button class="li act-li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
       <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
       <span class="r who"><b>${h(who||'—')}</b><small>${ago(sg&&Math.abs(new Date(t)-new Date(sg))<3e5?sg:t)}</small></span></button>`};
-  const recentBox=([t,title,view])=>{const list=docs.filter(d=>d.type===t).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,6);
-    return `<div class="card actbox"><div class="pad row"><h2 class="grow" style="font-size:1rem">${title}</h2><button class="btn sm ghost" data-go="${view}"${view==='docs'?` data-tab="${t}"`:''}>All</button></div>
+  const recentBox=t=>{const T=DOC_TABS[t];const list=docs.filter(T.f).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,5);
+    return `<div class="card actbox"><button class="pad row actbox-h" data-box="${t}" type="button"><h2 class="grow" style="font-size:1rem">${T.p}</h2><span class="muted" style="font-size:.78rem">${docs.filter(T.f).length} · open all ›</span></button>
       <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row">${can('quotation')?`<button class="btn" data-q="quotation">${I.plus}Quotation</button>`:''}${can('invoice')?`<button class="btn" data-q="invoice">${I.plus}Invoice</button>`:''}${can('delivery')?`<button class="btn" data-q="service">${I.plus}Service report</button><button class="btn primary" data-q="delivery">${I.plus}Delivery note</button>`:''}</div></div>
@@ -638,20 +638,29 @@ VIEWS.home=()=>{
   ${pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
   ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
-VIEWS_AFTER.home=()=>($$('.actbox [data-tab]').forEach(b=>b.onclick=e=>{e.stopPropagation();go('docs',{tab:b.dataset.tab})}),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
+VIEWS_AFTER.home=()=>($$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
 
+// Document lists: quotations, invoices, service reports (incl. call-out), delivery notes — newest first.
+const DOC_TABS={
+  quotation:{p:'Quotations',one:'quotation',f:d=>d.type==='quotation',ok:()=>can('quotation')||can('viewAll')},
+  invoice:{p:'Invoices',one:'invoice',f:d=>d.type==='invoice',ok:()=>can('invoice')||can('viewAll')},
+  service:{p:'Service reports',one:'service report',f:d=>d.type==='delivery'&&(d.reportType||'delivery')!=='delivery',ok:()=>seesAllDN()||can('viewAll')},
+  delivery:{p:'Delivery notes',one:'delivery note',f:d=>d.type==='delivery'&&(d.reportType||'delivery')==='delivery',ok:()=>seesAllDN()||can('viewAll')}};
+const newDoc=t=>t==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:t});
+const canNew=t=>t==='service'||t==='delivery'?can('delivery'):can(t);
 VIEWS.docs=()=>{
-  const tab=S.params.tab||(can('invoice')?'invoice':can('quotation')?'quotation':'delivery');const q=(S.params.q||'').toLowerCase();
-  const list=visibleDocs().filter(d=>d.type===tab).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject].join(' ').toLowerCase().includes(q)).sort(newestFirst);
-  const total=list.reduce((s,d)=>s+totals(d).total,0);
-  return `<div class="head"><div><h1>Documents</h1><div class="sub">${list.length} ${TYPE[tab].p.toLowerCase()}${tab!=='delivery'?` · ${cur(total)}`:''}</div></div>${tab==='delivery'&&can('delivery')?`<button class="btn" id="nsr">${I.plus}New service report</button>`:''}${can(tab)||tab==='delivery'&&can('delivery')?`<button class="btn primary" id="nd">${I.plus}New ${TYPE[tab].t.replace('Tax ','').toLowerCase()}</button>`:''}</div>
-  <div class="row"><div class="seg">${['quotation','invoice','delivery'].map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${TYPE[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, LPO…" value="${h(S.params.q||'')}"></div>
-  <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${TYPE[tab].p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button to make one.'}</div>`}</div>`;
+  const tabs=Object.keys(DOC_TABS).filter(t=>DOC_TABS[t].ok()||visibleDocs().some(DOC_TABS[t].f));
+  const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
+  const list=visibleDocs().filter(T.f).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject,d.createdByName].join(' ').toLowerCase().includes(q)).sort(newestFirst);
+  const money_=tab==='quotation'||tab==='invoice';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
+  return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
+   ${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div>
+  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, LPO, person…" value="${h(S.params.q||'')}"></div>
+  <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button above to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
   $$('[data-tab]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.tab}));
-  const nd=$('#nd');if(nd)nd.onclick=()=>go('edit',{type:S.params.tab||(can('invoice')?'invoice':can('quotation')?'quotation':'delivery')});
-  const nsr=$('#nsr');if(nsr)nsr.onclick=()=>go('edit',{type:'delivery',rt:'service'});
+  const nd=$('#nd');if(nd)nd.onclick=()=>newDoc(DOC_TABS[S.params.tab]?S.params.tab:$('.seg [data-tab].on').dataset.tab);
   const dq=$('#dq');dq.oninput=()=>{S.params.q=dq.value;clearTimeout(dq._t);dq._t=setTimeout(()=>{const p=dq.selectionStart;render();const n=$('#dq');n.focus();n.setSelectionRange(p,p)},250)};
 };
 VIEWS.deliveries=()=>{
