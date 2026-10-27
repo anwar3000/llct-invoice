@@ -590,14 +590,14 @@ function render(){
   if(S.me.role==='loading'){app.innerHTML='<div class="loading">Loading your workspace…</div>';return}
   if(S.me.role==='login'){loginScreen();return}
   if(S.me.role==='pending'||S.me.role==='disabled'){app.innerHTML=`<div class="loading"><div class="card pad" style="max-width:420px;text-align:center;display:flex;flex-direction:column;gap:8px"><h2>${S.me.role==='pending'?'Waiting for access':'Access turned off'}</h2><p class="muted" style="margin:0">${S.me.role==='pending'?'Your request has been sent. The admin will set what you can do here, then this page updates by itself.':'Your access to this workspace was turned off by the admin.'}</p></div></div>`;return}
-  const rs=document.documentElement.style;if(S.cfg.brand)rs.setProperty('--brand',S.cfg.brand);if(S.cfg.charcoal)rs.setProperty('--rail',S.cfg.charcoal);
+  // the app itself stays black on white; the brand colours are used on the documents
   const cur=S.view;const nav=navItems();
   const v=VIEWS[cur]?VIEWS[cur]():VIEWS.home();
   const logo='<img src="assets/mark.png" alt="">';
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
     ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
-    <div class="who"><div style="color:#fff;font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
-    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.25)" data-menu>${I.menu}</button></div>
+    <div class="who"><div style="color:var(--ink);font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
+    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-menu>${I.menu}</button></div>
     <main class="main"><div class="wrap">${v}</div></main></div>
     <nav class="tabbar">${tabbar(cur)}</nav></div>`;
   bindCommon(app);
