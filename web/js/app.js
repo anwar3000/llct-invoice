@@ -252,6 +252,7 @@ const I={
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ expand:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A1.5 1.5 0 015.5 3H20v15H5.5A1.5 1.5 0 004 19.5z"/><path d="M4 19.5A1.5 1.5 0 005.5 21H20v-3M8 7h8M8 11h6"/></svg>',
  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9v.01M18 15v.01"/></svg>',
  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg>',
@@ -750,13 +751,13 @@ VIEWS.edit=()=>{
    <datalist id="prodlist">${S.products.map(p=>`<option value="${h(p.name)}">`).join('')}</datalist>
    <div class="items">${d.items.map((i,n)=>`<div class="${cls}" data-i="${n}">
      ${isDN?'':`<div class="phw"><button class="photo" data-photo="${n}" type="button" aria-label="${i.photo?'Change':'Add'} product photo">${i.photo?img(i.photo):'+ Photo'}</button>${i.photo?`<select data-f="photoSize" aria-label="Photo size on document">${Object.entries(SZ).map(([k,l])=>`<option value="${k}" ${(i.photoSize||S.cfg.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="linkbtn" data-unphoto="${n}">Remove</button>`:''}</div>`}
-     <div class="desc"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><textarea data-f="desc" rows="1" placeholder="Description, model, specs">${h(i.desc)}</textarea>
+     <div class="desc"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><textarea data-f="desc" rows="3" class="grow-ta" placeholder="Description, model, specs (Enter for a new line)">${h(i.desc)}</textarea>
       ${hasSN?`<div class="snrow"><button class="btn sm ${(i.serials||[]).length?'':'ghost'}" type="button" data-serials="${n}">${I.scan}Serial nos ${(i.serials||[]).length?`· ${i.serials.length}/${h(i.qty||0)}`:''}</button>${(i.serials||[]).slice(0,3).map(x=>`<span class="chip">${h(x)}</span>`).join('')}${(i.serials||[]).length>3?`<span class="muted" style="font-size:.78rem">+${i.serials.length-3} more</span>`:''}</div>`:''}</div>
      <label class="field f-q"><span>Qty</span><input type="number" step="any" min="0" data-f="qty" value="${h(i.qty)}"></label>
      <label class="field f-u"><span>Unit</span><input data-f="unit" value="${h(i.unit)}"></label>
      ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${rep(d).st.map(x=>`<option ${(i.status||rep(d).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
-     <button class="xbtn" data-rm="${n}" aria-label="Remove item">✕</button></div>`).join('')}</div>
+     <div class="ibtns"><button class="xbtn ex" type="button" data-full="${n}" aria-label="Open item in full window" title="Open in full window">${I.expand}</button><button class="xbtn" type="button" data-rm="${n}" aria-label="Remove item" title="Remove item">✕</button></div></div>`).join('')}</div>
    <div><button class="btn" id="add-item">${I.plus}Add item</button></div>
    ${isDN?'':`<div class="totals"><div class="tr"><span class="muted">Subtotal</span><span class="num" id="t-sub">${money(t.sub)}</span></div>
     <div class="tr" style="align-items:center"><span class="muted">Discount</span><input type="number" step="any" id="e-discount" value="${h(d.discount)}" style="width:120px;text-align:right"></div>
@@ -775,6 +776,32 @@ function readEditor(){
   ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','contactName','contactMobile','contactEmail','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   readAtts(d.attachments||[],'att');
+}
+// One item in a full window: name, long description, qty, unit, rate / status.
+function itemFull(n){
+  readEditor();const it=ED.items[n];if(!it)return;const isDN=ED.type==='delivery';
+  const o=modal(`Item ${n+1}`,`<div class="grid itemfull">
+    <label class="field"><span>Item name</span><input id="if-name" list="prodlist" value="${h(it.name||'')}" placeholder="Item name"></label>
+    <label class="field"><span>Description</span><textarea id="if-desc" rows="10" placeholder="Description, model, specs, warranty…">${h(it.desc||'')}</textarea></label>
+    <div class="grid ${isDN?'g3':'g4'}">
+      <label class="field"><span>Qty</span><input id="if-qty" type="number" step="any" min="0" inputmode="decimal" value="${h(it.qty)}"></label>
+      <label class="field"><span>Unit</span><input id="if-unit" value="${h(it.unit||'')}"></label>
+      ${isDN?`<label class="field"><span>Status</span><select id="if-status">${rep(ED).st.map(x=>`<option ${(it.status||rep(ED).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`
+        :`<label class="field"><span>Rate</span><input id="if-price" type="number" step="any" min="0" inputmode="decimal" value="${h(it.price)}"></label>
+          <div class="field"><span>Amount</span><div class="num" id="if-amt" style="padding:9px 0;font-weight:700">${money((+it.qty||0)*(+it.price||0))}</div></div>`}
+    </div></div>`,
+    `${n>0?'<button class="btn" id="if-prev" type="button">‹ Previous</button>':''}${n<ED.items.length-1?'<button class="btn" id="if-next" type="button">Next ›</button>':''}<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="if-ok">Done</button>`,true);
+  o.querySelector('.modal').classList.add('tall');
+  const amt=()=>{const a=$('#if-amt',o);if(a)a.textContent=money((+$('#if-qty',o).value||0)*(+$('#if-price',o).value||0))};
+  $$('#if-qty,#if-price',o).forEach(x=>x.addEventListener('input',amt));
+  $('#if-name',o).addEventListener('change',()=>{const p=S.products.find(x=>x.name===$('#if-name',o).value);if(!p)return;
+    if(!$('#if-desc',o).value.trim())$('#if-desc',o).value=p.desc||'';if(!isDN&&p.price)$('#if-price',o).value=p.price;if(p.unit)$('#if-unit',o).value=p.unit;it.pid=p.id;if(!it.photo&&p.photo)it.photo=p.photo;amt()});
+  const keep=()=>{it.name=$('#if-name',o).value;it.desc=$('#if-desc',o).value;const q=$('#if-qty',o).value;it.qty=q===''?'':+q;it.unit=$('#if-unit',o).value;
+    if(isDN)it.status=$('#if-status',o).value;else{const pr=$('#if-price',o).value;it.price=pr===''?'':+pr}};
+  $('#if-ok',o).onclick=()=>{keep();closeModal();render()};
+  $('#if-prev',o)&&($('#if-prev',o).onclick=()=>{keep();render();itemFull(n-1)});
+  $('#if-next',o)&&($('#if-next',o).onclick=()=>{keep();render();itemFull(n+1)});
+  setTimeout(()=>{const d=$('#if-desc',o);d.focus();d.setSelectionRange(d.value.length,d.value.length)},120);
 }
 // Serial numbers for one line: type, paste a list, or scan with the camera.
 function serialEditor(n){
@@ -864,6 +891,9 @@ VIEWS_AFTER.edit=()=>{
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
   $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
+  $$('[data-full]').forEach(b=>b.onclick=()=>itemFull(+b.dataset.full));
+  // description boxes grow with the text, so long descriptions are easy to read and edit
+  $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
   $('#att-add').onclick=()=>addAttachments(false);$('#att-cam').onclick=()=>addAttachments(true);
   $$('[data-att-rep]').forEach(b=>b.onclick=async()=>{readEditor();if(await replacePhoto(ED.attachments[+b.dataset.attRep]))render()});

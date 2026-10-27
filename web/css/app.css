@@ -699,3 +699,22 @@ table.tbl{width:100%;border-collapse:collapse}
   .modal .body{padding:14px 16px}
   .modal footer{padding:10px 16px max(10px,env(safe-area-inset-bottom,0px))}
 }
+
+/* item description: multi-line, grows with the text; full-window item editor */
+.item textarea.grow-ta{min-height:66px;line-height:1.4;resize:vertical;overflow:hidden}
+.ibtns{display:flex;flex-direction:column;gap:2px}
+.xbtn.ex{display:grid;place-items:center}
+.xbtn.ex:hover{background:var(--brand-soft);color:var(--brand)}
+.modal.tall{min-height:min(78vh,760px)}
+.itemfull #if-desc{min-height:200px;line-height:1.45;resize:vertical}
+@media (max-width:700px){
+  .item>.ibtns{flex-direction:row;order:-1;margin-left:auto}
+  .item>.desc{flex:1 1 100%}
+  .modal.tall{min-height:0}
+  .itemfull #if-desc{min-height:140px}
+}
+.modal.tall>.body{flex:1}
+.modal.tall .itemfull{height:100%;grid-template-rows:auto 1fr auto}
+.modal.tall .itemfull>label:nth-child(2){display:flex;flex-direction:column}
+.modal.tall .itemfull>label:nth-child(2) #if-desc{flex:1}
+@media (max-width:480px){.itemfull .g3,.itemfull .g4{grid-template-columns:repeat(3,minmax(0,1fr))}.itemfull .g4>.field:last-child{grid-column:1/-1}}
