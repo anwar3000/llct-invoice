@@ -263,6 +263,7 @@ const I={
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ search:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
  pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0119 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
  expand:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A1.5 1.5 0 015.5 3H20v15H5.5A1.5 1.5 0 004 19.5z"/><path d="M4 19.5A1.5 1.5 0 005.5 21H20v-3M8 7h8M8 11h6"/></svg>',
@@ -836,7 +837,7 @@ VIEWS.edit=()=>{
    <datalist id="prodlist">${S.products.map(p=>`<option value="${h(p.name)}">`).join('')}</datalist>
    <div class="items">${d.items.map((i,n)=>`<div class="${cls}" data-i="${n}">
      ${isDN?'':`<div class="phw"><button class="photo" data-photo="${n}" type="button" aria-label="${i.photo?'Change':'Add'} product photo">${i.photo?img(i.photo):'+ Photo'}</button>${i.photo?`<select data-f="photoSize" aria-label="Photo size on document">${Object.entries(SZ).map(([k,l])=>`<option value="${k}" ${(i.photoSize||S.cfg.photoSize||'M')===k?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="linkbtn" data-unphoto="${n}">Remove</button>`:''}</div>`}
-     <div class="desc"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><textarea data-f="desc" rows="3" class="grow-ta" placeholder="Description, model, specs (Enter for a new line)">${h(i.desc)}</textarea>
+     <div class="desc"><div class="namerow"><input list="prodlist" data-f="name" value="${h(i.name)}" placeholder="Item name"><button type="button" class="btn sm findp" data-findp="${n}" title="Search products" aria-label="Search products">${I.search}</button></div><textarea data-f="desc" rows="3" class="grow-ta" placeholder="Description, model, specs (Enter for a new line)">${h(i.desc)}</textarea>
       ${hasSN?`<div class="snrow"><button class="btn sm ${(i.serials||[]).length?'':'ghost'}" type="button" data-serials="${n}">${I.scan}Serial nos ${(i.serials||[]).length?`· ${i.serials.length}/${h(i.qty||0)}`:''}</button>${(i.serials||[]).slice(0,3).map(x=>`<span class="chip">${h(x)}</span>`).join('')}${(i.serials||[]).length>3?`<span class="muted" style="font-size:.78rem">+${i.serials.length-3} more</span>`:''}</div>`:''}</div>
      <label class="field f-q"><span>Qty</span><input type="number" step="any" min="0" data-f="qty" value="${h(i.qty)}"></label>
      <label class="field f-u"><span>Unit</span><input data-f="unit" value="${h(i.unit)}"></label>
@@ -866,7 +867,7 @@ function readEditor(){
 function itemFull(n){
   readEditor();const it=ED.items[n];if(!it)return;const isDN=ED.type==='delivery';
   const o=modal(`Item ${n+1}`,`<div class="grid itemfull">
-    <label class="field"><span>Item name</span><input id="if-name" list="prodlist" value="${h(it.name||'')}" placeholder="Item name"></label>
+    <label class="field"><span>Item name</span><div class="namerow"><input id="if-name" list="prodlist" value="${h(it.name||'')}" placeholder="Item name"><button type="button" class="btn findp" id="if-find" title="Search products">${I.search} Search</button></div></label>
     <label class="field"><span>Description</span><textarea id="if-desc" rows="10" placeholder="Description, model, specs, warranty…">${h(it.desc||'')}</textarea></label>
     <div class="grid ${isDN?'g3':'g4'}">
       <label class="field"><span>Qty</span><input id="if-qty" type="number" step="any" min="0" inputmode="decimal" value="${h(it.qty)}"></label>
@@ -881,6 +882,7 @@ function itemFull(n){
   $$('#if-qty,#if-price',o).forEach(x=>x.addEventListener('input',amt));
   $('#if-name',o).addEventListener('change',()=>{const p=S.products.find(x=>x.name===$('#if-name',o).value);if(!p)return;
     if(!$('#if-desc',o).value.trim())$('#if-desc',o).value=p.desc||'';if(!isDN&&p.price)$('#if-price',o).value=p.price;if(p.unit)$('#if-unit',o).value=p.unit;it.pid=p.id;if(!it.photo&&p.photo)it.photo=p.photo;amt()});
+  $('#if-find',o).onclick=()=>productPicker(p=>{if(!p)return;$('#if-name',o).value=p.name;$('#if-desc',o).value=p.desc||$('#if-desc',o).value;if(!isDN&&+p.price)$('#if-price',o).value=p.price;if(p.unit)$('#if-unit',o).value=p.unit;it.pid=p.id;if(!it.photo&&p.photo)it.photo=p.photo;amt()},$('#if-name',o).value);
   const keep=()=>{it.name=$('#if-name',o).value;it.desc=$('#if-desc',o).value;const q=$('#if-qty',o).value;it.qty=q===''?'':+q;it.unit=$('#if-unit',o).value;
     if(isDN)it.status=$('#if-status',o).value;else{const pr=$('#if-price',o).value;it.price=pr===''?'':+pr}};
   $('#if-ok',o).onclick=()=>{keep();closeModal();render()};
@@ -946,6 +948,18 @@ async function addAttachments(camera){
   readEditor();const added=await uploadFiles(files,{proof:ED.type==='delivery'});if(!ED)return;readEditor();ED.attachments.push(...added);render();
 }
 function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
+// Search the products list (name, description, category, barcode) and pick one.
+function productPicker(cb,start=''){
+  const o=modal('Find product',`<input type="search" class="search" id="pp-q" placeholder="Search name, model, description, barcode…" autocomplete="off" style="max-width:none;width:100%" value="${h(start)}"><div class="list card" id="pp-list" style="margin-top:10px;max-height:60vh;overflow:auto"></div>`,'',false,'ov2');
+  const txt=p=>[p.name,p.desc,p.category,p.barcode,p.sku].filter(Boolean).join(' ').toLowerCase();
+  const draw=()=>{const q=$('#pp-q',o).value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const list=S.products.filter(p=>q.every(w=>txt(p).includes(w))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,150);
+    $('#pp-list',o).innerHTML=list.map(p=>`<button class="li" data-pp="${h(p.id)}"><span class="ico q" style="overflow:hidden;padding:0">${p.photo?img(p.photo,'style="width:100%;height:100%;object-fit:cover"'):'▦'}</span><span style="min-width:0"><div class="t">${h(p.name)}</div><div class="s">${h([p.category,(p.desc||'').split('\n')[0]].filter(Boolean).join(' · '))}</div></span><span class="r num" style="font-size:.84rem">${+p.price?money(p.price):''}<div class="muted" style="font-size:.72rem">${h(p.unit||'')}</div></span></button>`).join('')
+      ||`<div class="empty" style="padding:16px"><b>No product found</b>${q.length?'Close this and type the item by hand — it will be saved to your products for next time.':'Your products list is empty.'}</div>`;
+    $$('[data-pp]',o).forEach(b=>b.onclick=()=>{o.remove();cb(S.products.find(x=>x.id===b.dataset.pp))})};
+  $('#pp-q',o).oninput=draw;draw();setTimeout(()=>{const q=$('#pp-q',o);q.focus();q.setSelectionRange(q.value.length,q.value.length)},60);
+}
+const fillItem=(it,p)=>Object.assign(it,{name:p.name,desc:p.desc||it.desc||'',price:+p.price||it.price||0,unit:p.unit||it.unit||'pcs',photo:it.photo||p.photo||'',pid:p.id});
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
 VIEWS_AFTER.edit=()=>{
   {const app=$('#app');if(!app._draftHook){app._draftHook=1;let t;const kick=()=>{if(S.view!=='edit'||!ED)return;clearTimeout(t);t=setTimeout(saveDraft,800)};app.addEventListener('input',kick);app.addEventListener('change',kick)}}
@@ -985,6 +999,7 @@ VIEWS_AFTER.edit=()=>{
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
   $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
   $$('[data-full]').forEach(b=>b.onclick=()=>itemFull(+b.dataset.full));
+  $$('[data-findp]').forEach(b=>b.onclick=()=>{readEditor();const n=+b.dataset.findp;productPicker(p=>{if(!p)return;readEditor();fillItem(ED.items[n],p);render()},ED.items[n].name||'')});
   // description boxes grow with the text, so long descriptions are easy to read and edit
   $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
