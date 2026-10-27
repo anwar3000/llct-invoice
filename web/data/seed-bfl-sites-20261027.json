@@ -1,0 +1,21 @@
+{
+  "id": "bfl-sites-20261027",
+  "clients": [
+    {
+      "name": "BFL Group",
+      "match": "BFL Group – Head Office",
+      "update": true,
+      "replace": ["address", "notes"],
+      "replaceSites": true,
+      "phone": "+971 4 812 8333",
+      "email": "info@bflgroup.ae",
+      "address": "BFL Group (Brands For Less)\nDubai Techno Park, Jebel Ali\nP.O. Box 80794, Dubai, United Arab Emirates",
+      "creditDays": 30,
+      "openingBalance": 0,
+      "notes": "Brands For Less (BFL Group). Branches are kept as sites.",
+      "places": [
+        { "name": "Head Office", "address": "Dubai Techno Park, Jebel Ali, Dubai", "phone": "+971 4 812 8333", "lat": 24.9424, "lng": 55.058098, "radius": 250 }
+      ]
+    }
+  ]
+}

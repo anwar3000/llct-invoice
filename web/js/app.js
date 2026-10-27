@@ -118,11 +118,14 @@ const hasGPS=g=>!!g&&typeof g.lat==='number'&&typeof g.lng==='number';
 function distM(a,b){const R=6371000,r=x=>x*Math.PI/180;const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);const q=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
 const fmtGPS=g=>hasGPS(g)?`${(+g.lat).toFixed(6)}, ${(+g.lng).toFixed(6)}`:'';
 const fmtDist=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
+// A client's sites (branches / locations): name, address, contact, phone and optional GPS. Stored as client.places.
+const sitesOf=c=>((c&&c.places)||[]).map((p,i)=>({...p,id:p.id||('s'+i)}));
+const siteText=si=>[si.name,si.address].filter(Boolean).join('\n');
 // Clients whose saved places, or whose attendance sites, are at this spot. Closest first.
 function nearby(g){
   if(!hasGPS(g))return [];const out=[];const slack=Math.min(g.acc||0,100);
   const byName=n=>{n=String(n||'').trim().toLowerCase();if(n.length<3)return null;return S.clients.find(c=>String(c.name||'').trim().toLowerCase()===n)||S.clients.find(c=>{const cn=String(c.name||'').toLowerCase();return cn.length>2&&(cn.includes(n)||n.includes(cn))})||null};
-  S.clients.forEach(c=>(c.places||[]).forEach(pl=>{if(!hasGPS(pl))return;const dd=distM(g,pl);if(dd<=(+pl.radius||150)+slack)out.push({client:c,site:pl.name||'',address:pl.address||'',dist:dd})}));
+  S.clients.forEach(c=>(c.places||[]).forEach(pl=>{if(!hasGPS(pl))return;const dd=distM(g,pl);if(dd<=(+pl.radius||150)+slack)out.push({client:c,site:pl.name||'',siteId:pl.id||'',address:pl.address||'',dist:dd})}));
   S.sites.forEach(si=>{if(!hasGPS(si)||si.active===false||si.approved===false)return;const dd=distM(g,si);
     if(dd<=(+si.radius||200)+slack){const pr=S.projects[si.projectId];out.push({client:byName(pr&&pr.client)||byName(si.name),site:si.name||'',address:si.address||'',dist:dd})}});
   out.sort((a,b)=>(!!b.client-!!a.client)||a.dist-b.dist);
@@ -133,7 +136,9 @@ async function rememberPlace(d){
   const g=d.gps;if(d.type!=='delivery'||!hasGPS(g)||!d.clientId||(g.acc||0)>300)return;
   const c=S.clients.find(x=>x.id===d.clientId);if(!c)return;
   if((c.places||[]).some(pl=>hasGPS(pl)&&distM(pl,g)<=(+pl.radius||150)))return;
-  const places=[...(c.places||[]),{name:(d.deliveryAddress||'Site').slice(0,80),lat:g.lat,lng:g.lng,radius:150,addedAt:new Date().toISOString()}];
+  // the chosen site has no GPS yet: save this spot on that site instead of adding a new one
+  if(d.siteId){const i=(c.places||[]).findIndex((pl,k)=>(pl.id||('s'+k))===d.siteId);if(i>=0&&!hasGPS(c.places[i])){const places=clone(c.places);places[i]={...places[i],id:d.siteId,lat:g.lat,lng:g.lng,radius:places[i].radius||150};try{const x={...c,places,updatedAt:new Date().toISOString()};delete x.id;await Store.put('clients',c.id,x)}catch(e){}return}}
+  const places=[...(c.places||[]),{id:uid(),name:(d.siteName||d.deliveryAddress||'Site').split('\n')[0].slice(0,80),address:d.siteName?(d.siteAddress||''):'',lat:g.lat,lng:g.lng,radius:150,addedAt:new Date().toISOString()}];
   try{const x={...c,places,updatedAt:new Date().toISOString()};delete x.id;await Store.put('clients',c.id,x)}catch(e){console.warn('place',e)}
 }
 
@@ -258,6 +263,7 @@ const I={
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0119 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
  expand:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A1.5 1.5 0 015.5 3H20v15H5.5A1.5 1.5 0 004 19.5z"/><path d="M4 19.5A1.5 1.5 0 005.5 21H20v-3M8 7h8M8 11h6"/></svg>',
  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9v.01M18 15v.01"/></svg>',
@@ -412,6 +418,7 @@ function renderSheet(d){
   return `<div class="sheet${docCls()}" data-client="${h(cl.name||'')}" data-site="${h(d.deliveryAddress||d.subject||'')}" data-ref="${h(d.ref||'')}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number,isPrem()?subFor(d):'')}
   <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
+    ${!isDN&&d.siteName?`<div class="k" style="margin-top:8px">Site</div><div style="white-space:pre-line">${h([d.siteName,d.siteAddress].filter(Boolean).join('\n'))}</div>`:''}
     ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div></div>
     ${detHtml(det)}</div>
   ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
@@ -629,12 +636,14 @@ VIEWS.home=()=>{
       <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row ovbtns">${boxes.map(t=>`<button class="btn" data-box="${t}">${I.doc||''}${DOC_TABS[t].p}</button>`).join('')}</div></div>
+  ${money4?`<div class="hilites">
+    <button class="hl-card hl-navy" data-go="clients"><span class="hl-l">Receivable</span><span class="hl-v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span class="hl-s">${overdue.length?`<b>${overdue.length}</b> invoice${overdue.length===1?'':'s'} overdue`:'Nothing overdue'}</span></button>
+    <button class="hl-card hl-blue" data-box="invoice"><span class="hl-l">Invoiced this month</span><span class="hl-v">${money(monthInv)}</span><span class="hl-s">${(n=>`${n} invoice${n===1?'':'s'}`)(inv.filter(d=>(d.date||'').startsWith(ym)).length)}</span></button>
+    <button class="hl-card hl-green" data-go="payments"><span class="hl-l">Received this month</span><span class="hl-v">${money(monthRec)}</span><span class="hl-s">${(n=>`${n} payment${n===1?'':'s'}`)(S.payments.filter(p=>(p.date||'').startsWith(ym)).length)}</span></button>
+    <button class="hl-card hl-orange" data-go="deliveries"><span class="hl-l">Pending deliveries</span><span class="hl-v">${pend.length}</span><span class="hl-s">${pend.filter(d=>(d.reportType||'delivery')!=='delivery').length} service / call-out</span></button>
+  </div>`:''}
 
   <div class="actgrid">${boxes.map(recentBox).join('')}</div>
-  ${money4?`<div class="kpis"><div class="card kpi hl"><span class="label">Receivable</span><span class="v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span style="font-size:.78rem;color:#bbb">${overdue.length} invoice${overdue.length===1?'':'s'} overdue</span></div>
-    <div class="card kpi"><span class="label">Invoiced this month</span><span class="v">${money(monthInv)}</span></div>
-    <div class="card kpi"><span class="label">Received this month</span><span class="v">${money(monthRec)}</span></div>
-    <div class="card kpi"><span class="label">Pending deliveries</span><span class="v">${pend.length}</span></div></div>`:''}
   ${pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
   ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
@@ -757,6 +766,7 @@ VIEWS.edit=()=>{
   <div class="card pad grid">
    <div class="grid g4">
     <label class="field" style="grid-column:span 2"><span>Client</span><div class="row" style="flex-wrap:nowrap"><select id="e-client"><option value="">Choose a client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===d.clientId?'selected':''}>${h(c.name)}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-nc" title="Add client">${I.plus}</button>`:''}</div></label>
+    ${(()=>{const c=S.clients.find(x=>x.id===d.clientId);const ss=sitesOf(c);return c&&(ss.length||can('clients'))?`<label class="field" style="grid-column:span 2"><span>Site</span><div class="row" style="flex-wrap:nowrap"><select id="e-site"><option value="">${ss.length?'Choose a site…':'No sites yet'}</option>${ss.map(si=>`<option value="${h(si.id)}" ${si.id===d.siteId?'selected':''}>${h(si.name)}${si.address?' — '+h(si.address.split('\n')[0]):''}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-ns" type="button" title="Add a site to this client">${I.plus}</button>`:''}</div></label>`:''})()}
     <label class="field"><span>Number</span><input id="e-number" value="${h(d.number)}"></label>
     <label class="field"><span>Date</span><input type="date" id="e-date" value="${h(d.date)}"></label>
     ${d.type==='invoice'?`<label class="field"><span>Due date</span><input type="date" id="e-dueDate" value="${h(d.dueDate)}"></label>`:''}
@@ -894,7 +904,7 @@ VIEWS_AFTER.edit=()=>{
   $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date,ED.reportType);$('#e-number').value=ED.number}});
   if(ED.type==='delivery'){
     const applyNear=(k,auto)=>{const m=(ED._near||[])[k];if(!m)return;readEditor();ED._picked=k;
-      if(m.client){ED.clientId=m.client.id;ED.client=clientSnap(m.client)}
+      if(m.client){ED.clientId=m.client.id;ED.client=clientSnap(m.client);const si=m.siteId&&sitesOf(m.client).find(x=>x.id===m.siteId);if(si){ED.siteId=si.id;ED.siteName=si.name;ED.siteAddress=si.address||''}}
       const place=[m.site,m.address].filter(Boolean).join(', ');if(place&&(!auto||!ED.deliveryAddress))ED.deliveryAddress=place;
       render();if(m.client)toast((auto?'Client picked from your location: ':'Client set: ')+m.client.name)};
     const locate=async()=>{readEditor();ED._gpsBusy=true;ED._gpsErr='';const tx=$('#gps-txt');if(tx)tx.textContent='Getting your location…';
@@ -911,7 +921,12 @@ VIEWS_AFTER.edit=()=>{
       if(ED._new&&ED._auto)ED.number=nextNumber(ED.type,ED.date,ED.reportType);render()};
     if(ED._new&&!ED.gps&&!ED._gpsTried){ED._gpsTried=true;locate()}
   }
-  $('#e-client').onchange=e=>{readEditor();ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
+  const pickSite=si=>{readEditor();ED.siteId=si?si.id:'';ED.siteName=si?si.name:'';ED.siteAddress=si?si.address||'':'';
+    if(ED.type==='delivery'&&si)ED.deliveryAddress=siteText(si);render()};
+  $('#e-site')&&($('#e-site').onchange=e=>pickSite(sitesOf(S.clients.find(x=>x.id===ED.clientId)).find(x=>x.id===e.target.value)));
+  $('#e-ns')&&($('#e-ns').onclick=()=>{const c=S.clients.find(x=>x.id===ED.clientId);if(!c)return;
+    siteForm(null,async si=>{const x={...c,places:sitesOf(c).concat([si]),updatedAt:new Date().toISOString()};delete x.id;if(await save('clients',c.id,x,'Site added to '+c.name)){c.places=x.places;pickSite(si)}})});
+  $('#e-client').onchange=e=>{readEditor();if(ED.clientId!==e.target.value){ED.siteId='';ED.siteName='';ED.siteAddress=''}ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
@@ -1032,7 +1047,7 @@ VIEWS.clients=()=>{
   const list=S.clients.filter(c=>!q||[c.name,c.contact,c.phone,c.email].join(' ').toLowerCase().includes(q)).map(c=>({c,b:clientBalance(c.id)})).sort((a,b)=>b.b-a.b||a.c.name.localeCompare(b.c.name));
   return `<div class="head"><div><h1>Clients & SOA</h1><div class="sub">${S.clients.length} clients${can('reports')?' · '+cur(list.reduce((s,x)=>s+x.b,0))+' receivable':''}</div></div>${can('clients')?`<div class="row"><button class="btn" id="imc">Import</button><button class="btn primary" id="nc">${I.plus}Add client</button></div>`:''}</div>
   <input class="search" id="cq" placeholder="Search clients" value="${h(S.params.q||'')}">
-  <div class="card list">${list.length?list.map(({c,b})=>`<button class="li" data-c="${c.id}"><span class="ico q">${h(c.name.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</span><span style="min-width:0"><div class="t">${h(c.name)}</div><div class="s">${h([c.contact,c.phone].filter(Boolean).join(' · ')||'No contact details')}</div></span>
+  <div class="card list">${list.length?list.map(({c,b})=>`<button class="li" data-c="${c.id}"><span class="ico q">${h(c.name.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</span><span style="min-width:0"><div class="t">${h(c.name)}</div><div class="s">${sitesOf(c).length?`${sitesOf(c).length} site${sitesOf(c).length===1?'':'s'} · `:''}${h([c.contact,c.phone].filter(Boolean).join(' · ')||'No contact details')}</div></span>
    <span class="r">${can('reports')?`<div class="num" style="${b>0?'font-weight:600':''}">${money(b)}</div><span class="pill ${b>0?'warn':'good'}">${b>0?'balance due':b<0?'in credit':'settled'}</span>`:''}</span></button>`).join(''):`<div class="empty"><b>No clients yet</b>Add a client to start quoting and invoicing.</div>`}</div>`;
 };
 VIEWS_AFTER.clients=()=>{
@@ -1055,11 +1070,14 @@ VIEWS.client=()=>{
    <tr><td class="num">${fdate(from)}</td><td colspan="5"><b>Balance brought forward</b></td><td class="r num"><b>${money(x.open)}</b></td></tr>
    ${x.rows.map(r=>`<tr class="soarow" ${r.id?`data-sinv="${r.id}"`:r.pid?`data-spay="${r.pid}"`:r.open?'data-sopen="1"':''} tabindex="0"><td class="num">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="num">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r num">${r.dr?money(r.dr):''}</td><td class="r num">${r.cr?money(r.cr):''}</td><td class="r num">${money(r.bal)}</td></tr>`).join('')}
    <tr><td colspan="4"><b>Closing balance</b></td><td class="r num"><b>${money(x.invd)}</b></td><td class="r num"><b>${money(x.recd)}</b></td><td class="r num"><b>${money(x.close)}</b></td></tr></tbody></table></div></div>`:''}
+  <div class="card"><div class="pad row"><h2 class="grow">Sites</h2>${can('clients')?`<button class="btn sm" id="c-site-add">${I.plus}Add site</button>`:''}</div><div class="list">${sitesOf(c).map(si=>{const n=S.docs.filter(d=>d.clientId===c.id&&d.siteId===si.id).length;
+    return `<div class="li" style="cursor:default"><span class="ico q">${I.pin}</span><span style="min-width:0"><div class="t">${h(si.name)}</div><div class="s">${h([si.address&&si.address.split('\n')[0],si.contact,si.phone].filter(Boolean).join(' · '))}${hasGPS(si)?` · <a href="https://maps.google.com/?q=${si.lat},${si.lng}" target="_blank" rel="noopener">map</a>`:''}</div></span><span class="r muted" style="font-size:.8rem">${n} doc${n===1?'':'s'}</span></div>`}).join('')||'<div class="empty" style="padding:16px">No sites yet. Add the head office and each branch.</div>'}</div></div>
   <div class="card"><div class="pad"><h2>Documents</h2></div><div class="list">${docs.filter(d=>visibleDocs().includes(d)).map(docRow).join('')||'<div class="empty">No documents for this client yet.</div>'}</div></div>`;
 };
 VIEWS_AFTER.client=()=>{
   const c=S.clients.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>go('clients'));if(!c)return;
   $('#ec')&&($('#ec').onclick=()=>clientForm(c));
+  $('#c-site-add')&&($('#c-site-add').onclick=()=>siteForm(null,async si=>{const x={...c,places:sitesOf(c).concat([si]),updatedAt:new Date().toISOString()};delete x.id;await save('clients',c.id,x,'Site added')}));
   $('#cp')&&($('#cp').onclick=()=>paymentForm({clientId:c.id}));
   $('#old-inv')&&($('#old-inv').onclick=()=>legacyBulk(c));
   $$('[data-sinv]').forEach(r=>r.onclick=()=>{const d=S.docs.find(x=>x.id===r.dataset.sinv);if(!d)return;d.legacy&&can('invoice')?legacyForm(d):go('view',{id:d.id})});
@@ -1136,6 +1154,26 @@ function legacyForm(d){
   $('#lf-pay',o)&&($('#lf-pay',o).onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
   $('#lf-del',o)&&($('#lf-del',o).onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
 }
+// One site of a client: name, address, contact, phone, GPS (current location or typed "lat, lng").
+function siteForm(si,done){
+  const e={radius:150,...(si||{})};
+  const o=modal(si?'Edit site':'New site',`<div class="grid g2">
+    <label class="field" style="grid-column:1/-1"><span>Site name</span><input id="sf-name" value="${h(e.name||'')}" placeholder="e.g. Head Office, BFL RAK, Al Quoz warehouse"></label>
+    <label class="field" style="grid-column:1/-1"><span>Address</span><textarea id="sf-address" rows="2">${h(e.address||'')}</textarea></label>
+    <label class="field"><span>Site contact</span><input id="sf-contact" value="${h(e.contact||'')}"></label>
+    <label class="field"><span>Phone</span><input id="sf-phone" inputmode="tel" value="${h(e.phone||'')}"></label>
+    <label class="field"><span>GPS (lat, lng)</span><input id="sf-gps" value="${hasGPS(e)?fmtGPS(e):''}" placeholder="25.2048, 55.2708"></label>
+    <label class="field"><span>Match radius (m)</span><input id="sf-rad" type="number" min="30" step="10" value="${h(e.radius||150)}"></label>
+    <div style="grid-column:1/-1" class="row"><button class="btn" id="sf-here" type="button">${I.pin}Use my current location</button><span class="muted" style="font-size:.78rem">or paste the coordinates from Google Maps</span></div></div>`,
+    `<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="sf-ok">Save site</button>`,false,'ov2');
+  $('#sf-here',o).onclick=async()=>{const b=$('#sf-here',o);b.disabled=true;const g=await getGPS();b.disabled=false;
+    if(!hasGPS(g)){toast(g&&g.error==='denied'?'Location is blocked. Allow location access and try again.':'Location not available.',true);return}$('#sf-gps',o).value=fmtGPS(g)};
+  $('#sf-ok',o).onclick=()=>{const name=$('#sf-name',o).value.trim();if(!name){toast('Enter the site name.',true);return}
+    const gt=$('#sf-gps',o).value.trim();let lat=null,lng=null;if(gt){const m=gt.match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);if(!m||Math.abs(+m[1])>90||Math.abs(+m[2])>180){toast('GPS should look like 25.2048, 55.2708',true);return}lat=+(+m[1]).toFixed(6);lng=+(+m[2]).toFixed(6)}
+    const out={...e,id:e.id&&!/^s\d+$/.test(e.id)?e.id:uid(),name,address:$('#sf-address',o).value.trim(),contact:$('#sf-contact',o).value.trim(),phone:$('#sf-phone',o).value.trim(),radius:+$('#sf-rad',o).value||150,addedAt:e.addedAt||new Date().toISOString()};
+    if(lat!=null){out.lat=lat;out.lng=lng}else{delete out.lat;delete out.lng}
+    o.remove();done(out)};
+}
 function clientForm(c,after){
   const e=c||{};
   const o=modal(c?'Edit client':'New client',`<div class="grid g2">
@@ -1146,16 +1184,16 @@ function clientForm(c,after){
    <label class="field"><span>Credit days</span><input type="number" id="c-creditDays" value="${h(e.creditDays??S.cfg.dueDays)}"></label><span></span>
    <label class="field"><span>Old balance (before using this app)</span><input type="number" step="any" id="c-openingBalance" value="${h(e.openingBalance||'')}" placeholder="0.00"></label>
    <label class="field"><span>Old balance as of</span><input type="date" id="c-openingDate" value="${h(e.openingDate||today())}"></label>
-   <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px"><b>Saved locations</b><div class="muted" style="font-size:.8rem">Delivery notes and reports made at these places pick this client automatically.</div>
-    <div id="c-places"></div><div class="scanrow"><input id="c-pname" placeholder="Place name, e.g. Head office"><button class="btn" id="c-here" type="button">Add my current location</button></div></div></div>`,
+   <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px"><div class="row"><div class="grow"><b>Sites</b><div class="muted" style="font-size:.8rem">Branches and locations of this client, e.g. Head Office, RAK, Al Quoz warehouse. Pick one on each document. Sites with GPS are recognised automatically on delivery notes and reports.</div></div><button class="btn" id="c-addsite" type="button">${I.plus}Add site</button></div>
+    <div id="c-places" class="sitelist"></div></div></div>`,
    `${c&&isAdmin()?'<button class="btn danger" id="c-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="c-save">Save client</button>`);
-  let places=clone(e.places||[]);
-  const drawPl=()=>{$('#c-places',o).innerHTML=places.length?places.map((pl,k)=>`<div class="kv"><span>${h(pl.name||'Place')} <span class="muted num" style="font-size:.78rem">${fmtGPS(pl)}</span></span><button class="btn ghost sm" type="button" data-plrm="${k}">Remove</button></div>`).join(''):'<span class="muted" style="font-size:.84rem">None yet.</span>';
-    $$('[data-plrm]',o).forEach(b=>b.onclick=()=>{places.splice(+b.dataset.plrm,1);drawPl()})};drawPl();
-  $('#c-here',o).onclick=async()=>{const b=$('#c-here',o);b.disabled=true;b.textContent='Getting location…';const g=await getGPS();b.disabled=false;b.textContent='Add my current location';
-    if(!hasGPS(g)){toast(g&&g.error==='denied'?'Location is blocked. Allow location access and try again.':'Location not available.',true);return}
-    places.push({name:$('#c-pname',o).value.trim()||'Site '+(places.length+1),lat:g.lat,lng:g.lng,radius:150,addedAt:new Date().toISOString()});$('#c-pname',o).value='';drawPl()};
-  $('#c-save',o).onclick=async()=>{const d={...e,places};['name','contact','phone','email','taxId','address','openingDate'].forEach(k=>d[k]=$('#c-'+k,o).value.trim());d.creditDays=+$('#c-creditDays',o).value||0;d.openingBalance=+$('#c-openingBalance',o).value||0;
+  let places=sitesOf(e);
+  const drawPl=()=>{$('#c-places',o).innerHTML=places.length?places.map((pl,k)=>`<div class="siterow"><span class="ico q">${I.pin}</span><span style="min-width:0"><b>${h(pl.name||'Site')}</b><div class="muted" style="font-size:.78rem;white-space:pre-line">${h([pl.address,[pl.contact,pl.phone].filter(Boolean).join(' · ')].filter(Boolean).join('\n'))}</div>${hasGPS(pl)?`<div class="num" style="font-size:.74rem;color:var(--good)">GPS ${fmtGPS(pl)}</div>`:'<div style="font-size:.74rem" class="muted">No GPS yet</div>'}</span>
+      <span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm" type="button" data-pled="${k}">Edit</button><button class="btn ghost sm" type="button" data-plrm="${k}" aria-label="Remove site">✕</button></span></div>`).join(''):'<div class="muted" style="font-size:.84rem">No sites yet. Add the head office and each branch or project location.</div>';
+    $$('[data-plrm]',o).forEach(b=>b.onclick=()=>{places.splice(+b.dataset.plrm,1);drawPl()});
+    $$('[data-pled]',o).forEach(b=>b.onclick=()=>siteForm(places[+b.dataset.pled],si=>{places[+b.dataset.pled]=si;drawPl()}))};drawPl();
+  $('#c-addsite',o).onclick=()=>siteForm(null,si=>{places.push(si);drawPl()});
+  $('#c-save',o).onclick=async()=>{const d={...e,places:places.map(pl=>({...pl,id:pl.id&&!/^s\d+$/.test(pl.id)?pl.id:uid()}))};['name','contact','phone','email','taxId','address','openingDate'].forEach(k=>d[k]=$('#c-'+k,o).value.trim());d.creditDays=+$('#c-creditDays',o).value||0;d.openingBalance=+$('#c-openingBalance',o).value||0;
     if(!d.name){toast('Enter the client name.',true);return}const id=e.id||uid();d.updatedAt=new Date().toISOString();
     if(await save('clients',id,d,'Client saved')){closeModal();d.id=id;if(after)after(d)}};
   $('#c-del',o)&&($('#c-del',o).onclick=async()=>{if(S.docs.some(x=>x.clientId===e.id)){toast('This client has documents. Delete those first.',true);return}if(!await confirmBox('Delete client?',e.name+' will be removed.'))return;await Store.remove('clients',e.id);go('clients')});
@@ -1613,7 +1651,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1623,15 +1661,21 @@ async function runSeeds(){
       const names=async col=>new Set((await getDocsFromServer(collection(fdb,COL[col]))).docs.map(d=>String(d.data().name||'').trim().toLowerCase()));
       const cMap=new Map((await getDocsFromServer(collection(fdb,COL.clients))).docs.map(d=>[String(d.data().name||'').trim().toLowerCase(),{...d.data(),id:d.id}]));
       const haveC=new Set(cMap.keys()),haveP=await names('products');let nc=0,np=0;const now=new Date().toISOString();
-      for(const c of seed.clients||[]){const k=c.name.trim().toLowerCase();
+      for(const c of seed.clients||[]){let k=c.name.trim().toLowerCase();
+        // "match": an older name of the same client (renamed to "name")
+        const mk=c.match&&String(c.match).trim().toLowerCase();if(!haveC.has(k)&&mk&&haveC.has(mk)){const ex0=cMap.get(mk);cMap.delete(mk);haveC.delete(mk);cMap.set(k,ex0);haveC.add(k)}
         // "update": fill in missing details and add locations on a client that already exists
-        if(haveC.has(k)){if(!c.update)continue;const ex=cMap.get(k);const up={};
+        if(haveC.has(k)){if(!c.update)continue;const ex=cMap.get(k);const up={};if(ex.name!==c.name)up.name=c.name;
           ['contact','phone','email','taxId','address','notes'].forEach(f=>{if(c[f]&&(!String(ex[f]||'').trim()||(c.replace||[]).includes(f))&&ex[f]!==c[f])up[f]=c[f]});
-          const have=ex.places||[];const add=(c.places||[]).filter(pl=>!have.some(q=>hasGPS(q)&&distM(q,pl)<=(+q.radius||150))).map(pl=>({...pl,addedAt:now}));
-          if(add.length)up.places=have.concat(add);
+          // seed sites replace an existing site at the same spot (keeping its id), otherwise they are added
+          const have=clone(ex.places||[]);let ch=false;
+          for(const pl of c.places||[]){const i=have.findIndex(q=>hasGPS(q)&&hasGPS(pl)&&distM(q,pl)<=(+q.radius||150));
+            if(i>=0){if(c.replaceSites&&JSON.stringify({...have[i],addedAt:0,id:0})!==JSON.stringify({...have[i],...pl,addedAt:0,id:0})){have[i]={...have[i],...pl,id:have[i].id||uid()};ch=true}}
+            else{have.push({...pl,id:pl.id||uid(),addedAt:now});ch=true}}
+          if(ch)up.places=have;
           if(Object.keys(up).length){up.updatedAt=now;await setDoc(doc(fdb,COL.clients,ex.id),up,{merge:true});cMap.set(k,{...ex,...up});nc++}
           continue}
-        delete c.update;delete c.replace;const cid=uid();
+        delete c.update;delete c.replace;delete c.match;delete c.replaceSites;c.places=(c.places||[]).map(pl=>({...pl,id:pl.id||uid()}));const cid=uid();
         const cd={...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now};await setDoc(doc(fdb,COL.clients,cid),cd);cMap.set(k,{...cd,id:cid});haveC.add(k);nc++}
       // previous invoices (kept with their original numbers) and payments already received
       const dMap=new Map();let nl=0,npay=0;
