@@ -393,6 +393,8 @@ function termsHtml(t){
   if(!isPrem())return `<div class="terms">${h(t)}</div>`;
   return `<div class="tlist">${String(t).split(/\n+/).map(x=>x.trim()).filter(Boolean).map((x,i)=>`<div class="tl"><i>${i+1}</i><span>${h(x)}</span></div>`).join('')}</div>`;
 }
+// What a quotation / invoice prints: site (default on), amount in words (on), bank details (invoices only by default).
+const showSite=d=>d.showSite!==false, showWords=d=>d.showWords!==false, showBank=d=>d.showBank!=null?!!d.showBank:d.type==='invoice';
 function bankHtml(b){
   if(!isPrem())return `<div class="terms">${h(b)}</div>`;
   return `<div class="bk">${String(b).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^([^:]{2,22}):\s*(.+)$/);return m?`<span>${h(m[1])}</span><b>${h(m[2])}</b>`:`<b class="full">${h(x)}</b>`}).join('')}</div>`;
@@ -441,15 +443,15 @@ function renderSheet(d){
   return `<div class="sheet${docCls()}" data-client="${h(cl.name||'')}" data-site="${h(d.deliveryAddress||d.subject||'')}" data-ref="${h(d.ref||'')}" style="--b:${h(c.brand)};--c:${h(c.charcoal)}">${sheetHead(title,d.number,isPrem()?subFor(d):'')}
   <div class="meta"><div class="box cbox">${isPrem()?`<span class="bico">${ico('building',c.brand)}</span>`:''}<div class="cbody"><div class="k">${isDN?R.who:isQ?'Prepared for':'Bill to'}</div><div class="cn">${h(cl.name||'—')}</div>
     <div class="ad" style="white-space:pre-line;color:#5d6168">${h([cl.contact,cl.address,[cl.phone,cl.email].filter(Boolean).join(' · '),cl.taxId?`${c.taxIdLabel}: ${cl.taxId}`:''].filter(Boolean).join('\n'))}</div>
-    ${!isDN&&d.siteName?`<div class="k" style="margin-top:8px">Site</div><div style="white-space:pre-line">${h([d.siteName,d.siteAddress].filter(Boolean).join('\n'))}</div>`:''}
+    ${!isDN&&d.siteName&&showSite(d)?`<div class="k" style="margin-top:8px">Site</div><div style="white-space:pre-line">${h([d.siteName,d.siteAddress].filter(Boolean).join('\n'))}</div>`:''}
     ${isDN&&(d.deliveryAddress||hasGPS(d.gps))?`<div class="k" style="margin-top:8px">Site / location</div>${d.deliveryAddress?`<div style="white-space:pre-line">${h(d.deliveryAddress)}</div>`:''}${hasGPS(d.gps)?`<div class="gps"><b>GPS</b> ${fmtGPS(d.gps)}</div>`:''}`:''}</div></div>
     ${detHtml(det)}</div>
   ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
   ${isSvc&&(d.complaint||d.workDone)?`<div class="svc">${d.complaint?`<div><div class="hh">Complaint / request</div><div class="terms">${h(d.complaint)}</div></div>`:''}${d.workDone?`<div><div class="hh">Work carried out</div><div class="terms">${h(d.workDone)}</div></div>`:''}</div>`:''}
   ${rows||!isSvc?`<table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>`:''}
-  ${(()=>{const words=showPrice?`<div class="words">${isPrem()?`<span class="wico">${ico('doc',c.charcoal)}</span>`:''}<span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:'';
+  ${(()=>{const words=showPrice&&(isDN||showWords(d))?`<div class="words">${isPrem()?`<span class="wico">${ico('doc',c.charcoal)}</span>`:''}<span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:'';
     return `<div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}${isPrem()?words:''}</div>${totalsHtml}</div>${isPrem()?'':words}`})()}
-  ${(d.terms||(d.type!=='delivery'&&c.bank))?`<div class="info">${d.terms?`<div><div class="hh">Terms & conditions</div>${termsHtml(d.terms)}</div>`:''}${d.type!=='delivery'&&c.bank?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}</div>`:''}
+  ${(d.terms||(d.type!=='delivery'&&c.bank&&showBank(d)))?`<div class="info${d.type!=='delivery'&&c.bank&&showBank(d)?'':' nobank'}">${d.terms?`<div><div class="hh">Terms & conditions</div>${termsHtml(d.terms)}</div>`:''}${d.type!=='delivery'&&c.bank&&showBank(d)?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}</div>`:''}
   <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}${isDN&&dl.deliveredBy?' · Delivered by '+h(nameOf(dl.deliveredBy,dl.deliveredByName)):''}</div></div>${right}</div>
   ${sheetFoot()}</div>`;
 }
@@ -877,6 +879,11 @@ VIEWS.edit=()=>{
   <div class="card pad grid"><div class="row"><div class="hgrow"><h2>${isDN?h(rep(d).photos)+' photos':'Attachments'}</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. Pick a size for each.${isDN?'':' PDF files (up to 700 KB each) are joined at the end.'}</div></div>
     <div class="row"><button class="btn" id="att-cam" type="button">${I.scan}Take photo</button><button class="btn" id="att-add" type="button">${I.plus}Upload${isDN?' photo':' photo or PDF'}</button></div></div>
    ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>attRow(a,k,'att',{inPdf:true})).join('')}</div>`:''}</div>
+  ${!isDN?`<div class="card pad docopts"><b>Show on the document</b>
+    <label class="check"><input type="checkbox" id="o-site" ${showSite(d)?'checked':''}>Site</label>
+    <label class="check"><input type="checkbox" id="o-words" ${showWords(d)?'checked':''}>Amount in words</label>
+    <label class="check"><input type="checkbox" id="o-bank" ${showBank(d)?'checked':''}>Bank details</label>
+    <span class="muted" style="font-size:.78rem">Untick to fit more on one page.</span></div>`:''}
   <div class="card pad grid g2"><label class="field"><span>Notes (shown on document)</span><textarea id="e-notes">${h(d.notes)}</textarea></label><label class="field"><span>Terms & conditions</span><textarea id="e-terms" rows="4">${h(d.terms)}</textarea></label></div>
   <div class="row"><span class="grow"></span><button class="btn" id="cx2">Cancel</button><button class="btn primary" id="sv2">Save ${docTitle(d).replace('Tax ','').toLowerCase()}</button></div>`;
 };
@@ -885,6 +892,7 @@ function readEditor(){
   ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','contactName','contactMobile','contactEmail','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   readAtts(d.attachments||[],'att');
+  if($('#o-site')){d.showSite=$('#o-site').checked;d.showWords=$('#o-words').checked;d.showBank=$('#o-bank').checked}
 }
 // One item in a full window: name, long description, qty, unit, rate / status.
 function itemFull(n){
