@@ -296,6 +296,7 @@ function modal(title,body,foot,wide,id='ov'){
   new MutationObserver(fit).observe(document.body,{childList:true});
   document.addEventListener('focusin',ev=>{const t=ev.target;if(!t.closest||!t.closest('.modal')||!/INPUT|SELECT|TEXTAREA/.test(t.tagName))return;
     setTimeout(()=>{fit();t.scrollIntoView({block:'center',behavior:'smooth'})},280)});})();
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('.themesw [data-theme]');if(b){e.preventDefault();e.stopPropagation();setTheme(b.dataset.theme)}},true);
 function closeModal(){const o=$('#ov');if(o)o.remove()}
 function confirmBox(title,text,okLabel='Delete'){return new Promise(res=>{const o=modal(title,`<p style="margin:0">${h(text)}</p>`,`<button class="btn" data-x>Cancel</button><button class="btn primary" id="ok">${h(okLabel)}</button>`);
   $('#ok',o).onclick=()=>{closeModal();res(true)};o.addEventListener('click',e=>{if(e.target.closest('[data-x]')||e.target===o)res(false)})})}
@@ -598,7 +599,7 @@ function render(){
   const logo='<img src="assets/mark.png" alt="">';
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
     ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
-    <div class="who"><div style="color:var(--ink);font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
+    <div class="who"><div style="margin-bottom:8px">${themeSwitch()}</div><div style="color:var(--ink);font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
     <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-ai aria-label="AI assistant">✨ AI</button><button class="btn sm" data-menu>${I.menu}</button></div>
     <main class="main"><div class="wrap">${v}</div></main></div>
     <nav class="tabbar">${tabbar(cur)}</nav>${cur==='edit'||cur==='deliver'?'':`<button class="aifab" data-ai title="AI assistant" aria-label="AI assistant">✨ <span>Ask AI</span></button>`}</div>`;
@@ -620,7 +621,7 @@ function bindCommon(root){
   $$('[data-logout]',root).forEach(b=>b.onclick=logOut);
   $$('[data-myinfo]',root).forEach(b=>b.onclick=profileForm);
   $$('[data-ai]',root).forEach(b=>b.onclick=aiPanel);
-  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
+  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<div class="li" style="cursor:default"><span class="ico q">◐</span><span class="t">Theme</span><span>${themeSwitch()}</span></div><button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
   $$('[data-open]',root).forEach(b=>b.onclick=()=>go('view',{id:b.dataset.open}));
 }
 function newMenu(){
@@ -657,6 +658,14 @@ function searchSelect(sel,title){
       $$('[data-v]',o).forEach(r=>r.onclick=()=>{o.remove();sel.value=r.dataset.v;lab();sel.dispatchEvent(new Event('change',{bubbles:true}))})};
     $('#sp-q',o).oninput=draw;draw();setTimeout(()=>$('#sp-q',o).focus(),60)};
 }
+/* ----- theme: light / dark / auto (follows the phone), remembered on this device ----- */
+const themePref=()=>{try{return localStorage.getItem('ll_theme')||'light'}catch(e){return 'light'}};
+function applyTheme(){const p=themePref();const dark=p==='dark'||(p==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme=dark?'dark':'light';const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dark?'#18191C':'#FFFFFF';
+  const cs=document.querySelector('meta[name="color-scheme"]');if(cs)cs.content=dark?'dark':'light'}
+function setTheme(p){try{localStorage.setItem('ll_theme',p)}catch(e){}applyTheme();$$('.themesw').forEach(w=>$$('button',w).forEach(b=>b.classList.toggle('on',b.dataset.theme===p)))}
+const themeSwitch=()=>`<span class="themesw" role="group" aria-label="Theme">${[['light','☀ Light'],['dark','☾ Dark'],['auto','Auto']].map(([k,l])=>`<button type="button" data-theme="${k}" class="${themePref()===k?'on':''}">${l}</button>`).join('')}</span>`;
+applyTheme();try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themePref()==='auto')applyTheme()})}catch(e){}
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
   return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
