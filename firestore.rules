@@ -355,7 +355,7 @@ service cloud.firestore {
     match /inv_docs/{id} {
       allow read: if invHas('viewAll')
                   || (invOn() && resource.data.createdBy == request.auth.uid)
-                  || (invHas('deliver') && resource.data.type == 'delivery');
+                  || ((invHas('deliver') || invHas('delivery')) && resource.data.type == 'delivery');
       allow create: if invHas(request.resource.data.type) && request.resource.data.createdBy == request.auth.uid;
       // Editors of that document type; delivery staff may only add serials, status, proof photos and the signature.
       allow update: if (invHas(resource.data.type) && request.resource.data.type == resource.data.type

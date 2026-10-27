@@ -241,7 +241,9 @@ async function reserveNumber(type,date,rt,preferred){
   }
   return pre+rand3();
 }
-const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&can('deliver')&&!(d.delivery&&d.delivery.signedAt)));
+// Delivery notes and service/call-out reports are shared: everyone with delivery access sees all of them.
+const seesAllDN=()=>can('delivery')||can('deliver');
+const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&seesAllDN()));
 
 /* ================= icons ================= */
 const I={
@@ -648,7 +650,7 @@ VIEWS_AFTER.deliveries=()=>{$$('[data-tab]').forEach(b=>b.onclick=()=>go('delive
 /* ----- document view ----- */
 VIEWS.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);if(!d)return `<div class="empty"><b>Document not found</b>It may have been deleted.</div>`;
-  const [s,k]=docStatus(d);const t=totals(d);const canEdit=can(d.type)&&!(d.type==='delivery'&&d.delivery&&d.delivery.signedAt&&!isAdmin());
+  const [s,k]=docStatus(d);const t=totals(d);const canEdit=can(d.type)&&(can('viewAll')||d.createdBy===S.me.id)&&!(d.type==='delivery'&&d.delivery&&d.delivery.signedAt&&!isAdmin());
   const paid=d.type==='invoice'?paidOn(d.id):0;const kids=S.docs.filter(x=>x.sourceId===d.id);const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const pays=S.payments.filter(p=>p.invoiceId===d.id);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1 class="num" style="font-family:var(--f-display)">${h(d.number)}</h1><div class="sub">${h(docTitle(d))} · ${h(d.client&&d.client.name||'')}</div></div></div>
@@ -1655,7 +1657,7 @@ function startData(){
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
-  else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(can('deliver'))Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
+  else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(seesAllDN())Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){const ra=()=>{if(S.view==='accounts')soon()};
     Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
