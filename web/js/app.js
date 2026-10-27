@@ -120,7 +120,7 @@ const fmtGPS=g=>hasGPS(g)?`${(+g.lat).toFixed(6)}, ${(+g.lng).toFixed(6)}`:'';
 const fmtDist=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
 // A client's sites (branches / locations): name, address, contact, phone and optional GPS. Stored as client.places.
 const sitesOf=c=>((c&&c.places)||[]).map((p,i)=>({...p,id:p.id||('s'+i)}));
-const siteText=si=>[si.name,si.address].filter(Boolean).join('\n');
+const siteText=si=>[si.name,si.address].filter(Boolean).join(', ');
 // Clients whose saved places, or whose attendance sites, are at this spot. Closest first.
 function nearby(g){
   if(!hasGPS(g))return [];const out=[];const slack=Math.min(g.acc||0,100);
@@ -640,6 +640,19 @@ const docFile=d=>`${d.number} ${(d.client&&d.client.name)||''}${docSite(d)&&docS
 const docText=d=>[d.number,d.client&&d.client.name,docSite(d),d.deliveryAddress,d.ref,d.subject,d.createdByName,d.technician,docTitle(d),
   ...(d.items||[]).flatMap(i=>[i.name,i.desc,...(i.serials||[])])].filter(Boolean).join(' ').toLowerCase();
 const docMatch=(d,q)=>q.split(/\s+/).filter(Boolean).every(w=>docText(d).includes(w));
+// Long dropdowns (clients, sites) become a tap-to-search picker. The real <select> stays (hidden) and gets a normal change event.
+function searchSelect(sel,title){
+  if(!sel||sel._ss)return;sel._ss=1;sel.style.display='none';
+  const b=document.createElement('button');b.type='button';b.className='pickbtn';sel.after(b);
+  const lab=()=>{const o=sel.options[sel.selectedIndex];const has=o&&o.value;b.innerHTML=`<span class="${has?'':'ph'}">${h(o?o.text:'')}</span><span class="dd">▾</span>`};lab();
+  b.onclick=()=>{const opts=[...sel.options].filter(o=>o.value).map(o=>({v:o.value,t:o.text}));
+    const o=modal(title,`<input type="search" class="search" id="sp-q" placeholder="Type to search…" autocomplete="off" style="max-width:none;width:100%"><div class="list card" id="sp-list" style="margin-top:10px;max-height:58vh;overflow:auto"></div>`,'',false,'ov2');
+    const draw=()=>{const q=$('#sp-q',o).value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const list=opts.filter(x=>q.every(w=>x.t.toLowerCase().includes(w)));
+      $('#sp-list',o).innerHTML=list.slice(0,200).map(x=>{const [n,...rest]=x.t.split(' — ');return `<button class="li" data-v="${h(x.v)}" style="grid-template-columns:1fr auto"><span style="min-width:0"><div class="t">${h(n)}</div>${rest.length?`<div class="s">${h(rest.join(' — '))}</div>`:''}</span><span>${x.v===sel.value?'✓':''}</span></button>`}).join('')||'<div class="empty" style="padding:16px">Nothing matches.</div>';
+      $$('[data-v]',o).forEach(r=>r.onclick=()=>{o.remove();sel.value=r.dataset.v;lab();sel.dispatchEvent(new Event('change',{bubbles:true}))})};
+    $('#sp-q',o).oninput=draw;draw();setTimeout(()=>$('#sp-q',o).focus(),60)};
+}
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
   return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
@@ -962,6 +975,7 @@ VIEWS_AFTER.edit=()=>{
   }
   const pickSite=si=>{readEditor();ED.siteId=si?si.id:'';ED.siteName=si?si.name:'';ED.siteAddress=si?si.address||'':'';
     if(ED.type==='delivery'&&si)ED.deliveryAddress=siteText(si);render()};
+  searchSelect($('#e-client'),'Choose client');searchSelect($('#e-site'),'Choose site');
   $('#e-site')&&($('#e-site').onchange=e=>pickSite(sitesOf(S.clients.find(x=>x.id===ED.clientId)).find(x=>x.id===e.target.value)));
   $('#e-ns')&&($('#e-ns').onclick=()=>{const c=S.clients.find(x=>x.id===ED.clientId);if(!c)return;
     siteForm(null,async si=>{const x={...c,places:sitesOf(c).concat([si]),updatedAt:new Date().toISOString()};delete x.id;if(await save('clients',c.id,x,'Site added to '+c.name)){c.places=x.places;pickSite(si)}})});
@@ -1308,6 +1322,7 @@ function paymentForm(pre={}){
    <label class="field"><span>Cheque date</span><input type="date" id="p-chq" value="${h(e.chequeDate||'')}"></label>
    <label class="field" style="grid-column:1/-1"><span>Note (printed on receipt)</span><input id="p-note" value="${h(e.note||'')}"></label></div>`,
    `${e.id?'<button class="btn danger" id="p-del">Delete</button><button class="btn" id="p-rcpt">'+I.pdf+'Receipt</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="p-save">Save payment</button>`);
+  setTimeout(()=>searchSelect($('#p-client',o),'Choose client'));
   $('#p-client',o).onchange=ev=>{e.clientId=ev.target.value;e.invoiceId='';$('#p-inv',o).innerHTML='<option value="">On account (not linked to one invoice)</option>'+invOpts(e.clientId)};
   $('#p-inv',o).onchange=ev=>{const op=ev.target.selectedOptions[0];if(op&&op.dataset.due&&!$('#p-amount',o).value)$('#p-amount',o).value=op.dataset.due};
   if(e.invoiceId&&!e.amount){const op=$('#p-inv',o).selectedOptions[0];if(op&&op.dataset.due)$('#p-amount',o).value=op.dataset.due}
