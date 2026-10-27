@@ -599,9 +599,9 @@ function render(){
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
     ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
     <div class="who"><div style="color:var(--ink);font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
-    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-menu>${I.menu}</button></div>
+    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-ai aria-label="AI assistant">✨ AI</button><button class="btn sm" data-menu>${I.menu}</button></div>
     <main class="main"><div class="wrap">${v}</div></main></div>
-    <nav class="tabbar">${tabbar(cur)}</nav></div>`;
+    <nav class="tabbar">${tabbar(cur)}</nav>${cur==='edit'||cur==='deliver'?'':`<button class="aifab" data-ai title="AI assistant" aria-label="AI assistant">✨ <span>Ask AI</span></button>`}</div>`;
   bindCommon(app);
   if(VIEWS_AFTER[cur])VIEWS_AFTER[cur]();
   $$('.preview-wrap').forEach(fitPreview);alignBrand();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>alignBrand());
@@ -619,6 +619,7 @@ function bindCommon(root){
   $$('[data-new]',root).forEach(b=>b.onclick=newMenu);
   $$('[data-logout]',root).forEach(b=>b.onclick=logOut);
   $$('[data-myinfo]',root).forEach(b=>b.onclick=profileForm);
+  $$('[data-ai]',root).forEach(b=>b.onclick=aiPanel);
   $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
   $$('[data-open]',root).forEach(b=>b.onclick=()=>go('view',{id:b.dataset.open}));
 }
@@ -1548,7 +1549,7 @@ VIEWS.accounts=()=>{
   const outside=accEntries().filter(e=>(e.date<from||e.date>to)&&e.src==='manual').length;
   let lastDate='';
   return `<div class="head"><div><h1>Accounts</h1><div class="sub">Same accounts as the attendance app · ${fdate(from)} – ${fdate(to)}</div></div>
-   <div class="row"><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
+   <div class="row"><button class="btn" id="ac-imp">${I.plus}Import Excel / CSV</button><button class="btn" id="ac-csv">${I.pdf}Export</button><button class="btn" id="ac-in">${I.plus}Income</button><button class="btn primary" id="ac-ex">${I.plus}Expense</button></div></div>
   <div class="row"><div class="seg">${[['month','This month'],['last','Last month'],['year','This year'],['all','All'],['custom','Custom']].map(([k,l])=>`<button class="${(S.params.per||'month')===k?'on':''}" data-per="${k}">${l}</button>`).join('')}</div>
    ${(S.params.per)==='custom'?`<input type="date" id="ac-f" value="${from}" style="width:auto"><input type="date" id="ac-t" value="${to}" style="width:auto">`:''}
    <div class="seg">${[['','Cash & bank'],['cash','Cash'],['bank','Bank / cheque']].map(([k,l])=>`<button class="${mf===k?'on':''}" data-mf="${k}">${l}</button>`).join('')}</div>
@@ -1579,6 +1580,7 @@ VIEWS_AFTER.accounts=()=>{
   $('#ac-f')&&($('#ac-f').onchange=e=>set('af',e.target.value));$('#ac-t')&&($('#ac-t').onchange=e=>set('at',e.target.value));
   $('#ac-cat').onchange=e=>set('cat',e.target.value);$('#ac-pj')&&($('#ac-pj').onchange=e=>set('pj',e.target.value));
   const q=$('#ac-q');q.oninput=()=>{S.params.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#ac-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
+  $('#ac-imp').onclick=acctImport;
   $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});$('#ac-open').onclick=openingForm;
   $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;
     if(id.startsWith('petty_')){toast('Petty cash given to staff comes from the attendance app (Petty cash). Change it there.');return}
@@ -1669,6 +1671,76 @@ async function moveOldLedger(rows){if(moving||!isAdmin())return;moving=true;let 
     const b=writeBatch(fdb);b.set(doc(fdb,COL.acct,e.id),body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,e.id),file);b.delete(doc(fdb,COL.ledger,e.id));await b.commit();n++}
     if(n)toast(`${n} earlier account ${n===1?'entry':'entries'} moved into the shared accounts`)}
   catch(x){console.warn('move ledger',x)}finally{moving=false}}
+/* ----- accounts import: Excel (.xlsx/.xls) or CSV ----- */
+let XLSXlib=null;
+function loadXLSX(){if(window.XLSX)return Promise.resolve(window.XLSX);if(XLSXlib)return XLSXlib;
+  XLSXlib=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>res(window.XLSX);sc.onerror=()=>{XLSXlib=null;rej(new Error('Could not load the Excel reader. Check the internet connection.'))};document.head.appendChild(sc)});return XLSXlib}
+async function readSheetFile(f){
+  if(/\.(xlsx|xlsm|xls|ods)$/i.test(f.name)){const X=await loadXLSX();const wb=X.read(new Uint8Array(await f.arrayBuffer()),{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];return X.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}).map(r=>r.map(v=>v instanceof Date?new Date(v-v.getTimezoneOffset()*6e4).toISOString().slice(0,10):v))}
+  return parseCSV(await f.text())}
+// dates: 2026-10-05, 05/10/2026 (day first), 5-Oct-2026, Excel serial numbers
+function anyDate(v){if(v==null||v==='')return '';if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
+  const t=String(v).trim();let m;
+  if(m=t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/))return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if(m=t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}
+  if(m=t.match(/^(\d{1,2})[\s-]([A-Za-z]{3,})[\s-,]*(\d{2,4})/)){const mo='janfebmaraprmayjunjulaugsepoctnovdec'.indexOf(m[2].slice(0,3).toLowerCase())/3+1;if(mo>0){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${String(mo).padStart(2,'0')}-${m[1].padStart(2,'0')}`}}
+  const d=new Date(t);return isNaN(d)?'':new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
+const anyAmt=v=>{if(typeof v==='number')return v;const t=String(v||'').replace(/[^0-9.\-()]/g,'');if(!t)return 0;const n=parseFloat(t.replace(/[()]/g,''));return isNaN(n)?0:(/^\(.*\)$/.test(t)?-n:n)};
+const ACC_FIELDS=[['date','Date',/date|day/],['type','Type (income / expense)',/^type$|in.?out|dr.?cr|income.?expense|nature/],['amount','Amount (+ income / − expense)',/^amount|^amt|total|value|aed/],
+  ['inAmt','Money in (credit / income)',/credit|^in$|money in|income|receipt|deposit/],['outAmt','Money out (debit / expense)',/debit|^out$|money out|expense|payment|withdraw|paid/],
+  ['category','Category',/categ|head|account head|group/],['party','Paid to / received from',/party|paid to|received from|payee|vendor|supplier|customer|name|description|particular|narration|details/],
+  ['method','Method',/method|mode|cash.?bank|payment type/],['reference','Reference',/ref|cheque|chq|voucher|bill|invoice no|txn|transaction/],
+  ['bank','Bank',/^bank/],['note','Note',/note|remark|memo|comment/],['project','Project',/project/],['site','Site',/site|location/]];
+function acctImport(){
+  const o=modal('Import accounts from Excel / CSV',`<div class="grid">
+    <div class="muted" style="font-size:.84rem">Choose an .xlsx, .xls or .csv file. The first row should be the column headings. Use one Amount column (minus = expense), or separate Money in / Money out (Credit / Debit) columns like a bank statement.</div>
+    <div class="row"><input type="file" id="ai-file" accept=".csv,.xlsx,.xls,.xlsm,.ods,.txt"><button class="btn" id="ai-tpl" type="button">Download sample file</button></div>
+    <div id="ai-body"></div></div>`,`<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="ai-go" disabled>Import</button>`,true);
+  $('#ai-tpl',o).onclick=()=>saveFile(new TextEncoder().encode('﻿Date,Type,Category,Amount,Method,Paid to / Received from,Reference,Bank,Project,Site,Note\r\n05/10/2026,Expense,Supplier payment,4500,Bank transfer,Dahua distributor,INV-7781,RAK Bank,,,\r\n06/10/2026,Income,Cheque deposit,12000,Cheque,BFL Group,000184,WIO Bank,,,Advance\r\n'),'Accounts import sample.csv','text/csv','Save sample').catch(()=>{});
+  let rows=[],head=[],map={},defType='expense',dupSkip=true;
+  const guess=()=>{map={};const used=new Set();ACC_FIELDS.forEach(([k,,re])=>{const i=head.findIndex((h0,ix)=>!used.has(ix)&&re.test(String(h0).trim().toLowerCase()));if(i>=0){map[k]=i;used.add(i)}});
+    if(map.inAmt!=null||map.outAmt!=null){if(map.amount!=null&&(map.amount===map.inAmt||map.amount===map.outAmt))delete map.amount}};
+  const proj=n=>{n=String(n||'').trim().toLowerCase();if(!n)return null;return projList().find(x=>x.name.toLowerCase()===n||String(x.code||'').toLowerCase()===n||[x.code,x.name].filter(Boolean).join(' · ').toLowerCase()===n)||projList().find(x=>x.name.toLowerCase().includes(n))||null};
+  const site=n=>{n=String(n||'').trim().toLowerCase();if(!n)return null;return S.sites.find(x=>String(x.name||'').toLowerCase()===n)||null};
+  const build=()=>{const get=(r,k)=>map[k]!=null?r[map[k]]:'';const out=[];
+    rows.forEach((r,ix)=>{if(!r.some(v=>String(v).trim()!==''))return;const date=anyDate(get(r,'date'));let amt=0,type='';
+      if(map.inAmt!=null||map.outAmt!=null){const a=Math.abs(anyAmt(get(r,'inAmt'))),b=Math.abs(anyAmt(get(r,'outAmt')));if(a>0){amt=a;type='income'}else if(b>0){amt=b;type='expense'}}
+      if(!amt&&map.amount!=null){const v=anyAmt(get(r,'amount'));amt=Math.abs(v);if(v<0)type='expense'}
+      const tt=String(get(r,'type')||'').toLowerCase();if(/inc|in\b|cr|receiv|deposit/.test(tt))type='income';else if(/exp|out|dr|paid|pay/.test(tt))type='expense';
+      if(!type)type=defType;
+      let method=String(get(r,'method')||'').trim();const mm=ACC_METHODS.find(x=>x.toLowerCase()===method.toLowerCase())||(/cheq|chq/i.test(method)?'Cheque':/cash/i.test(method)?'Cash':/card/i.test(method)?'Card':/transfer|bank|tt|neft|wire/i.test(method)?'Bank transfer':method?'Online / app':(()=>{const t=[get(r,'party'),get(r,'note'),get(r,'reference')].join(' ');return /cheq|chq/i.test(t)?'Cheque':/\bcash\b/i.test(t)?'Cash':(String(get(r,'bank')||'').trim()||map.inAmt!=null||map.outAmt!=null)?'Bank transfer':'Cash'})());
+      const cat=String(get(r,'category')||'').trim()||(type==='income'?'Other income':'Other expense');
+      const pj=proj(get(r,'project')),st=site(get(r,'site'));
+      const e={row:ix+2,date,amount:r2(amt),type,category:cat,party:String(get(r,'party')||'').trim(),method:mm,reference:String(get(r,'reference')||'').trim(),bank:String(get(r,'bank')||'').trim(),note:String(get(r,'note')||'').trim(),
+        projectId:pj?pj.id:'',projectName:pj?[pj.code,pj.name].filter(Boolean).join(' · '):'',siteId:st?st.id:'',siteName:st?st.name||'':''};
+      e.err=!date?'no date':!(e.amount>0)?'no amount':'';
+      e.dup=S.acct.some(x=>x.date===e.date&&Math.abs((+x.amount||0)-e.amount)<0.005&&(x.type||'expense')===e.type&&String(x.party||'').toLowerCase()===e.party.toLowerCase()&&String(x.reference||'')===e.reference);
+      out.push(e)});return out};
+  const draw=()=>{const list=build();const ok=list.filter(e=>!e.err&&!(dupSkip&&e.dup));
+    const inc=r2(ok.filter(e=>e.type==='income').reduce((t,e)=>t+e.amount,0)),exp=r2(ok.filter(e=>e.type==='expense').reduce((t,e)=>t+e.amount,0));
+    $('#ai-body',o).innerHTML=`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><b>Match the columns</b><div class="grid g3">${ACC_FIELDS.map(([k,l])=>`<label class="field"><span>${l}</span><select data-map="${k}"><option value="">— none —</option>${head.map((h0,i)=>`<option value="${i}" ${map[k]===i?'selected':''}>${h(String(h0||'Column '+(i+1)))}</option>`).join('')}</select></label>`).join('')}</div>
+      <div class="row"><label class="field" style="width:auto"><span>When the type isn't clear</span><select id="ai-def"><option value="expense" ${defType==='expense'?'selected':''}>Expense</option><option value="income" ${defType==='income'?'selected':''}>Income</option></select></label>
+      <label class="check"><input type="checkbox" id="ai-dup" ${dupSkip?'checked':''}>Skip rows already in accounts</label></div></div>
+      <div class="notice"><b>${ok.length}</b> row${ok.length===1?'':'s'} to import · income ${money(inc)} · expenses ${money(exp)}${list.filter(e=>e.err).length?` · <span style="color:var(--bad)">${list.filter(e=>e.err).length} with no date or amount (skipped)</span>`:''}${list.filter(e=>e.dup).length?` · ${list.filter(e=>e.dup).length} already there`:''}</div>
+      <div class="scroll-x" style="max-height:38vh;overflow:auto"><table class="tbl"><thead><tr><th>Row</th><th>Date</th><th>Type</th><th>Category</th><th>Paid to / from</th><th>Method</th><th>Ref</th><th class="r">Amount</th><th></th></tr></thead><tbody>
+      ${list.slice(0,300).map(e=>`<tr style="${e.err||(dupSkip&&e.dup)?'opacity:.45':''}"><td>${e.row}</td><td class="num">${e.date?fdate(e.date):'—'}</td><td>${e.type==='income'?'<span class="pill good">in</span>':'<span class="pill bad">out</span>'}</td><td>${h(e.category)}</td><td>${h(e.party)}</td><td>${h(e.method)}</td><td>${h(e.reference)}</td><td class="r num">${money(e.amount)}</td><td style="font-size:.75rem">${e.err?h(e.err):e.dup?'already there':''}</td></tr>`).join('')}</tbody></table></div>`;
+    $$('[data-map]',o).forEach(sl=>sl.onchange=()=>{const v=sl.value;if(v==='')delete map[sl.dataset.map];else map[sl.dataset.map]=+v;draw()});
+    $('#ai-def',o).onchange=e=>{defType=e.target.value;draw()};$('#ai-dup',o).onchange=e=>{dupSkip=e.target.checked;draw()};
+    const go=$('#ai-go',o);go.disabled=!ok.length;go.textContent=ok.length?`Import ${ok.length} row${ok.length===1?'':'s'}`:'Import';go._rows=ok};
+  $('#ai-file',o).onchange=async e=>{const f=e.target.files[0];if(!f)return;$('#ai-body',o).innerHTML='<div class="muted">Reading the file…</div>';
+    try{const all=(await readSheetFile(f)).filter(r=>r.some(v=>String(v).trim()!==''));
+      // heading row: the first row with at least 2 text cells among the first 10 rows
+      let hi=all.findIndex((r,i)=>i<10&&r.filter(v=>typeof v==='string'&&/[a-z]/i.test(v)).length>=2);if(hi<0)hi=0;
+      head=all[hi].map(v=>String(v).trim());rows=all.slice(hi+1);guess();draw()}
+    catch(x){$('#ai-body',o).innerHTML=`<div class="notice" style="color:var(--bad)">${h(x.message||'Could not read this file.')}</div>`}};
+  $('#ai-go',o).onclick=async()=>{const list=$('#ai-go',o)._rows||[];if(!list.length)return;const btn=$('#ai-go',o);btn.disabled=true;
+    try{for(let i=0;i<list.length;i+=400){const b=writeBatch(fdb);list.slice(i,i+400).forEach(e=>{const {row,err,dup,...d}=e;
+        b.set(doc(collection(fdb,COL.acct)),{...d,chequeDate:'',month:d.date.slice(0,7),importedFrom:'file',createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()})});
+        btn.textContent=`Importing ${Math.min(i+400,list.length)} of ${list.length}…`;await b.commit()}
+      closeModal();toast(`${list.length} account entr${list.length===1?'y':'ies'} imported`);S.params.per='all';render()}
+    catch(x){btn.disabled=false;btn.textContent='Import';toast('Import failed: '+(x.message||x.code),true)}};
+}
 function openingForm(){const op=S.acctOpen||{};
   const o=modal('Opening balance',`<p class="muted" style="margin:0 0 10px">Cash in hand and bank balance on the day you start keeping accounts. Shared with the attendance app.</p><div class="grid g2">
     <label class="field" style="grid-column:1/-1"><span>As at date</span><input type="date" id="ob-d" value="${h(op.date||today().slice(0,8)+'01')}"></label>
@@ -1851,6 +1923,125 @@ async function runSeeds(){
       if(made.length)setTimeout(()=>toast('Quotation '+made.join(', ')+' created. Open Documents → Quotations.'),2600);
     }catch(e){console.warn('seed',url,e)}
   }
+}
+
+/* ================= AI assistant (Gemini through Firebase AI Logic) ================= */
+// Type or speak an instruction; the assistant fills a quotation, invoice, delivery note or report for you to check and save,
+// finds documents, or answers questions about clients, products and balances.
+const AI_MODELS=['gemini-3.8-flash','gemini-3.5-flash'];
+let aiMod=null,aiApp=null;const AIH=[];
+async function aiLoad(){if(!aiMod){const [appM,aiM]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.19.0/firebase-ai.js')]);
+    aiApp=appM.getApps().find(a=>a.name==='llct-ai')||appM.initializeApp(firebaseConfig,'llct-ai');aiMod=aiM}}
+async function aiModel(name,schema){
+  if(!aiMod){const [appM,aiM]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.19.0/firebase-ai.js')]);
+    aiApp=appM.getApps().find(a=>a.name==='llct-ai')||appM.initializeApp(firebaseConfig,'llct-ai');aiMod=aiM}
+  const {getAI,getGenerativeModel,GoogleAIBackend}=aiMod;
+  return getGenerativeModel(getAI(aiApp,{backend:new GoogleAIBackend()}),{model:name,generationConfig:{responseMimeType:'application/json',responseSchema:schema,temperature:0.2}});
+}
+function aiSchema(){const {Schema}=aiMod;
+  const item=Schema.object({properties:{name:Schema.string(),desc:Schema.string(),qty:Schema.number(),unit:Schema.string(),price:Schema.number()},optionalProperties:['desc','qty','unit','price']});
+  return Schema.object({properties:{
+    heard:Schema.string(),reply:Schema.string(),
+    action:Schema.enumString({enum:['none','create_document','search','open_document','open_client']}),
+    docType:Schema.enumString({enum:['quotation','invoice','delivery','service','callout']}),
+    client:Schema.string(),site:Schema.string(),subject:Schema.string(),ref:Schema.string(),notes:Schema.string(),
+    complaint:Schema.string(),workDone:Schema.string(),timeIn:Schema.string(),timeOut:Schema.string(),discount:Schema.number(),
+    items:Schema.array({items:item}),query:Schema.string(),number:Schema.string()},
+    optionalProperties:['heard','docType','client','site','subject','ref','notes','complaint','workDone','timeIn','timeOut','discount','items','query','number']})}
+function aiContext(){
+  const cl=S.clients.slice(0,400).map(c=>{const ss=sitesOf(c).map(x=>x.name);return '- '+c.name+(ss.length?' | sites: '+ss.slice(0,80).join('; '):'')}).join('\n');
+  const pr=S.products.slice(0,400).map(p=>`- ${p.name}${p.unit?' ['+p.unit+']':''}${+p.price?' @ '+p.price:''}`).join('\n');
+  const docs=visibleDocs().slice().sort(newestFirst).slice(0,40).map(d=>`- ${d.number} ${docTitle(d)} · ${d.client&&d.client.name||''}${docSite(d)?' / '+docSite(d):''} · ${d.date} · ${docStatus(d)[0]}${d.type!=='delivery'?' · '+money(totals(d).total):''}`).join('\n');
+  const bal=can('reports')?S.clients.map(c=>[c.name,clientBalance(c.id)]).filter(x=>Math.abs(x[1])>0.005).sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>`- ${x[0]}: ${money(x[1])}`).join('\n'):'';
+  const may=['quotation','invoice','delivery'].filter(t=>can(t));
+  return `Company: ${S.cfg.name} (Dubai, UAE). Currency ${S.cfg.currency}. VAT ${S.cfg.taxRate}%. Today ${today()}. User: ${S.me.name}.
+User may create: ${may.map(t=>t==='delivery'?'delivery notes, service reports, call-out reports':t+'s').join(', ')||'nothing'}.
+CLIENTS (with their sites):\n${cl||'(none)'}\nPRODUCTS (name [unit] @ price):\n${pr||'(none)'}\nRECENT DOCUMENTS:\n${docs||'(none)'}${bal?'\nCLIENT BALANCES DUE:\n'+bal:''}`}
+const AI_RULES=`You are the assistant inside LLCT Invoicing, an app for quotations, invoices, delivery notes, service reports and call-out reports of a CCTV / IoT / networking company in the UAE.
+Read the user's instruction (typed, or spoken in the attached audio — any language, e.g. English, Malayalam, Hindi, Arabic; put a short English transcript in "heard") and reply in JSON.
+- To make a document set action=create_document and docType (quotation, invoice, delivery = delivery note, service = service report, callout = call-out attendance report).
+  client: the exact client name from the list (closest match); site: exact site name of that client if one is meant.
+  items: each line with name (use the exact product name from the list when it matches), qty, unit, price (use the list price unless the user gives one), desc only if useful.
+  Service / call-out reports: put the problem in complaint and what was done in workDone (clear, professional sentences); timeIn/timeOut as HH:MM 24h if said. subject: short title.
+- To find documents set action=search with query (a few words: number, client, site, serial or item).
+- To open one document set action=open_document with number. To open a client set action=open_client with client.
+- Otherwise action=none and just answer in reply using the data given (balances, recent documents, products, prices). Never invent numbers.
+Always write a short, friendly reply saying what you did or what is missing. If the client is unclear, still fill what you can and say so.`;
+async function wavFrom(blob){const ac=new (window.AudioContext||window.webkitAudioContext)();const buf=await ac.decodeAudioData(await blob.arrayBuffer());ac.close&&ac.close();
+  const rate=16000,len=Math.ceil(buf.duration*rate),off=new OfflineAudioContext(1,len,rate),src=off.createBufferSource();src.buffer=buf;src.connect(off.destination);src.start();
+  const pcm=(await off.startRendering()).getChannelData(0);const dv=new DataView(new ArrayBuffer(44+pcm.length*2));const ws=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i))};
+  ws(0,'RIFF');dv.setUint32(4,36+pcm.length*2,true);ws(8,'WAVE');ws(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,rate,true);dv.setUint32(28,rate*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);ws(36,'data');dv.setUint32(40,pcm.length*2,true);
+  for(let i=0;i<pcm.length;i++){const v=Math.max(-1,Math.min(1,pcm[i]));dv.setInt16(44+i*2,v<0?v*0x8000:v*0x7FFF,true)}
+  let bin='';const u=new Uint8Array(dv.buffer);for(let i=0;i<u.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(bin)}
+const normN=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function bestMatch(list,name,key=x=>x.name){const n=normN(name);if(!n)return null;let best=null,sc=0;const nw=n.split(' ');
+  for(const x of list){const k=normN(key(x));if(!k)continue;let v=k===n?100:(k.includes(n)||n.includes(k))?60+Math.min(k.length,n.length)/Math.max(k.length,n.length)*30:0;
+    if(!v){const kw=k.split(' ');const hit=nw.filter(w=>w.length>1&&kw.includes(w)).length;v=hit/Math.max(nw.length,1)*55}
+    if(v>sc){sc=v;best=x}}return sc>=30?best:null}
+function aiApply(r){
+  const done=[];
+  if(r.action==='create_document'&&r.docType){
+    const rt=['service','callout'].includes(r.docType)?r.docType:'';const type=rt?'delivery':r.docType;
+    if(!can(type)){return 'You don\'t have permission to make '+(rt?'reports':type+'s')+'.'}
+    if(S.view==='edit'&&ED)saveDraft();
+    const params={type,...(rt?{rt}:{}),ai:Date.now()};const d=newDraft(type,rt||undefined);
+    const c=bestMatch(S.clients,r.client);if(c){d.clientId=c.id;d.client=clientSnap(c);if(type==='invoice'&&c.creditDays)d.dueDate=addDays(d.date,+c.creditDays);
+      const si=r.site&&bestMatch(sitesOf(c),r.site);if(si){d.siteId=si.id;d.siteName=si.name;d.siteAddress=si.address||'';if(type==='delivery')d.deliveryAddress=siteText(si)}
+      else if(type==='delivery'&&!d.deliveryAddress)d.deliveryAddress=r.site||c.address||''}
+    else if(r.client)done.push(`client "${r.client}" is not in your list — choose or add it`);
+    ['subject','ref','notes','complaint','workDone'].forEach(k=>{if(r[k])d[k]=r[k]});
+    ['timeIn','timeOut'].forEach(k=>{if(/^\d{1,2}:\d{2}$/.test(r[k]||''))d[k]=r[k].padStart(5,'0')});
+    if(+r.discount)d.discount=+r.discount;
+    const items=(r.items||[]).filter(i=>i&&i.name);
+    if(items.length){d.items=items.map(i=>{const p=bestMatch(S.products,i.name);const it={name:i.name,desc:i.desc||'',qty:+i.qty||1,unit:i.unit||'pcs',price:+i.price||0,photo:''};
+      if(p){fillItem(it,p);if(i.desc)it.desc=i.desc;if(+i.price)it.price=+i.price;if(i.unit)it.unit=i.unit;it.qty=+i.qty||1}return it})}
+    else if(rt)d.items=[];
+    d._ai=1;ED=d;ED._key=JSON.stringify(params);closeModal();go('edit',params);
+    setTimeout(()=>toast('Filled by the AI assistant — check everything, then Save'),300);
+    return done.length?'Note: '+done.join('; ')+'.':''}
+  if(r.action==='search'&&r.query){closeModal();go('home',{oq:r.query});return ''}
+  if(r.action==='open_document'&&r.number){const d=visibleDocs().find(x=>normN(x.number)===normN(r.number))||visibleDocs().find(x=>normN(x.number).includes(normN(r.number)));
+    if(d){closeModal();go('view',{id:d.id});return ''}return 'I couldn\'t find document '+r.number+'.'}
+  if(r.action==='open_client'&&r.client){const c=bestMatch(S.clients,r.client);if(c){closeModal();go('client',{id:c.id});return ''}return 'I couldn\'t find client '+r.client+'.'}
+  return ''}
+function aiPanel(){
+  const o=modal('AI assistant',`<div class="aichat" id="ai-log">${AIH.length?'':`<div class="aihint"><b>Tell me what to do</b> — type or tap the mic and speak. For example:
+    <ul><li>Service report for BFL Dubai Mall, NVR not recording, replaced 4TB hard disk, time in 10:30 out 12:00</li><li>Quotation for IKEA: 16 Dahua 4MP bullet cameras, one 16 channel NVR and 2 rolls of Cat6</li><li>Delivery note for LL Dubai Operations with 2 Hikvision 8TB HDD</li><li>Which clients owe us the most?</li><li>Find documents with serial WX12AB345</li></ul></div>`}
+    ${AIH.map(m=>`<div class="aimsg ${m.who}">${h(m.text)}</div>`).join('')}</div>
+    <div class="aibar"><textarea id="ai-in" rows="2" placeholder="Type an instruction…"></textarea><button class="btn aimic" id="ai-mic" type="button" title="Speak">🎤</button><button class="btn primary" id="ai-send" type="button">Send</button></div>
+    <div class="muted" id="ai-st" style="font-size:.78rem;min-height:1.1em"></div>`,'',true);
+  o.querySelector('.modal').classList.add('aimodal');
+  const log=$('#ai-log',o),st=$('#ai-st',o),inp=$('#ai-in',o);log.scrollTop=log.scrollHeight;setTimeout(()=>inp.focus(),80);
+  const add=(who,text)=>{AIH.push({who,text});if(AIH.length>30)AIH.shift();const hn=$('.aihint',o);if(hn)hn.remove();log.insertAdjacentHTML('beforeend',`<div class="aimsg ${who}">${h(text)}</div>`);log.scrollTop=log.scrollHeight};
+  let busy=false;
+  const ask=async(text,audio)=>{if(busy)return;busy=true;$('#ai-send',o).disabled=true;st.innerHTML='<span class="dot-spin"></span> Thinking…';
+    if(text)add('me',text);
+    const hist=AIH.slice(-9,-1).map(m=>(m.who==='me'?'User: ':'Assistant: ')+m.text).join('\n');
+    const prompt=`${AI_RULES}\n\n${aiContext()}\n\n${hist?'CONVERSATION SO FAR:\n'+hist+'\n\n':''}${audio?'The new instruction is in the attached audio.':'NEW INSTRUCTION: '+text}`;
+    let out=null,err=null;
+    for(const name of AI_MODELS){try{await aiLoad();const sm=await aiModel(name,aiSchema());
+        const parts=[prompt];if(audio)parts.push({inlineData:{mimeType:'audio/wav',data:audio}});
+        const res=await sm.generateContent(parts);out=JSON.parse(res.response.text());break}catch(x){err=x;console.warn('AI',name,x)}}
+    busy=false;if(document.body.contains(o))$('#ai-send',o).disabled=false;st.textContent='';
+    if(!out){const msg=String(err&&(err.message||err)||'');
+      add('ai',/not.*enabled|has not been used|PERMISSION_DENIED|api.?key|firebasevertexai|ai logic|404/i.test(msg)?'The AI service is not switched on yet for this Firebase project. In Firebase console open AI Logic → Get started → Gemini Developer API, then try again.'
+        :/quota|429|exhaust/i.test(msg)?'The AI is busy right now (usage limit). Try again in a minute.':/app.?check|recaptcha/i.test(msg)?'The AI security check failed. Ask the admin to check App Check in Firebase.':'Sorry, I could not reach the AI service. Check the internet connection and try again.');
+      return}
+    if(audio&&out.heard)add('me','🎤 '+out.heard);
+    const note=aiApply(out);add('ai',[out.reply,note].filter(Boolean).join(' ')||'Done.')};
+  $('#ai-send',o).onclick=()=>{const t=inp.value.trim();if(!t)return;inp.value='';ask(t)};
+  inp.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#ai-send',o).click()}};
+  // voice: record, then send the audio itself to Gemini (works in the Android app and every browser)
+  let rec=null,chunks=[],t0=0,tick=null;
+  $('#ai-mic',o).onclick=async()=>{const b=$('#ai-mic',o);
+    if(rec&&rec.state==='recording'){rec.stop();return}
+    try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];rec=new MediaRecorder(stream);
+      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+      rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());clearInterval(tick);b.classList.remove('rec');b.textContent='🎤';
+        if(Date.now()-t0<700){st.textContent='Hold on a little longer while speaking.';return}
+        st.innerHTML='<span class="dot-spin"></span> Listening…';try{const wav=await wavFrom(new Blob(chunks,{type:rec.mimeType||'audio/webm'}));await ask('',wav)}catch(x){st.textContent='Could not use the recording: '+(x.message||x)}};
+      rec.start();t0=Date.now();b.classList.add('rec');b.textContent='■';tick=setInterval(()=>{const sec=Math.round((Date.now()-t0)/1000);st.textContent=`Recording… ${sec}s — tap ■ when you finish`;if(sec>=90)rec.stop()},500)}
+    catch(x){st.textContent=/denied|NotAllowed/i.test(String(x&&x.name||x))?'Microphone is blocked. Allow microphone access for this app and try again.':'Microphone not available: '+(x.message||x)}};
 }
 /* ================= sign-in & data ================= */
 function loginScreen(){

@@ -777,3 +777,20 @@ table.tbl{width:100%;border-collapse:collapse}
 input,select,textarea{background:#fff}
 .docopts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
 .sheet .info.nobank{grid-template-columns:1fr!important}
+
+/* AI assistant */
+.aifab{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:22px;z-index:25;border:0;border-radius:999px;background:#111;color:#fff;padding:12px 18px;font:inherit;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+@media (max-width:900px){.aifab{display:none}}
+.modal.aimodal{width:min(720px,100%);height:min(86vh,760px)}
+.modal.aimodal .body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.aichat{flex:1;min-height:180px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:2px}
+.aimsg{max-width:85%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;line-height:1.4;font-size:.92rem}
+.aimsg.me{align-self:flex-end;background:#111;color:#fff;border-bottom-right-radius:4px}
+.aimsg.ai{align-self:flex-start;background:var(--sunk);border-bottom-left-radius:4px}
+.aihint{color:var(--muted);font-size:.86rem}.aihint ul{margin:6px 0 0;padding-left:18px}.aihint li{margin:3px 0}
+.aibar{display:flex;gap:8px;align-items:flex-end}.aibar textarea{flex:1;min-height:44px;max-height:140px;resize:vertical}
+.aimic{font-size:1.1rem;min-width:46px}.aimic.rec{background:#B42318;color:#fff;border-color:#B42318;animation:aipulse 1.2s infinite}
+@keyframes aipulse{50%{box-shadow:0 0 0 6px rgba(180,35,24,.18)}}
+.dot-spin{display:inline-block;width:10px;height:10px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:700px){.modal.aimodal{height:100%}}
