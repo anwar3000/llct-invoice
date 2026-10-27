@@ -1566,7 +1566,15 @@ async function runSeeds(){
       const names=async col=>new Set((await getDocsFromServer(collection(fdb,COL[col]))).docs.map(d=>String(d.data().name||'').trim().toLowerCase()));
       const cMap=new Map((await getDocsFromServer(collection(fdb,COL.clients))).docs.map(d=>[String(d.data().name||'').trim().toLowerCase(),{...d.data(),id:d.id}]));
       const haveC=new Set(cMap.keys()),haveP=await names('products');let nc=0,np=0;const now=new Date().toISOString();
-      for(const c of seed.clients||[]){const k=c.name.trim().toLowerCase();if(haveC.has(k))continue;const cid=uid();
+      for(const c of seed.clients||[]){const k=c.name.trim().toLowerCase();
+        // "update": fill in missing details and add locations on a client that already exists
+        if(haveC.has(k)){if(!c.update)continue;const ex=cMap.get(k);const up={};
+          ['contact','phone','email','taxId','address','notes'].forEach(f=>{if(c[f]&&(!String(ex[f]||'').trim()||(c.replace||[]).includes(f))&&ex[f]!==c[f])up[f]=c[f]});
+          const have=ex.places||[];const add=(c.places||[]).filter(pl=>!have.some(q=>hasGPS(q)&&distM(q,pl)<=(+q.radius||150))).map(pl=>({...pl,addedAt:now}));
+          if(add.length)up.places=have.concat(add);
+          if(Object.keys(up).length){up.updatedAt=now;await setDoc(doc(fdb,COL.clients,ex.id),up,{merge:true});cMap.set(k,{...ex,...up});nc++}
+          continue}
+        delete c.update;delete c.replace;const cid=uid();
         const cd={...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now};await setDoc(doc(fdb,COL.clients,cid),cd);cMap.set(k,{...cd,id:cid});haveC.add(k);nc++}
       // previous invoices (kept with their original numbers) and payments already received
       const dMap=new Map();let nl=0,npay=0;
