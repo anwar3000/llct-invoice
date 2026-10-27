@@ -298,7 +298,29 @@ function modal(title,body,foot,wide,id='ov'){
 function closeModal(){const o=$('#ov');if(o)o.remove()}
 function confirmBox(title,text,okLabel='Delete'){return new Promise(res=>{const o=modal(title,`<p style="margin:0">${h(text)}</p>`,`<button class="btn" data-x>Cancel</button><button class="btn primary" id="ok">${h(okLabel)}</button>`);
   $('#ok',o).onclick=()=>{closeModal();res(true)};o.addEventListener('click',e=>{if(e.target.closest('[data-x]')||e.target===o)res(false)})})}
-function go(view,params={}){S.view=view;S.params=params;closeModal();render();window.scrollTo(0,0)}
+function go(view,params={}){S.view=view;S.params=params;closeModal();render();window.scrollTo(0,0);navPush()}
+/* ----- navigation that survives reloads, app switching and the back button ----- */
+const navHash=(v,p)=>{const k=Object.keys(p||{}).filter(x=>!['q'].includes(x)&&p[x]!==''&&p[x]!=null);const o={};k.forEach(x=>o[x]=p[x]);return '#/'+v+(k.length?'?'+encodeURIComponent(JSON.stringify(o)):'')};
+function navPush(replace){try{const hsh=navHash(S.view,S.params);if(location.hash===hsh)return;history[replace?'replaceState':'pushState']({v:S.view},'',hsh)}catch(e){}}
+function parseHash(){const m=location.hash.match(/^#\/([a-z]+)(?:\?(.*))?$/);if(!m||!VIEWS[m[1]])return null;let p={};try{if(m[2])p=JSON.parse(decodeURIComponent(m[2]))}catch(e){}return {v:m[1],p}}
+(function androidBack(){try{const A=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;if(!A)return;
+  A.addListener('backButton',()=>{if($$('.overlay').length){const ov=$$('.overlay');ov[ov.length-1].remove();return}
+    if(S.view!=='home'&&history.length>1)history.back();else if(S.view!=='home')go('home');else A.minimizeApp()});
+  A.addListener('appStateChange',st=>{if(!st.isActive&&S.view==='edit')saveDraft()})}catch(e){}})();
+window.addEventListener('popstate',()=>{
+  if(!S.me||!S.me.id)return;
+  // back with a pop-up open: close the pop-up and stay on this screen
+  const ov=$$('.overlay');if(ov.length){ov[ov.length-1].remove();try{history.pushState({v:S.view},'',navHash(S.view,S.params))}catch(e){}return}
+  if(S.view==='edit'&&ED)saveDraft();
+  const r=parseHash()||{v:'home',p:{}};S.view=r.v;S.params=r.p;render();window.scrollTo(0,0)});
+// Unsaved document kept on the phone, so switching apps or a reload doesn't lose it.
+const DRAFT_KEY='ll_draft';
+function saveDraft(){try{if(!ED||!S.me.id)return;readEditor();localStorage.setItem(DRAFT_KEY,JSON.stringify({u:S.me.id,at:Date.now(),params:S.params,ed:ED}))}catch(e){}}
+function getDraft(){try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');if(!d||d.u!==S.me.id||Date.now()-d.at>7*864e5)return null;return d}catch(e){return null}}
+function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch(e){}}
+function resumeDraft(){const d=getDraft();if(!d)return false;ED=d.ed;ED._key=JSON.stringify(d.params);S.view='edit';S.params=d.params;render();navPush();toast('Unsaved '+(ED.type==='delivery'?rep(ED).t.toLowerCase():TYPE[ED.type].t.toLowerCase())+' restored');return true}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&S.view==='edit')saveDraft()});
+window.addEventListener('pagehide',()=>{if(S.view==='edit')saveDraft()});
 
 /* ================= signature pad ================= */
 function sigPad(host){
@@ -636,6 +658,8 @@ VIEWS.home=()=>{
       <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row ovbtns">${boxes.map(t=>`<button class="btn" data-box="${t}">${I.doc||''}${DOC_TABS[t].p}</button>`).join('')}</div></div>
+  ${(()=>{const dr=getDraft();if(!dr||!dr.ed)return '';const e=dr.ed;const nm=e.type==='delivery'?rep(e).t:TYPE[e.type].t;
+    return `<div class="notice row" style="align-items:center"><span class="grow"><b>Unfinished ${h(nm.toLowerCase())}</b> ${h(e.number||'')}${e.client&&e.client.name?' · '+h(e.client.name):''} — not saved yet (${ago(new Date(dr.at).toISOString())})</span><button class="btn sm primary" id="dr-go">Continue</button><button class="btn sm ghost" id="dr-x">Discard</button></div>`})()}
   ${money4?`<div class="hilites">
     <button class="hl-card hl-navy" data-go="clients"><span class="hl-l">Receivable</span><span class="hl-v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span class="hl-s">${overdue.length?`<b>${overdue.length}</b> invoice${overdue.length===1?'':'s'} overdue`:'Nothing overdue'}</span></button>
     <button class="hl-card hl-blue" data-box="invoice"><span class="hl-l">Invoiced this month</span><span class="hl-v">${money(monthInv)}</span><span class="hl-s">${(n=>`${n} invoice${n===1?'':'s'}`)(inv.filter(d=>(d.date||'').startsWith(ym)).length)}</span></button>
@@ -647,7 +671,7 @@ VIEWS.home=()=>{
   ${pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
   ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
-VIEWS_AFTER.home=()=>($$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
+VIEWS_AFTER.home=()=>($('#dr-go')&&($('#dr-go').onclick=resumeDraft),$('#dr-x')&&($('#dr-x').onclick=async()=>{if(await confirmBox('Discard the unsaved document?','What you typed will be lost.','Discard')){clearDraft();render()}}),$$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
 
 // Document lists: quotations, invoices, service reports (incl. call-out), delivery notes — newest first.
 const DOC_TABS={
@@ -745,6 +769,7 @@ function newDraft(type,rt){
 }
 VIEWS.edit=()=>{
   const p=S.params;
+  if(p.id&&!S.docs.find(x=>x.id===p.id)&&(!ED||ED.id!==p.id))return '<div class="loading">Opening document…</div>';
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
     else{ED=newDraft(p.type,p.rt);const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
@@ -898,7 +923,9 @@ async function addAttachments(camera){
 function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
 VIEWS_AFTER.edit=()=>{
-  const cancel=()=>{const d=ED;ED=null;d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
+  {const app=$('#app');if(!app._draftHook){app._draftHook=1;let t;const kick=()=>{if(S.view!=='edit'||!ED)return;clearTimeout(t);t=setTimeout(saveDraft,800)};app.addEventListener('input',kick);app.addEventListener('change',kick)}}
+  saveDraft();
+  const cancel=()=>{const d=ED;ED=null;clearDraft();d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
   $('#cx').onclick=cancel;$('#cx2').onclick=cancel;
   $('#e-number').addEventListener('input',()=>{ED._auto=false});
   $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date,ED.reportType);$('#e-number').value=ED.number}});
@@ -951,7 +978,7 @@ VIEWS_AFTER.edit=()=>{
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
       delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
-      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
@@ -1769,7 +1796,7 @@ function messageScreen(title,text,retry){
   $('#ms-out').onclick=logOut;if(retry)$('#ms-retry').onclick=()=>location.reload();
 }
 const busyViews=['edit','deliver','settings'];
-let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.includes(S.view))render()},80)};
+let rT;const soon=()=>{clearTimeout(rT);rT=setTimeout(()=>{if(!busyViews.includes(S.view)||(S.view==='edit'&&!ED)||(S.view==='deliver'&&!DV))render()},80)};
 /* ----- login log ----- */
 function deviceId(){try{let d=localStorage.getItem('ll_dev');if(!d){d=uid();localStorage.setItem('ll_dev',d)}return d}catch(e){return ''}}
 async function deviceInfo(){const u=navigator.userAgent||'';let m;
@@ -1826,6 +1853,10 @@ onAuthStateChanged(auth,async u=>{
       if(!a||a.enabled===false){logEvent('denied',{reason:'No invoicing access'});messageScreen('No invoicing access yet',`Signed in as <b>${h(S.me.name)}</b>. Ask the admin to turn on invoicing access for you in Staff &amp; access.`,true);return}
       S.me.role='employee';S.me.perms=a.perms||{}}
   }catch(e){messageScreen('Could not load your account',h(e.code||e.message)+'<br>Check your internet connection and the Firestore rules.',true);return}
-  S.view='home';S.params={};render();startData();logSession();
+  const back=parseHash();const dr=getDraft();
+  if(back&&back.v==='edit'&&dr&&JSON.stringify(dr.params)===JSON.stringify(back.p)){ED=dr.ed;ED._key=JSON.stringify(dr.params);S.view='edit';S.params=dr.params}
+  else if(back&&(back.v!=='edit'||back.p.id)){S.view=back.v;S.params=back.p}
+  else{S.view='home';S.params={}}
+  render();navPush(true);startData();logSession();
 });
 window.addEventListener('resize',()=>$$('.preview-wrap').forEach(fitPreview));
