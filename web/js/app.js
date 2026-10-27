@@ -243,6 +243,12 @@ async function reserveNumber(type,date,rt,preferred){
 }
 // Delivery notes and service/call-out reports are shared: everyone with delivery access sees all of them.
 const seesAllDN=()=>can('delivery')||can('deliver');
+// Newest first everywhere: by date, then by when it was entered.
+const tsOf=v=>v&&v.seconds?new Date(v.seconds*1e3).toISOString():String(v||'');
+const newestFirst=(a,b)=>String(b.date||'').localeCompare(String(a.date||''))||tsOf(b.createdAt).localeCompare(tsOf(a.createdAt))||String(b.number||'').localeCompare(String(a.number||''));
+const lastTouched=x=>tsOf(x.updatedAt)||tsOf(x.createdAt)||String(x.date||'');
+function ago(iso){if(!iso)return '';const m=Math.round((Date.now()-new Date(iso))/6e4);if(!(m>=0))return fdate(iso);
+  if(m<1)return 'just now';if(m<60)return m+' min ago';const hh=Math.round(m/60);if(hh<24)return hh+' h ago';const dd=Math.round(hh/24);return dd<7?dd+' d ago':fdate(iso)}
 const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d.type==='delivery'&&seesAllDN()));
 
 /* ================= icons ================= */
@@ -611,22 +617,32 @@ VIEWS.home=()=>{
   const monthRec=r2(S.payments.filter(p=>(p.date||'').startsWith(ym)).reduce((s,p)=>s+(+p.amount||0),0));
   const pend=docs.filter(d=>d.type==='delivery'&&!(d.delivery&&d.delivery.signedAt));
   const overdue=inv.filter(d=>invStatus(d)[0].includes('overdue'));
-  const recent=docs.slice().sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1).slice(0,8);
+  // Recent activity: three boxes — delivery/service reports, quotations, invoices — newest first, with who made each.
+  const boxes=[['delivery','Delivery notes & reports','deliveries'],['quotation','Quotations','docs'],['invoice','Invoices','docs']].filter(([t])=>can(t)||can('viewAll')||(t==='delivery'&&seesAllDN())||docs.some(d=>d.type===t));
+  const actRow=d=>{const sg=d.delivery&&d.delivery.signedAt;const t=lastTouched(d);const [st,k]=docStatus(d);
+    const who=d.createdByName||(S.users[d.createdBy]||{}).name||'';
+    return `<button class="li act-li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
+      <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
+      <span class="r who"><b>${h(who||'—')}</b><small>${ago(sg&&Math.abs(new Date(t)-new Date(sg))<3e5?sg:t)}</small></span></button>`};
+  const recentBox=([t,title,view])=>{const list=docs.filter(d=>d.type===t).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,6);
+    return `<div class="card actbox"><div class="pad row"><h2 class="grow" style="font-size:1rem">${title}</h2><button class="btn sm ghost" data-go="${view}"${view==='docs'?` data-tab="${t}"`:''}>All</button></div>
+      <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row">${can('quotation')?`<button class="btn" data-q="quotation">${I.plus}Quotation</button>`:''}${can('invoice')?`<button class="btn" data-q="invoice">${I.plus}Invoice</button>`:''}${can('delivery')?`<button class="btn" data-q="service">${I.plus}Service report</button><button class="btn primary" data-q="delivery">${I.plus}Delivery note</button>`:''}</div></div>
+
+  <div class="actgrid">${boxes.map(recentBox).join('')}</div>
   ${money4?`<div class="kpis"><div class="card kpi hl"><span class="label">Receivable</span><span class="v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span style="font-size:.78rem;color:#bbb">${overdue.length} invoice${overdue.length===1?'':'s'} overdue</span></div>
     <div class="card kpi"><span class="label">Invoiced this month</span><span class="v">${money(monthInv)}</span></div>
     <div class="card kpi"><span class="label">Received this month</span><span class="v">${money(monthRec)}</span></div>
     <div class="card kpi"><span class="label">Pending deliveries</span><span class="v">${pend.length}</span></div></div>`:''}
   ${pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
-  ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}
-  <div class="card"><div class="pad"><h2>Recent activity</h2></div><div class="list">${recent.length?recent.map(docRow).join(''):`<div class="empty"><b>No documents yet</b>Create your first quotation, invoice or delivery note with the buttons above.</div>`}</div></div>`;
+  ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
-VIEWS_AFTER.home=()=>$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q}));
+VIEWS_AFTER.home=()=>($$('.actbox [data-tab]').forEach(b=>b.onclick=e=>{e.stopPropagation();go('docs',{tab:b.dataset.tab})}),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
 
 VIEWS.docs=()=>{
   const tab=S.params.tab||(can('invoice')?'invoice':can('quotation')?'quotation':'delivery');const q=(S.params.q||'').toLowerCase();
-  const list=visibleDocs().filter(d=>d.type===tab).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.date+b.number)>(a.date+a.number)?1:-1);
+  const list=visibleDocs().filter(d=>d.type===tab).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject].join(' ').toLowerCase().includes(q)).sort(newestFirst);
   const total=list.reduce((s,d)=>s+totals(d).total,0);
   return `<div class="head"><div><h1>Documents</h1><div class="sub">${list.length} ${TYPE[tab].p.toLowerCase()}${tab!=='delivery'?` · ${cur(total)}`:''}</div></div>${tab==='delivery'&&can('delivery')?`<button class="btn" id="nsr">${I.plus}New service report</button>`:''}${can(tab)||tab==='delivery'&&can('delivery')?`<button class="btn primary" id="nd">${I.plus}New ${TYPE[tab].t.replace('Tax ','').toLowerCase()}</button>`:''}</div>
   <div class="row"><div class="seg">${['quotation','invoice','delivery'].map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${TYPE[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, LPO…" value="${h(S.params.q||'')}"></div>
@@ -641,7 +657,7 @@ VIEWS_AFTER.docs=()=>{
 VIEWS.deliveries=()=>{
   const tab=S.params.tab||'pending';
   const all=visibleDocs().filter(d=>d.type==='delivery');
-  const list=all.filter(d=>tab==='pending'?!(d.delivery&&d.delivery.signedAt):(d.delivery&&d.delivery.signedAt)).sort((a,b)=>(b.date>a.date?1:-1));
+  const list=all.filter(d=>tab==='pending'?!(d.delivery&&d.delivery.signedAt):(d.delivery&&d.delivery.signedAt)).sort(newestFirst);
   return `<div class="head"><div><h1>Deliveries</h1><div class="sub">${all.filter(d=>!(d.delivery&&d.delivery.signedAt)).length} waiting · ${all.filter(d=>d.delivery&&d.delivery.signedAt).length} delivered</div></div>${can('delivery')?`<div class="row"><button class="btn" id="nsr">${I.plus}New service report</button><button class="btn primary" id="nd">${I.plus}New delivery note</button></div>`:''}</div>
   <div class="seg"><button class="${tab==='pending'?'on':''}" data-tab="pending">Waiting</button><button class="${tab==='done'?'on':''}" data-tab="done">Delivered</button></div>
   <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>${tab==='pending'?'Nothing waiting to deliver':'No completed deliveries yet'}</b>${tab==='pending'?'New delivery notes appear here until they are signed.':''}</div>`}</div>`;
@@ -910,7 +926,7 @@ VIEWS_AFTER.edit=()=>{
       if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
-      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();
+      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
       if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
@@ -1020,7 +1036,7 @@ VIEWS.client=()=>{
   const first=[c.openingBalance?c.openingDate:null,...S.docs.filter(d=>d.clientId===c.id&&d.type==='invoice').map(d=>d.date),...S.payments.filter(p=>p.clientId===c.id).map(p=>p.date)].filter(Boolean).sort()[0]||today().slice(0,4)+'-01-01';
   const from=S.params.sf||first,to=S.params.st||today();
   const x=soaData(c.id,from,to);
-  const docs=S.docs.filter(d=>d.clientId===c.id).sort((a,b)=>b.date>a.date?1:-1);
+  const docs=S.docs.filter(d=>d.clientId===c.id).sort(newestFirst);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Clients</button><div><h1>${h(c.name)}</h1><div class="sub">${h([c.contact,c.phone,c.email].filter(Boolean).join(' · '))}</div></div></div>
    <div class="row">${can('clients')?`<button class="btn" id="ec">${I.pen}Edit</button>`:''}${can('invoice')?`<button class="btn" id="old-inv">${I.plus}Add previous invoices</button>`:''}${can('payments')?`<button class="btn" id="cp">${I.cash}Record payment</button>`:''}${can('reports')?`<button class="btn primary" id="soa">${I.pdf}SOA PDF</button>`:''}</div></div>
   ${can('reports')?`<div class="kpis"><div class="card kpi hl"><span class="label">Balance due</span><span class="v">${money(clientBalance(c.id))}<small>${h(S.cfg.currency)}</small></span></div>
@@ -1138,7 +1154,7 @@ function clientForm(c,after){
 
 /* ----- payments ----- */
 VIEWS.payments=()=>{
-  const list=S.payments.slice().sort((a,b)=>b.date>a.date?1:-1);
+  const list=S.payments.slice().sort(newestFirst);
   const ym=today().slice(0,7);
   return `<div class="head"><div><h1>Payments</h1><div class="sub">${cur(list.filter(p=>(p.date||'').startsWith(ym)).reduce((s,p)=>s+(+p.amount||0),0))} received this month</div></div>${can('payments')?`<button class="btn primary" id="np">${I.plus}Record payment</button>`:''}</div>
   <div class="card list">${list.length?list.map(p=>{const c=S.clients.find(x=>x.id===p.clientId);const inv=S.docs.find(d=>d.id===p.invoiceId);
@@ -1329,7 +1345,7 @@ VIEWS.accounts=()=>{
   const bal=accBalance(to>today()?today():to);
   const coll=r2(S.payments.filter(p=>p.date>=from&&p.date<=to&&!/credit|adjust|previous/i.test(p.method||'')).reduce((t,p)=>t+(+p.amount||0),0));
   const list=all.filter(e=>(tab==='all'||e.type===tab)&&(!cat||e.category===cat)&&(!q||[e.category,e.party,e.note,e.reference,e.bank,e.siteName,e.projectName,e.method].join(' ').toLowerCase().includes(q)))
-    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    .sort(newestFirst);
   const byCat={};all.filter(e=>e.type==='expense').forEach(e=>byCat[e.category||'Other']=(byCat[e.category||'Other']||0)+e.amount);
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:1;
   const allCats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
