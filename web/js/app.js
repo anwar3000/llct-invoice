@@ -41,7 +41,7 @@ function numWords(n){
 }
 
 /* ================= config & permissions ================= */
-const DEFAULT_CFG={name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
+const DEFAULT_CFG={dnEmail:'service@llct.net / mekha@llct.net',name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
   currency:'AED',currencyName:'dirhams',minorName:'fils',taxLabel:'VAT',taxRate:5,
   prefix:{quotation:'QTN',invoice:'INV',delivery:'DLN',receipt:'RCT'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
@@ -765,7 +765,9 @@ function newDraft(type,rt){
   const date=today();rt=type==='delivery'&&REPORT[rt]?rt:'';
   return {id:uid(),type,...(rt?{reportType:rt}:{}),number:nextNumber(type,date,rt||undefined),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
     clientId:'',client:null,ref:'',subject:'',salesperson:'',deliveryAddress:'',items:[{name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''}],discount:0,taxRate:S.cfg.taxRate,
-    notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:(S.me.profile||{}).mobile||'',contactEmail:(S.me.profile||{}).email||'',createdAt:new Date().toISOString(),_new:true};
+    notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',
+    // delivery notes & service reports: the company service contact, not the person's own phone / email (editable)
+    contactMobile:type==='delivery'?'':((S.me.profile||{}).mobile||''),contactEmail:type==='delivery'?(S.cfg.dnEmail||DEFAULT_CFG.dnEmail):((S.me.profile||{}).email||''),createdAt:new Date().toISOString(),_new:true};
 }
 VIEWS.edit=()=>{
   const p=S.params;
@@ -798,7 +800,7 @@ VIEWS.edit=()=>{
     ${isQ?`<label class="field"><span>Valid until</span><input type="date" id="e-validUntil" value="${h(d.validUntil)}"></label>`:''}
     <label class="field"><span>${isQ?'Client reference':'LPO / reference'}</span><input id="e-ref" value="${h(d.ref)}"></label>
     <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
-    <label class="field"><span>Contact person</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
+    <label class="field"><span>${isDN&&(d.reportType||'delivery')==='delivery'?'Delivery person':'Contact person'}</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
     <label class="field"><span>Contact mobile</span><input id="e-contactMobile" inputmode="tel" value="${h(d.contactMobile||'')}"></label>
     <label class="field"><span>Contact email</span><input id="e-contactEmail" type="email" value="${h(d.contactEmail||'')}"></label>
     <label class="field" style="grid-column:span ${isDN?1:2}"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="e.g. Supply of CCTV equipment"></label>
@@ -1678,7 +1680,7 @@ VIEWS.settings=()=>{
   <div class="view-grid"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
   <div class="card pad grid"><h2>Company</h2>
    <div class="row" style="align-items:flex-start"><div class="field"><span style="font-size:.75rem;font-weight:600;color:var(--muted)">Logo</span><button class="logo-box" id="s-logo" type="button">${c.logo?img(c.logo):'Upload logo'}</button>${c.logo?'<button class="btn ghost sm" id="s-logo-x">Remove</button>':''}</div>
-    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}${f('tagline','Tagline (Premium style)',c.tagline,'text',true)}
+    <div class="grid grow g2" style="min-width:220px">${f('name','Company name')}${f('website','Website')}${f('phone','Phone')}${f('email','Email')}${f('dnEmail','Delivery / service report email')}${f('taxIdLabel','Tax ID label')}${f('taxId','Tax ID number')}${f('tagline','Tagline (Premium style)',c.tagline,'text',true)}
      <label class="field" style="grid-column:1/-1"><span>Company GPS (shown in the header)</span><div class="row" style="flex-wrap:nowrap"><input id="s-gps" value="${h(c.gps||'')}" placeholder="25.2xxxxx, 55.3xxxxx"><button class="btn" id="s-gps-here" type="button">Use my location</button></div></label></div></div>
    <label class="field"><span>Address</span><textarea id="s-address">${h(c.address)}</textarea></label>
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
@@ -1715,7 +1717,7 @@ VIEWS_AFTER.settings=()=>{
   $('#s-stamp-clr').onclick=()=>{c.stamp='';$('#s-stamp-pv').innerHTML='<span class="muted">No stamp.</span>';toast('Stamp removed. Save settings to keep the change.')};
   $('#s-sig-clr').onclick=()=>{sp.clear();c.signature='';toast('Signature cleared. Save settings to keep the change.')};
   $('#s-save').onclick=async()=>{
-    ['name','website','phone','email','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline','gps'].forEach(k=>c[k]=$('#s-'+k).value.trim());
+    ['name','website','phone','email','dnEmail','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline','gps'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
     c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
     c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
