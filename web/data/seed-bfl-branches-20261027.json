@@ -1,0 +1,341 @@
+{
+ "id": "bfl-branches-20261027",
+ "clients": [
+  {
+   "name": "BFL Group",
+   "update": true,
+   "matchSitesBy": "name",
+   "places": [
+    {
+     "name": "Brands For Less – Reef Mall",
+     "address": "116 Salah Al Din St, Deira, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Oasis Mall",
+     "address": "Oasis Mall, First Floor, 2nd Interchange, Sheikh Zayed Rd, Al Quoz 1, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Arabian Center",
+     "address": "Ground Floor, Arabian Center, Al Khawaneej St, Al Mizhar 1, Dubai, UAE",
+     "lat": 25.2333,
+     "lng": 55.4366,
+     "radius": 400
+    },
+    {
+     "name": "Luxury For Less – Motor City",
+     "address": "First Floor, BFL Shopping Centre, Motor City, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – BFL Shopping Center",
+     "address": "Motor City – Green Community, Motor City, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Damac Hills 2",
+     "address": "Damac Hills 2, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Forsan Central Mall",
+     "address": "Forsan Central Mall, Khalifa City, Abu Dhabi, UAE"
+    },
+    {
+     "name": "Brands For Less – Sharjah Central",
+     "address": "Sharjah Central, Sharjah, UAE"
+    },
+    {
+     "name": "Brands For Less – Dubai Silicon Oasis",
+     "address": "Dubai Silicon Oasis, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Yas Mall",
+     "address": "Yas Mall, Yas Island, Abu Dhabi, UAE",
+     "lat": 24.4887,
+     "lng": 54.6087,
+     "radius": 500
+    },
+    {
+     "name": "Muy Mucho – Ras Al Khaimah",
+     "address": "Ras Al Khaimah, UAE"
+    },
+    {
+     "name": "Brands For Less – Dalma Mall",
+     "address": "Dalma Mall, Mussafah, Abu Dhabi, UAE",
+     "lat": 24.3336,
+     "lng": 54.5246,
+     "radius": 500
+    },
+    {
+     "name": "Brands For Less – Sahara Mall",
+     "address": "Sahara Centre, Al Nahda, Sharjah, UAE",
+     "lat": 25.2977,
+     "lng": 55.3729,
+     "radius": 400
+    },
+    {
+     "name": "Brands For Less – Al Ghurair Centre",
+     "address": "Al Ghurair Centre, Al Rigga Rd, Deira, Dubai, UAE",
+     "lat": 25.2676,
+     "lng": 55.3175,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Ras Al Khaimah",
+     "address": "Ras Al Khaimah, UAE"
+    },
+    {
+     "name": "Muy Mucho – Mushrif Mall",
+     "address": "Mushrif Mall, Abu Dhabi, UAE",
+     "lat": 24.4362,
+     "lng": 54.4118,
+     "radius": 400
+    },
+    {
+     "name": "Brands For Less – Mushrif Mall",
+     "address": "Mushrif Mall, Abu Dhabi, UAE",
+     "lat": 24.4362,
+     "lng": 54.4118,
+     "radius": 400
+    },
+    {
+     "name": "Brands For Less – Al Ain Mall",
+     "address": "Al Ain Mall, Al Ain, UAE",
+     "lat": 24.2215,
+     "lng": 55.782,
+     "radius": 400
+    },
+    {
+     "name": "Brands For Less – Circle Mall",
+     "address": "Circle Mall, Jumeirah Village Circle, Dubai, UAE"
+    },
+    {
+     "name": "Muy Mucho – Umm Suqeim",
+     "address": "Umm Suqeim St, Dubai, UAE"
+    },
+    {
+     "name": "Muy Mucho – Ibn Battuta",
+     "address": "Ibn Battuta Mall, Dubai, UAE",
+     "lat": 25.045,
+     "lng": 55.1186,
+     "radius": 700
+    },
+    {
+     "name": "Brands For Less – JBR",
+     "address": "Jumeirah Beach Residence, Dubai, UAE"
+    },
+    {
+     "name": "Homes For Less – Nakheel Mall",
+     "address": "Nakheel Mall, Palm Jumeirah, Dubai, UAE",
+     "lat": 25.1122,
+     "lng": 55.1392,
+     "radius": 300
+    },
+    {
+     "name": "Toys For Less – Nakheel Mall",
+     "address": "Nakheel Mall, Palm Jumeirah, Dubai, UAE",
+     "lat": 25.1122,
+     "lng": 55.1392,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Nakheel Mall",
+     "address": "Nakheel Mall, Palm Jumeirah, Dubai, UAE",
+     "lat": 25.1122,
+     "lng": 55.1392,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Abu Shagara",
+     "address": "Abu Shagara, Sharjah, UAE"
+    },
+    {
+     "name": "Brands For Less – Reem Mall",
+     "address": "Reem Mall, Al Reem Island, Abu Dhabi, UAE"
+    },
+    {
+     "name": "Brands For Less – City Centre Ajman",
+     "address": "City Centre Ajman, Ajman, UAE",
+     "lat": 25.3996,
+     "lng": 55.4797,
+     "radius": 400
+    },
+    {
+     "name": "Toys For Less – WTC Mall",
+     "address": "World Trade Center Mall, Abu Dhabi, UAE",
+     "lat": 24.4871,
+     "lng": 54.3576,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Abu Dhabi Mall",
+     "address": "Unit AM 02, Mezzanine Floor, beside Union Coop supermarket, Abu Dhabi Mall, Abu Dhabi, UAE",
+     "lat": 24.4959,
+     "lng": 54.3834,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – First Avenue Mall",
+     "address": "First Avenue Mall, Motor City, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Dubai Mall",
+     "address": "The Dubai Mall, Downtown Dubai, Dubai, UAE",
+     "lat": 25.1975,
+     "lng": 55.2796,
+     "radius": 500
+    },
+    {
+     "name": "Brands For Less – Dubai Marina Mall",
+     "address": "Dubai Marina Mall, Dubai Marina, Dubai, UAE",
+     "lat": 25.0763,
+     "lng": 55.1405,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – The Springs Souk",
+     "address": "The Springs Souk, The Springs, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Deira City Centre",
+     "address": "Deira City Centre, Port Saeed, Dubai, UAE",
+     "lat": 25.2521,
+     "lng": 55.333,
+     "radius": 400
+    },
+    {
+     "name": "Homes For Less – Ibn Battuta Mall",
+     "address": "Ibn Battuta Mall, Dubai, UAE",
+     "lat": 25.045,
+     "lng": 55.1186,
+     "radius": 700
+    },
+    {
+     "name": "Toys For Less – Ibn Battuta Mall",
+     "address": "Ibn Battuta Mall, opposite Marks & Spencer, Ground Floor, Dubai, UAE",
+     "lat": 25.045,
+     "lng": 55.1186,
+     "radius": 700
+    },
+    {
+     "name": "Brands For Less – Shindagha Mall",
+     "address": "Shindagha City Centre, Al Khaleej St, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – WTC Mall",
+     "address": "World Trade Center Mall, Abu Dhabi, UAE",
+     "lat": 24.4871,
+     "lng": 54.3576,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Al Ghazal Mall",
+     "address": "Al Ghazal Mall, Al Wasl Rd, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Al Yasmeen",
+     "address": "Al Yasmeen, Sharjah, UAE"
+    },
+    {
+     "name": "Brands For Less – Bawabat Al Sharq Mall",
+     "address": "Bawabat Al Sharq Mall, Baniyas, Abu Dhabi, UAE"
+    },
+    {
+     "name": "Brands For Less – Al Wahda Mall",
+     "address": "Al Wahda Mall, Abu Dhabi, UAE",
+     "lat": 24.4699,
+     "lng": 54.3726,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Festival City Mall",
+     "address": "Dubai Festival City Mall, Dubai, UAE",
+     "lat": 25.2224,
+     "lng": 55.353,
+     "radius": 500
+    },
+    {
+     "name": "Brands For Less – Al Barsha",
+     "address": "Al Barsha, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Al Khan",
+     "address": "Al Khan, Sharjah, UAE"
+    },
+    {
+     "name": "Brands For Less – Ajman",
+     "address": "Ajman, UAE"
+    },
+    {
+     "name": "Brands For Less – BurJuman Mall",
+     "address": "BurJuman Mall, Bur Dubai, Dubai, UAE",
+     "lat": 25.254,
+     "lng": 55.3036,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Fujairah Mall",
+     "address": "Fujairah, UAE"
+    },
+    {
+     "name": "Tchibo Prozente – Dubai Outlet Mall",
+     "address": "Dubai Outlet Mall, Dubailand, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Hamdan",
+     "address": "Hamdan St, Abu Dhabi, UAE"
+    },
+    {
+     "name": "Brands For Less – Ibn Battuta Mall",
+     "address": "Ibn Battuta Mall, Dubai, UAE",
+     "lat": 25.045,
+     "lng": 55.1186,
+     "radius": 700
+    },
+    {
+     "name": "Brands For Less – Khalidiyah Mall",
+     "address": "Khalidiyah Mall, Abu Dhabi, UAE",
+     "lat": 24.4667,
+     "lng": 54.3402,
+     "radius": 300
+    },
+    {
+     "name": "Brands For Less – Ibn Battuta Mall Metro Link",
+     "address": "Ibn Battuta Mall Metro Link, Dubai, UAE",
+     "lat": 25.045,
+     "lng": 55.1186,
+     "radius": 700
+    },
+    {
+     "name": "Toys For Less – Oud Metha",
+     "address": "Al Safa Paradise, Show Room #1, Oud Metha Rd, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Oud Metha",
+     "address": "Al Safa Paradise, Oud Metha Rd, Dubai, UAE"
+    },
+    {
+     "name": "Tchibo Prozente – Sharjah City Centre",
+     "address": "City Centre Sharjah, Sharjah, UAE"
+    },
+    {
+     "name": "Toys For Less – Al Barsha",
+     "address": "Shop 3, Plot 373-117, Sheikh Zayed Rd, Al Barsha 1, Dubai, UAE"
+    },
+    {
+     "name": "Toys For Less – Abu Shagara",
+     "address": "Al Haraj Bldg, opposite K.M. Trading, Abu Shagara, Sharjah, UAE"
+    },
+    {
+     "name": "Brands For Less – Uptown Mirdif",
+     "address": "Uptown Mirdif, Mirdif, Dubai, UAE"
+    },
+    {
+     "name": "Toys For Less – Uptown Mirdif",
+     "address": "Shop R7A, Uptown Mirdif, Mirdif, Dubai, UAE"
+    },
+    {
+     "name": "Brands For Less – Umm Suqeim",
+     "address": "Umm Suqeim St, Dubai, UAE"
+    }
+   ]
+  }
+ ]
+}

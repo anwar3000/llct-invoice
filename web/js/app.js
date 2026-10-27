@@ -1725,7 +1725,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1743,13 +1743,14 @@ async function runSeeds(){
           ['contact','phone','email','taxId','address','notes'].forEach(f=>{if(c[f]&&(!String(ex[f]||'').trim()||(c.replace||[]).includes(f))&&ex[f]!==c[f])up[f]=c[f]});
           // seed sites replace an existing site at the same spot (keeping its id), otherwise they are added
           const have=clone(ex.places||[]);let ch=false;
-          for(const pl of c.places||[]){const i=have.findIndex(q=>hasGPS(q)&&hasGPS(pl)&&distM(q,pl)<=(+q.radius||150));
+          const nm=x=>String(x||'').trim().toLowerCase();
+          for(const pl of c.places||[]){const i=c.matchSitesBy==='name'?have.findIndex(q=>nm(q.name)===nm(pl.name)):have.findIndex(q=>hasGPS(q)&&hasGPS(pl)&&distM(q,pl)<=(+q.radius||150));
             if(i>=0){if(c.replaceSites&&JSON.stringify({...have[i],addedAt:0,id:0})!==JSON.stringify({...have[i],...pl,addedAt:0,id:0})){have[i]={...have[i],...pl,id:have[i].id||uid()};ch=true}}
             else{have.push({...pl,id:pl.id||uid(),addedAt:now});ch=true}}
           if(ch)up.places=have;
           if(Object.keys(up).length){up.updatedAt=now;await setDoc(doc(fdb,COL.clients,ex.id),up,{merge:true});cMap.set(k,{...ex,...up});nc++}
           continue}
-        delete c.update;delete c.replace;delete c.match;delete c.replaceSites;c.places=(c.places||[]).map(pl=>({...pl,id:pl.id||uid()}));const cid=uid();
+        delete c.update;delete c.replace;delete c.match;delete c.replaceSites;delete c.matchSitesBy;c.places=(c.places||[]).map(pl=>({...pl,id:pl.id||uid()}));const cid=uid();
         const cd={...c,places:(c.places||[]).map(pl=>({...pl,addedAt:now})),updatedAt:now};await setDoc(doc(fdb,COL.clients,cid),cd);cMap.set(k,{...cd,id:cid});haveC.add(k);nc++}
       // previous invoices (kept with their original numbers) and payments already received
       const dMap=new Map();let nl=0,npay=0;
