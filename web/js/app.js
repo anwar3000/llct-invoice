@@ -1556,7 +1556,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
