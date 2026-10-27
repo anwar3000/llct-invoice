@@ -793,6 +793,37 @@ function newDraft(type,rt){
     // delivery notes & service reports: the company service contact, not the person's own phone / email (editable)
     contactMobile:type==='delivery'?'':((S.me.profile||{}).mobile||''),contactEmail:type==='delivery'?(S.cfg.dnEmail||DEFAULT_CFG.dnEmail):((S.me.profile||{}).email||''),createdAt:new Date().toISOString(),_new:true};
 }
+// Header fields of the editor. Quotations / invoices: as before.
+function qiHead(d,isQ,isDN){return `
+    <label class="field"><span>${isQ?'Client reference':'LPO / reference'}</span><input id="e-ref" value="${h(d.ref)}"></label>
+    <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
+    <label class="field"><span>${isDN&&(d.reportType||'delivery')==='delivery'?'Delivery person':'Contact person'}</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
+    <label class="field"><span>Contact mobile</span><input id="e-contactMobile" inputmode="tel" value="${h(d.contactMobile||'')}"></label>
+    <label class="field"><span>Contact email</span><input id="e-contactEmail" type="email" value="${h(d.contactEmail||'')}"></label>
+    <label class="field" style="grid-column:span ${isDN?1:2}"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="e.g. Supply of CCTV equipment"></label>
+    ${isDN?`<label class="field" style="grid-column:span 2"><span>Site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>`:''}
+    ${isDN&&(d.reportType||'delivery')!=='delivery'?`<label class="field"><span>Technician</span><input id="e-technician" value="${h(d.technician||S.me.name||'')}"></label><label class="field"><span>Time in</span><input type="time" id="e-timeIn" value="${h(d.timeIn||'')}"></label><label class="field"><span>Time out</span><input type="time" id="e-timeOut" value="${h(d.timeOut||'')}"></label>
+     <label class="field" style="grid-column:1/-1"><span>Complaint / request</span><textarea id="e-complaint" rows="2">${h(d.complaint||'')}</textarea></label><label class="field" style="grid-column:1/-1"><span>Work carried out</span><textarea id="e-workDone" rows="3">${h(d.workDone||'')}</textarea></label>`:''}`}
+// Delivery notes & service / call-out reports: the essentials up front, the rest folded away.
+function dnHead(d){const svc=(d.reportType||'delivery')!=='delivery';
+  return `<label class="field" style="grid-column:1/-1"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="${svc?'e.g. CCTV not recording – NVR check':'e.g. Supply of CCTV equipment'}"></label>
+    <label class="field" style="grid-column:1/-1"><span>Site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>
+   </div>
+   ${svc?`<div class="timerow">
+     <label class="field"><span>Time in</span><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="time" id="e-timeIn" value="${h(d.timeIn||'')}"><button class="btn sm" type="button" data-now="e-timeIn">Now</button></div></label>
+     <label class="field"><span>Time out</span><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="time" id="e-timeOut" value="${h(d.timeOut||'')}"><button class="btn sm" type="button" data-now="e-timeOut">Now</button></div></label></div>
+    <label class="field"><span>Complaint / request</span><textarea id="e-complaint" class="bigta" rows="4" placeholder="What the customer reported or asked for">${h(d.complaint||'')}</textarea></label>
+    <label class="field"><span>Work carried out</span><textarea id="e-workDone" class="bigta tall" rows="7" placeholder="What was checked, repaired, replaced or configured">${h(d.workDone||'')}</textarea></label>`:''}
+   <details class="moredet" ${ED&&ED._more?'open':''}><summary>More details <span class="muted">— reference, ${svc?'technician, ':'delivery person, '}contact</span></summary>
+    <div class="grid g4 ed-top" style="margin-top:10px">
+     <label class="field"><span>LPO / reference</span><input id="e-ref" value="${h(d.ref)}"></label>
+     <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
+     ${svc?`<label class="field"><span>Technician</span><input id="e-technician" value="${h(d.technician||S.me.name||'')}"></label>`:''}
+     <label class="field"><span>${svc?'Contact person':'Delivery person'}</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
+     <label class="field"><span>Contact mobile</span><input id="e-contactMobile" inputmode="tel" value="${h(d.contactMobile||'')}"></label>
+     <label class="field"><span>Contact email</span><input id="e-contactEmail" type="email" value="${h(d.contactEmail||'')}"></label>
+    </div></details>
+   <div>`}
 VIEWS.edit=()=>{
   const p=S.params;
   if(p.id&&!S.docs.find(x=>x.id===p.id)&&(!ED||ED.id!==p.id))return '<div class="loading">Opening document…</div>';
@@ -815,22 +846,14 @@ VIEWS.edit=()=>{
      :`<div class="muted" style="font-size:.84rem">No saved client at this spot. Pick a client below or add a new one. This place will be remembered for them.</div>`):''}
   </div>`:''}
   <div class="card pad grid">
-   <div class="grid g4">
+   <div class="grid g4 ed-top">
     <label class="field" style="grid-column:span 2"><span>Client</span><div class="row" style="flex-wrap:nowrap"><select id="e-client"><option value="">Choose a client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===d.clientId?'selected':''}>${h(c.name)}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-nc" title="Add client">${I.plus}</button>`:''}</div></label>
     ${(()=>{const c=S.clients.find(x=>x.id===d.clientId);const ss=sitesOf(c);return c&&(ss.length||can('clients'))?`<label class="field" style="grid-column:span 2"><span>Site</span><div class="row" style="flex-wrap:nowrap"><select id="e-site"><option value="">${ss.length?'Choose a site…':'No sites yet'}</option>${ss.map(si=>`<option value="${h(si.id)}" ${si.id===d.siteId?'selected':''}>${h(si.name)}${si.address?' — '+h(si.address.split('\n')[0]):''}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-ns" type="button" title="Add a site to this client">${I.plus}</button>`:''}</div></label>`:''})()}
     <label class="field"><span>Number</span><input id="e-number" value="${h(d.number)}"></label>
     <label class="field"><span>Date</span><input type="date" id="e-date" value="${h(d.date)}"></label>
     ${d.type==='invoice'?`<label class="field"><span>Due date</span><input type="date" id="e-dueDate" value="${h(d.dueDate)}"></label>`:''}
     ${isQ?`<label class="field"><span>Valid until</span><input type="date" id="e-validUntil" value="${h(d.validUntil)}"></label>`:''}
-    <label class="field"><span>${isQ?'Client reference':'LPO / reference'}</span><input id="e-ref" value="${h(d.ref)}"></label>
-    <label class="field"><span>Salesperson</span><input id="e-salesperson" value="${h(d.salesperson)}"></label>
-    <label class="field"><span>${isDN&&(d.reportType||'delivery')==='delivery'?'Delivery person':'Contact person'}</span><input id="e-contactName" value="${h(d.contactName||'')}"></label>
-    <label class="field"><span>Contact mobile</span><input id="e-contactMobile" inputmode="tel" value="${h(d.contactMobile||'')}"></label>
-    <label class="field"><span>Contact email</span><input id="e-contactEmail" type="email" value="${h(d.contactEmail||'')}"></label>
-    <label class="field" style="grid-column:span ${isDN?1:2}"><span>Subject</span><input id="e-subject" value="${h(d.subject)}" placeholder="e.g. Supply of CCTV equipment"></label>
-    ${isDN?`<label class="field" style="grid-column:span 2"><span>Site / address</span><input id="e-deliveryAddress" value="${h(d.deliveryAddress)}"></label>`:''}
-    ${isDN&&(d.reportType||'delivery')!=='delivery'?`<label class="field"><span>Technician</span><input id="e-technician" value="${h(d.technician||S.me.name||'')}"></label><label class="field"><span>Time in</span><input type="time" id="e-timeIn" value="${h(d.timeIn||'')}"></label><label class="field"><span>Time out</span><input type="time" id="e-timeOut" value="${h(d.timeOut||'')}"></label>
-     <label class="field" style="grid-column:1/-1"><span>Complaint / request</span><textarea id="e-complaint" rows="2">${h(d.complaint||'')}</textarea></label><label class="field" style="grid-column:1/-1"><span>Work carried out</span><textarea id="e-workDone" rows="3">${h(d.workDone||'')}</textarea></label>`:''}
+    ${isDN?dnHead(d):qiHead(d,isQ,isDN)}
    </div>
   </div>
   <div class="card pad grid"><div class="row"><h2 class="grow">Items</h2><button class="btn sm" id="scan-add">${I.scan}Scan product</button></div>
@@ -999,6 +1022,8 @@ VIEWS_AFTER.edit=()=>{
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
   $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
   $$('[data-full]').forEach(b=>b.onclick=()=>itemFull(+b.dataset.full));
+  $$('[data-now]').forEach(b=>b.onclick=()=>{const el=$('#'+b.dataset.now);const n=new Date();el.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');el.dispatchEvent(new Event('change',{bubbles:true}))});
+  $('.moredet')&&$('.moredet').addEventListener('toggle',e=>{if(ED)ED._more=e.target.open});
   $$('[data-findp]').forEach(b=>b.onclick=()=>{readEditor();const n=+b.dataset.findp;productPicker(p=>{if(!p)return;readEditor();fillItem(ED.items[n],p);render()},ED.items[n].name||'')});
   // description boxes grow with the text, so long descriptions are easy to read and edit
   $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
@@ -1018,7 +1043,7 @@ VIEWS_AFTER.edit=()=>{
       if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
-      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
+      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
       if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;

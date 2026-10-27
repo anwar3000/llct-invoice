@@ -762,3 +762,16 @@ table.tbl{width:100%;border-collapse:collapse}
 .pickbtn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;color:inherit;min-height:40px}
 .pickbtn span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pickbtn .ph{color:var(--muted)}.pickbtn .dd{color:var(--muted);font-size:.8rem}
 .namerow{display:flex;gap:6px;align-items:stretch}.namerow input{flex:1;min-width:0}.findp{padding:0 10px;white-space:nowrap}.findp svg{width:16px;height:16px}
+
+/* delivery / service report editor */
+.timerow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.timerow input{min-width:0;flex:1}
+.bigta{width:100%;min-height:110px;line-height:1.45;resize:vertical}
+.bigta.tall{min-height:170px}
+.moredet{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+.moredet>summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:6px}
+.moredet>summary::before{content:'▸';transition:transform .15s;display:inline-block}
+.moredet[open]>summary::before{transform:rotate(90deg)}
+.moredet>summary::-webkit-details-marker{display:none}
+.moredet>summary .muted{font-weight:400;font-size:.82rem}
+@media (max-width:480px){.g4.ed-top{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-top>.field{min-width:0}}
