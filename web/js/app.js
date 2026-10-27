@@ -841,7 +841,7 @@ VIEWS.edit=()=>{
   if(p.id&&!S.docs.find(x=>x.id===p.id)&&(!ED||ED.id!==p.id))return '<div class="loading">Opening document…</div>';
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
-    else{ED=newDraft(p.type,p.rt);const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
+    else{ED=newDraft(p.type,p.rt);if(p.attSite){ED.attSiteId=p.attSite;ED.attSessionId=p.attSession||'';ED.attSiteName=p.attSiteName||'';ED._att=1}const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
       if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
         if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
     ED._key=JSON.stringify(p);
@@ -1003,6 +1003,7 @@ function productPicker(cb,start=''){
 const fillItem=(it,p)=>Object.assign(it,{name:p.name,desc:p.desc||it.desc||'',price:+p.price||it.price||0,unit:p.unit||it.unit||'pcs',photo:it.photo||p.photo||'',pid:p.id});
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
 VIEWS_AFTER.edit=()=>{
+  if(ED&&ED._att&&!ED._attDone&&applyAttSite()){render();return}
   {const app=$('#app');if(!app._draftHook){app._draftHook=1;let t;const kick=()=>{if(S.view!=='edit'||!ED)return;clearTimeout(t);t=setTimeout(saveDraft,800)};app.addEventListener('input',kick);app.addEventListener('change',kick)}}
   saveDraft();
   const cancel=()=>{const d=ED;ED=null;clearDraft();d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
@@ -1061,7 +1062,7 @@ VIEWS_AFTER.edit=()=>{
       if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
-      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
+      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
       if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
@@ -2013,6 +2014,18 @@ function aiApply(r){
     if(d){closeModal();go('view',{id:d.id});return ''}return 'I couldn\'t find document '+r.number+'.'}
   if(r.action==='open_client'&&r.client){const c=bestMatch(S.clients,r.client);if(c){closeModal();go('client',{id:c.id});return ''}return 'I couldn\'t find client '+r.client+'.'}
   return ''}
+// Opened from the attendance app: use the client and site of the employee's check-in.
+function applyAttSite(){
+  if(!ED||!ED._att||ED._attDone)return false;const si=S.sites.find(x=>x.id===ED.attSiteId);if(!si&&!S.sites.length)return false;
+  ED._attDone=1;const name=(si&&si.name)||ED.attSiteName||'';
+  let c=null,cs=null;
+  if(si&&hasGPS(si)){const m=nearby({lat:+si.lat,lng:+si.lng,acc:0}).find(x=>x.client);if(m){c=m.client;cs=m.siteId&&sitesOf(c).find(x=>x.id===m.siteId)}}
+  if(!c&&si){const pr=S.projects[si.projectId];c=bestMatch(S.clients,pr&&pr.client)||bestMatch(S.clients,name)}
+  if(c){ED.clientId=c.id;ED.client=clientSnap(c);if(!cs)cs=bestMatch(sitesOf(c),name);
+    if(cs){ED.siteId=cs.id;ED.siteName=cs.name;ED.siteAddress=cs.address||''}}
+  ED.deliveryAddress=cs?siteText(cs):[name,si&&si.address].filter(Boolean).join(', ');
+  if(si&&!ED.subject)ED.subject='';
+  toast(c?`Client and site from your check-in: ${c.name}${cs?' – '+cs.name:''}`:`Site from your check-in: ${name}. Choose the client.`);return true}
 function aiPanel(){
   const o=modal('AI assistant',`<div class="aichat" id="ai-log">${AIH.length?'':`<div class="aihint"><b>Tell me what to do</b> — type or tap the mic and speak. For example:
     <ul><li>Service report for BFL Dubai Mall, NVR not recording, replaced 4TB hard disk, time in 10:30 out 12:00</li><li>Quotation for IKEA: 16 Dahua 4MP bullet cameras, one 16 channel NVR and 2 rolls of Cat6</li><li>Delivery note for LL Dubai Operations with 2 Hikvision 8TB HDD</li><li>Which clients owe us the most?</li><li>Find documents with serial WX12AB345</li></ul></div>`}
@@ -2098,7 +2111,7 @@ async function logOut(){await Promise.race([logEvent('logout'),new Promise(r=>se
 
 function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
-  Store.sub('sites',r=>{S.sites=r},null,true);
+  Store.sub('sites',r=>{S.sites=r;if(S.view==='edit'&&ED&&ED._att&&!ED._attDone){applyAttSite();render()}},null,true);
   Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
   Store.sub('clients',r=>{S.clients=r;soon()});
   Store.sub('products',r=>{S.products=r;soon()});
@@ -2131,7 +2144,7 @@ onAuthStateChanged(auth,async u=>{
   }catch(e){messageScreen('Could not load your account',h(e.code||e.message)+'<br>Check your internet connection and the Firestore rules.',true);return}
   const back=parseHash();const dr=getDraft();
   if(back&&back.v==='edit'&&dr&&JSON.stringify(dr.params)===JSON.stringify(back.p)){ED=dr.ed;ED._key=JSON.stringify(dr.params);S.view='edit';S.params=dr.params}
-  else if(back&&(back.v!=='edit'||back.p.id)){S.view=back.v;S.params=back.p}
+  else if(back&&(back.v!=='edit'||back.p.id||back.p.attSite)){S.view=back.v;S.params=back.p}
   else{S.view='home';S.params={}}
   render();navPush(true);startData();logSession();
 });
