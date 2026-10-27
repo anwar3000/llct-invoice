@@ -1045,13 +1045,13 @@ function profileForm(){
 VIEWS.clients=()=>{
   const q=(S.params.q||'').toLowerCase();
   const list=S.clients.filter(c=>!q||[c.name,c.contact,c.phone,c.email].join(' ').toLowerCase().includes(q)).map(c=>({c,b:clientBalance(c.id)})).sort((a,b)=>b.b-a.b||a.c.name.localeCompare(b.c.name));
-  return `<div class="head"><div><h1>Clients & SOA</h1><div class="sub">${S.clients.length} clients${can('reports')?' · '+cur(list.reduce((s,x)=>s+x.b,0))+' receivable':''}</div></div>${can('clients')?`<div class="row"><button class="btn" id="imc">Import</button><button class="btn primary" id="nc">${I.plus}Add client</button></div>`:''}</div>
+  return `<div class="head"><div><h1>Clients & SOA</h1><div class="sub">${S.clients.length} clients${can('reports')?' · '+cur(list.reduce((s,x)=>s+x.b,0))+' receivable':''}</div></div>${can('clients')?`<div class="row">${isAdmin()?`<button class="btn" id="grp">Group branches as sites</button>`:''}<button class="btn" id="imc">Import</button><button class="btn primary" id="nc">${I.plus}Add client</button></div>`:''}</div>
   <input class="search" id="cq" placeholder="Search clients" value="${h(S.params.q||'')}">
   <div class="card list">${list.length?list.map(({c,b})=>`<button class="li" data-c="${c.id}"><span class="ico q">${h(c.name.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</span><span style="min-width:0"><div class="t">${h(c.name)}</div><div class="s">${sitesOf(c).length?`${sitesOf(c).length} site${sitesOf(c).length===1?'':'s'} · `:''}${h([c.contact,c.phone].filter(Boolean).join(' · ')||'No contact details')}</div></span>
    <span class="r">${can('reports')?`<div class="num" style="${b>0?'font-weight:600':''}">${money(b)}</div><span class="pill ${b>0?'warn':'good'}">${b>0?'balance due':b<0?'in credit':'settled'}</span>`:''}</span></button>`).join(''):`<div class="empty"><b>No clients yet</b>Add a client to start quoting and invoicing.</div>`}</div>`;
 };
 VIEWS_AFTER.clients=()=>{
-  $('#nc')&&($('#nc').onclick=()=>clientForm());$('#imc')&&($('#imc').onclick=()=>importForm('clients'));
+  $('#nc')&&($('#nc').onclick=()=>clientForm());$('#imc')&&($('#imc').onclick=()=>importForm('clients'));$('#grp')&&($('#grp').onclick=()=>groupSites());
   $$('[data-c]').forEach(b=>b.onclick=()=>go('client',{id:b.dataset.c,from:'clients'}));
   const cq=$('#cq');cq.oninput=()=>{S.params.q=cq.value;clearTimeout(cq._t);cq._t=setTimeout(()=>{render();const n=$('#cq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
 };
@@ -1070,13 +1070,14 @@ VIEWS.client=()=>{
    <tr><td class="num">${fdate(from)}</td><td colspan="5"><b>Balance brought forward</b></td><td class="r num"><b>${money(x.open)}</b></td></tr>
    ${x.rows.map(r=>`<tr class="soarow" ${r.id?`data-sinv="${r.id}"`:r.pid?`data-spay="${r.pid}"`:r.open?'data-sopen="1"':''} tabindex="0"><td class="num">${fdate(r.date)}</td><td>${h(r.kind)}</td><td class="num">${h(r.no)}</td><td>${h(r.ref)}</td><td class="r num">${r.dr?money(r.dr):''}</td><td class="r num">${r.cr?money(r.cr):''}</td><td class="r num">${money(r.bal)}</td></tr>`).join('')}
    <tr><td colspan="4"><b>Closing balance</b></td><td class="r num"><b>${money(x.invd)}</b></td><td class="r num"><b>${money(x.recd)}</b></td><td class="r num"><b>${money(x.close)}</b></td></tr></tbody></table></div></div>`:''}
-  <div class="card"><div class="pad row"><h2 class="grow">Sites</h2>${can('clients')?`<button class="btn sm" id="c-site-add">${I.plus}Add site</button>`:''}</div><div class="list">${sitesOf(c).map(si=>{const n=S.docs.filter(d=>d.clientId===c.id&&d.siteId===si.id).length;
+  <div class="card"><div class="pad row"><h2 class="grow">Sites</h2>${isAdmin()?`<button class="btn sm" id="c-site-grp">Add existing clients as sites</button>`:''}${can('clients')?`<button class="btn sm" id="c-site-add">${I.plus}Add site</button>`:''}</div><div class="list">${sitesOf(c).map(si=>{const n=S.docs.filter(d=>d.clientId===c.id&&d.siteId===si.id).length;
     return `<div class="li" style="cursor:default"><span class="ico q">${I.pin}</span><span style="min-width:0"><div class="t">${h(si.name)}</div><div class="s">${h([si.address&&si.address.split('\n')[0],si.contact,si.phone].filter(Boolean).join(' · '))}${hasGPS(si)?` · <a href="https://maps.google.com/?q=${si.lat},${si.lng}" target="_blank" rel="noopener">map</a>`:''}</div></span><span class="r muted" style="font-size:.8rem">${n} doc${n===1?'':'s'}</span></div>`}).join('')||'<div class="empty" style="padding:16px">No sites yet. Add the head office and each branch.</div>'}</div></div>
   <div class="card"><div class="pad"><h2>Documents</h2></div><div class="list">${docs.filter(d=>visibleDocs().includes(d)).map(docRow).join('')||'<div class="empty">No documents for this client yet.</div>'}</div></div>`;
 };
 VIEWS_AFTER.client=()=>{
   const c=S.clients.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>go('clients'));if(!c)return;
   $('#ec')&&($('#ec').onclick=()=>clientForm(c));
+  $('#c-site-grp')&&($('#c-site-grp').onclick=()=>groupSites(c.id));
   $('#c-site-add')&&($('#c-site-add').onclick=()=>siteForm(null,async si=>{const x={...c,places:sitesOf(c).concat([si]),updatedAt:new Date().toISOString()};delete x.id;await save('clients',c.id,x,'Site added')}));
   $('#cp')&&($('#cp').onclick=()=>paymentForm({clientId:c.id}));
   $('#old-inv')&&($('#old-inv').onclick=()=>legacyBulk(c));
@@ -1173,6 +1174,52 @@ function siteForm(si,done){
     const out={...e,id:e.id&&!/^s\d+$/.test(e.id)?e.id:uid(),name,address:$('#sf-address',o).value.trim(),contact:$('#sf-contact',o).value.trim(),phone:$('#sf-phone',o).value.trim(),radius:+$('#sf-rad',o).value||150,addedAt:e.addedAt||new Date().toISOString()};
     if(lat!=null){out.lat=lat;out.lng=lng}else{delete out.lat;delete out.lng}
     o.remove();done(out)};
+}
+// Turn clients that are really branches into sites of a main client. Their documents, payments,
+// old balance and GPS places move to the main client; the branch client is then removed.
+function groupSites(parentId){
+  if(!isAdmin()){toast('Only an admin can move clients.',true);return}
+  let pid=parentId||'';const pick=new Set();let q='';
+  const stats=c=>({docs:S.docs.filter(d=>d.clientId===c.id).length,pays:S.payments.filter(p=>p.clientId===c.id).length,bal:clientBalance(c.id)});
+  const o=modal('Add existing clients as sites',`<div class="grid">
+    <label class="field"><span>Main client</span><select id="gs-p"><option value="">Choose the main client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===pid?'selected':''}>${h(c.name)}</option>`).join('')}</select></label>
+    <div class="muted" style="font-size:.82rem">Tick the clients that are branches or locations of the main client. Each becomes a site with its address, contact and GPS. All their quotations, invoices, delivery notes, reports and payments move to the main client, keeping the site on each document.</div>
+    <input class="search" id="gs-q" placeholder="Search clients, e.g. BFL">
+    <div class="card list" id="gs-list" style="max-height:44vh;overflow:auto"></div></div>`,
+    `<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="gs-go" disabled>Move as sites</button>`,true);
+  const draw=()=>{const list=S.clients.filter(c=>c.id!==pid&&(!q||c.name.toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name));
+    $('#gs-list',o).innerHTML=list.length?list.map(c=>{const x=stats(c);return `<label class="li" style="cursor:pointer"><input type="checkbox" data-gs="${c.id}" ${pick.has(c.id)?'checked':''} style="width:18px;height:18px">
+      <span style="min-width:0"><div class="t">${h(c.name)}</div><div class="s">${h([c.address&&c.address.split('\n')[0],`${x.docs} document${x.docs===1?'':'s'}`,`${x.pays} payment${x.pays===1?'':'s'}`].filter(Boolean).join(' · '))}</div></span>
+      <span class="r num" style="font-size:.84rem">${x.bal?money(x.bal):''}</span></label>`}).join(''):'<div class="empty" style="padding:16px">No other clients match.</div>';
+    $$('[data-gs]',o).forEach(cb=>cb.onchange=()=>{cb.checked?pick.add(cb.dataset.gs):pick.delete(cb.dataset.gs);upd()});upd()};
+  const upd=()=>{const b=$('#gs-go',o);b.disabled=!pid||!pick.size;b.textContent=pick.size?`Move ${pick.size} as site${pick.size===1?'':'s'}`:'Move as sites'};
+  $('#gs-p',o).onchange=e=>{pid=e.target.value;pick.delete(pid);draw()};
+  $('#gs-q',o).oninput=e=>{q=e.target.value.trim().toLowerCase();draw()};draw();
+  $('#gs-go',o).onclick=async()=>{const parent=S.clients.find(c=>c.id===pid);const kids=S.clients.filter(c=>pick.has(c.id));if(!parent||!kids.length)return;
+    const nd=kids.reduce((t,c)=>t+stats(c).docs,0),np=kids.reduce((t,c)=>t+stats(c).pays,0);
+    if(!await confirmBox('Move '+kids.length+' client'+(kids.length===1?'':'s')+' under '+parent.name+'?',`${kids.map(c=>c.name).join(', ')} will become sites of ${parent.name}. ${nd} document${nd===1?'':'s'} and ${np} payment${np===1?'':'s'} move with them, and the separate client${kids.length===1?' is':'s are'} removed.`,'Move'))return;
+    toast('Moving…');
+    try{
+      const now=new Date().toISOString();const places=sitesOf(parent).map(pl=>({...pl,id:/^s\d+$/.test(pl.id)?uid():pl.id}));
+      let ob=+parent.openingBalance||0,od=parent.openingDate||'';const ops=[];
+      for(const k of kids){
+        const ks=sitesOf(k);const main=ks.find(hasGPS)||{};
+        const site={id:uid(),name:k.name,address:k.address||'',contact:k.contact||'',phone:k.phone||'',...(hasGPS(main)?{lat:main.lat,lng:main.lng,radius:main.radius||150}:{}),addedAt:now,fromClient:k.id};
+        places.push(site);
+        // further saved places of the branch become their own sites
+        ks.filter(pl=>pl!==main).forEach(pl=>places.push({...pl,id:uid(),name:pl.name&&pl.name!==k.name?k.name+' – '+pl.name:k.name+' (2)',addedAt:now,fromClient:k.id}));
+        if(+k.openingBalance){ob+=+k.openingBalance;if(!od||(k.openingDate&&k.openingDate<od))od=k.openingDate||od}
+        S.docs.filter(d=>d.clientId===k.id).forEach(d=>{const u={clientId:parent.id,client:clientSnap(parent),updatedAt:now};
+          if(!d.siteId){u.siteId=site.id;u.siteName=site.name;u.siteAddress=site.address}
+          if(d.type==='delivery'&&!d.deliveryAddress)u.deliveryAddress=siteText(site);
+          ops.push(b=>b.set(doc(fdb,COL.docs,d.id),u,{merge:true}))});
+        S.payments.filter(p=>p.clientId===k.id).forEach(p=>ops.push(b=>b.set(doc(fdb,COL.payments,p.id),{clientId:parent.id,siteId:site.id,siteName:site.name,updatedAt:now},{merge:true})));
+        ops.push(b=>b.delete(doc(fdb,COL.clients,k.id)));
+      }
+      ops.unshift(b=>b.set(doc(fdb,COL.clients,parent.id),{places,openingBalance:r2(ob),openingDate:od||parent.openingDate||today(),updatedAt:now},{merge:true}));
+      for(let i=0;i<ops.length;i+=400){const b=writeBatch(fdb);ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
+      closeModal();toast(`${kids.length} site${kids.length===1?'':'s'} added to ${parent.name}`);go('client',{id:parent.id});
+    }catch(x){toast('Could not move: '+(x.message||x.code),true)}};
 }
 function clientForm(c,after){
   const e=c||{};
