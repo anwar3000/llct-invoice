@@ -633,9 +633,13 @@ function newMenu(){
 
 /* ================= views ================= */
 const VIEWS={},VIEWS_AFTER={};
+// The document's site: the chosen site, or (older delivery notes) the first line of the site / address.
+const docSite=d=>(d.siteName||(d.type==='delivery'&&d.deliveryAddress?String(d.deliveryAddress).split('\n')[0]:'')||'').trim();
+const siteLine=d=>{const st=docSite(d);return st&&st!==(d.client&&d.client.name)?`<div class="s site">${I.pin}${h(st)}</div>`:''};
+const docFile=d=>`${d.number} ${(d.client&&d.client.name)||''}${docSite(d)&&docSite(d)!==(d.client&&d.client.name)?' - '+docSite(d):''}.pdf`.replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
-  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
+  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
   <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span>${d.createdByName?`<small class="byline">${h(d.createdByName)}</small>`:''}</span></button>`;
 }
 VIEWS.home=()=>{
@@ -651,7 +655,7 @@ VIEWS.home=()=>{
   const actRow=d=>{const sg=d.delivery&&d.delivery.signedAt;const t=lastTouched(d);const [st,k]=docStatus(d);
     const who=d.createdByName||(S.users[d.createdBy]||{}).name||'';
     return `<button class="li act-li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
-      <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div><div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
+      <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
       <span class="r who"><b>${h(who||'—')}</b><small>${ago(sg&&Math.abs(new Date(t)-new Date(sg))<3e5?sg:t)}</small></span></button>`};
   const recentBox=t=>{const T=DOC_TABS[t];const list=docs.filter(T.f).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,5);
     return `<div class="card actbox"><button class="pad row actbox-h" data-box="${t}" type="button"><h2 class="grow" style="font-size:1rem">${T.p}</h2><span class="muted" style="font-size:.78rem">${docs.filter(T.f).length} · open all ›</span></button>
@@ -684,11 +688,11 @@ const canNew=t=>t==='service'||t==='delivery'?can('delivery'):can(t);
 VIEWS.docs=()=>{
   const tabs=Object.keys(DOC_TABS).filter(t=>DOC_TABS[t].ok()||visibleDocs().some(DOC_TABS[t].f));
   const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
-  const list=visibleDocs().filter(T.f).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject,d.createdByName].join(' ').toLowerCase().includes(q)).sort(newestFirst);
+  const list=visibleDocs().filter(T.f).filter(d=>!q||[d.number,d.client&&d.client.name,docSite(d),d.ref,d.subject,d.createdByName].join(' ').toLowerCase().includes(q)).sort(newestFirst);
   const money_=tab==='quotation'||tab==='invoice';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
   return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
    ${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div>
-  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, LPO, person…" value="${h(S.params.q||'')}"></div>
+  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, site, LPO, person…" value="${h(S.params.q||'')}"></div>
   <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button above to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
@@ -745,7 +749,7 @@ VIEWS_AFTER.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:d&&d.type}));
   if(!d)return;
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
-  $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`
+  $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
     .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d)));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
   $$('[data-rcpt]').forEach(b=>b.onclick=()=>downloadReceipt(S.payments.find(x=>x.id===b.dataset.rcpt)));
@@ -1058,7 +1062,7 @@ function thankYou(d,who){
   const R=rep(d);const o=modal(R.done,`<div class="thanks"><div class="tick">✓</div><h2>Thank you${who?', '+h(who):''}!</h2>
    <p>${h(R.ty)}<br>We appreciate your business.</p><div class="from">${img(S.cfg.logo)}<div><b>${h(S.cfg.name)}</b><span class="num">${h(d.number)} · ${fdt(d.delivery.signedAt)}</span></div></div></div>`,
    `<button class="btn" id="ty-pdf">${I.pdf}${h(R.t)} PDF</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
-  $('#ty-pdf',o).onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),`${d.number} ${(d.client&&d.client.name)||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
+  $('#ty-pdf',o).onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``.replace(/[\\/:*?"<>|]/g,'').trim());
 }
 function profileForm(){
   const p=S.me.profile||{};
