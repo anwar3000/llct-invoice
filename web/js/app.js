@@ -586,10 +586,11 @@ function newMenu(){
   if(can('quotation'))opts.push(['quotation','Quotation','Price offer with product photos']);
   if(can('invoice'))opts.push(['invoice','Invoice','Bill a client, track payment']);
   if(can('delivery'))opts.push(['delivery','Delivery note','Items, serial numbers and signature']);
+  if(can('delivery'))opts.push(['service','Service report','Technician visit, work done and customer sign-off']);
   if(can('payments'))opts.push(['payment','Payment received','Record money from a client']);
   if(!opts.length){toast('You don\'t have permission to create documents.',true);return}
-  const o=modal('Create new',`<div class="list card">${opts.map(([k,t,s])=>`<button class="li" data-k="${k}"><span class="ico ${k==='payment'?'p':TYPE[k].c}">${k==='payment'?'PAY':TYPE[k].a}</span><span style="min-width:0"><div class="t">${t}</div><div class="s">${s}</div></span><span></span></button>`).join('')}</div>`);
-  $$('[data-k]',o).forEach(b=>b.onclick=()=>{closeModal();b.dataset.k==='payment'?paymentForm():go('edit',{type:b.dataset.k})});
+  const o=modal('Create new',`<div class="list card">${opts.map(([k,t,s])=>`<button class="li" data-k="${k}"><span class="ico ${k==='payment'?'p':k==='service'?TYPE.delivery.c:TYPE[k].c}">${k==='payment'?'PAY':k==='service'?REPORT.service.a:TYPE[k].a}</span><span style="min-width:0"><div class="t">${t}</div><div class="s">${s}</div></span><span></span></button>`).join('')}</div>`);
+  $$('[data-k]',o).forEach(b=>b.onclick=()=>{closeModal();const k=b.dataset.k;k==='payment'?paymentForm():k==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:k})});
 }
 
 /* ================= views ================= */
@@ -609,7 +610,7 @@ VIEWS.home=()=>{
   const overdue=inv.filter(d=>invStatus(d)[0].includes('overdue'));
   const recent=docs.slice().sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1).slice(0,8);
   const money4=can('reports');
-  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row">${can('quotation')?`<button class="btn" data-q="quotation">${I.plus}Quotation</button>`:''}${can('invoice')?`<button class="btn" data-q="invoice">${I.plus}Invoice</button>`:''}${can('delivery')?`<button class="btn primary" data-q="delivery">${I.plus}Delivery note</button>`:''}</div></div>
+  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row">${can('quotation')?`<button class="btn" data-q="quotation">${I.plus}Quotation</button>`:''}${can('invoice')?`<button class="btn" data-q="invoice">${I.plus}Invoice</button>`:''}${can('delivery')?`<button class="btn" data-q="service">${I.plus}Service report</button><button class="btn primary" data-q="delivery">${I.plus}Delivery note</button>`:''}</div></div>
   ${money4?`<div class="kpis"><div class="card kpi hl"><span class="label">Receivable</span><span class="v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span style="font-size:.78rem;color:#bbb">${overdue.length} invoice${overdue.length===1?'':'s'} overdue</span></div>
     <div class="card kpi"><span class="label">Invoiced this month</span><span class="v">${money(monthInv)}</span></div>
     <div class="card kpi"><span class="label">Received this month</span><span class="v">${money(monthRec)}</span></div>
@@ -618,30 +619,31 @@ VIEWS.home=()=>{
   ${money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}
   <div class="card"><div class="pad"><h2>Recent activity</h2></div><div class="list">${recent.length?recent.map(docRow).join(''):`<div class="empty"><b>No documents yet</b>Create your first quotation, invoice or delivery note with the buttons above.</div>`}</div></div>`;
 };
-VIEWS_AFTER.home=()=>$$('[data-q]').forEach(b=>b.onclick=()=>go('edit',{type:b.dataset.q}));
+VIEWS_AFTER.home=()=>$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q}));
 
 VIEWS.docs=()=>{
   const tab=S.params.tab||(can('invoice')?'invoice':can('quotation')?'quotation':'delivery');const q=(S.params.q||'').toLowerCase();
   const list=visibleDocs().filter(d=>d.type===tab).filter(d=>!q||[d.number,d.client&&d.client.name,d.ref,d.subject].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.date+b.number)>(a.date+a.number)?1:-1);
   const total=list.reduce((s,d)=>s+totals(d).total,0);
-  return `<div class="head"><div><h1>Documents</h1><div class="sub">${list.length} ${TYPE[tab].p.toLowerCase()}${tab!=='delivery'?` · ${cur(total)}`:''}</div></div>${can(tab)||tab==='delivery'&&can('delivery')?`<button class="btn primary" id="nd">${I.plus}New ${TYPE[tab].t.replace('Tax ','').toLowerCase()}</button>`:''}</div>
+  return `<div class="head"><div><h1>Documents</h1><div class="sub">${list.length} ${TYPE[tab].p.toLowerCase()}${tab!=='delivery'?` · ${cur(total)}`:''}</div></div>${tab==='delivery'&&can('delivery')?`<button class="btn" id="nsr">${I.plus}New service report</button>`:''}${can(tab)||tab==='delivery'&&can('delivery')?`<button class="btn primary" id="nd">${I.plus}New ${TYPE[tab].t.replace('Tax ','').toLowerCase()}</button>`:''}</div>
   <div class="row"><div class="seg">${['quotation','invoice','delivery'].map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${TYPE[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, LPO…" value="${h(S.params.q||'')}"></div>
   <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${TYPE[tab].p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
   $$('[data-tab]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.tab}));
   const nd=$('#nd');if(nd)nd.onclick=()=>go('edit',{type:S.params.tab||(can('invoice')?'invoice':can('quotation')?'quotation':'delivery')});
+  const nsr=$('#nsr');if(nsr)nsr.onclick=()=>go('edit',{type:'delivery',rt:'service'});
   const dq=$('#dq');dq.oninput=()=>{S.params.q=dq.value;clearTimeout(dq._t);dq._t=setTimeout(()=>{const p=dq.selectionStart;render();const n=$('#dq');n.focus();n.setSelectionRange(p,p)},250)};
 };
 VIEWS.deliveries=()=>{
   const tab=S.params.tab||'pending';
   const all=visibleDocs().filter(d=>d.type==='delivery');
   const list=all.filter(d=>tab==='pending'?!(d.delivery&&d.delivery.signedAt):(d.delivery&&d.delivery.signedAt)).sort((a,b)=>(b.date>a.date?1:-1));
-  return `<div class="head"><div><h1>Deliveries</h1><div class="sub">${all.filter(d=>!(d.delivery&&d.delivery.signedAt)).length} waiting · ${all.filter(d=>d.delivery&&d.delivery.signedAt).length} delivered</div></div>${can('delivery')?`<button class="btn primary" id="nd">${I.plus}New delivery note</button>`:''}</div>
+  return `<div class="head"><div><h1>Deliveries</h1><div class="sub">${all.filter(d=>!(d.delivery&&d.delivery.signedAt)).length} waiting · ${all.filter(d=>d.delivery&&d.delivery.signedAt).length} delivered</div></div>${can('delivery')?`<div class="row"><button class="btn" id="nsr">${I.plus}New service report</button><button class="btn primary" id="nd">${I.plus}New delivery note</button></div>`:''}</div>
   <div class="seg"><button class="${tab==='pending'?'on':''}" data-tab="pending">Waiting</button><button class="${tab==='done'?'on':''}" data-tab="done">Delivered</button></div>
   <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>${tab==='pending'?'Nothing waiting to deliver':'No completed deliveries yet'}</b>${tab==='pending'?'New delivery notes appear here until they are signed.':''}</div>`}</div>`;
 };
-VIEWS_AFTER.deliveries=()=>{$$('[data-tab]').forEach(b=>b.onclick=()=>go('deliveries',{tab:b.dataset.tab}));const nd=$('#nd');if(nd)nd.onclick=()=>go('edit',{type:'delivery'})};
+VIEWS_AFTER.deliveries=()=>{$$('[data-tab]').forEach(b=>b.onclick=()=>go('deliveries',{tab:b.dataset.tab}));const nd=$('#nd');if(nd)nd.onclick=()=>go('edit',{type:'delivery'});const nsr=$('#nsr');if(nsr)nsr.onclick=()=>go('edit',{type:'delivery',rt:'service'})};
 
 /* ----- document view ----- */
 VIEWS.view=()=>{
@@ -698,9 +700,9 @@ VIEWS_AFTER.view=()=>{
 
 /* ----- editor ----- */
 let ED=null;
-function newDraft(type){
-  const date=today();
-  return {id:uid(),type,number:nextNumber(type,date),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
+function newDraft(type,rt){
+  const date=today();rt=type==='delivery'&&REPORT[rt]?rt:'';
+  return {id:uid(),type,...(rt?{reportType:rt}:{}),number:nextNumber(type,date,rt||undefined),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
     clientId:'',client:null,ref:'',subject:'',salesperson:'',deliveryAddress:'',items:[{name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''}],discount:0,taxRate:S.cfg.taxRate,
     notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:(S.me.profile||{}).mobile||'',contactEmail:(S.me.profile||{}).email||'',createdAt:new Date().toISOString(),_new:true};
 }
@@ -708,7 +710,7 @@ VIEWS.edit=()=>{
   const p=S.params;
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
-    else{ED=newDraft(p.type);const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
+    else{ED=newDraft(p.type,p.rt);const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
       if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
         if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
     ED._key=JSON.stringify(p);
