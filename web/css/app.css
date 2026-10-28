@@ -806,3 +806,4 @@ input,select,textarea{background:var(--field)}
 .themesw{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
 .themesw button{border:0;background:none;padding:5px 10px;font:inherit;font-size:.78rem;cursor:pointer;color:var(--muted)}
 .themesw button.on{background:var(--solid);color:var(--on-solid)}
+.balbl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.chipbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font:inherit;font-size:.78rem;cursor:pointer;color:var(--ink)}.chipbtn.on{background:var(--solid);color:var(--on-solid);border-color:var(--solid)}

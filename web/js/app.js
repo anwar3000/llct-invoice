@@ -887,8 +887,8 @@ VIEWS.edit=()=>{
     <div class="tr grand"><span>Total</span><span class="num" id="t-total">${cur(t.total)}</span></div></div>`}
   </div>
   <div class="card pad grid"><div class="row"><div class="hgrow"><h2>${isDN?h(rep(d).photos)+' photos':'Attachments'}</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. Pick a size for each.${isDN?'':' PDF files (up to 700 KB each) are joined at the end.'}</div></div>
-    <div class="row"><button class="btn" id="att-cam" type="button">${I.scan}Take photo</button><button class="btn" id="att-add" type="button">${I.plus}Upload${isDN?' photo':' photo or PDF'}</button></div></div>
-   ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>attRow(a,k,'att',{inPdf:true})).join('')}</div>`:''}</div>
+    <div class="row">${isDN&&(d.reportType||'delivery')!=='delivery'?`<button class="btn" id="att-before" type="button">${I.scan}Before the work</button><button class="btn" id="att-after" type="button">${I.scan}After the work</button>`:''}<button class="btn" id="att-cam" type="button">${I.scan}Take photo</button><button class="btn" id="att-add" type="button">${I.plus}Upload${isDN?' photo':' photo or PDF'}</button></div></div>
+   ${d.attachments.length?`<div class="atts">${d.attachments.map((a,k)=>attRow(a,k,'att',{inPdf:true,ba:isDN&&(d.reportType||'delivery')!=='delivery'})).join('')}</div>`:''}</div>
   ${!isDN?`<div class="card pad docopts"><b>Show on the document</b>
     <label class="check"><input type="checkbox" id="o-site" ${showSite(d)?'checked':''}>Site</label>
     <label class="check"><input type="checkbox" id="o-words" ${showWords(d)?'checked':''}>Amount in words</label>
@@ -954,10 +954,14 @@ function serialEditor(n){
   o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-x]'))setTimeout(render,0)});
   draw();setTimeout(()=>inp.focus(),50);
 }
+const PHOTO_LABELS=['Before the work','After the work'];
 const PSZ=[['S','Small · 4 per page'],['M','Medium · 2 per page'],['L','Large · full page']];
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cap]');if(!b)return;const row=b.closest('.att');const inp=row&&row.querySelector('input[data-attf="caption"],input[data-podf="caption"]');if(!inp)return;
+  inp.value=inp.value===b.dataset.cap?'':b.dataset.cap;$$('[data-cap]',row).forEach(x=>x.classList.toggle('on',x.dataset.cap===inp.value));inp.dispatchEvent(new Event('input',{bubbles:true}))});
 function attRow(a,k,px,opts={}){
   return `<div class="att" data-${px}="${k}"><div class="ath">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}</div><div class="atb">
    <input data-${px}f="caption" value="${h(a.caption||'')}" placeholder="${h(opts.ph||a.name||'Caption')}" aria-label="Caption">
+   ${opts.ba&&a.kind==='image'?`<div class="balbl">${PHOTO_LABELS.map(l=>`<button type="button" class="chipbtn ${a.caption===l?'on':''}" data-cap="${h(l)}">${h(l)}</button>`).join('')}</div>`:''}
    <div class="atc">${a.kind==='image'?`<select data-${px}f="size" aria-label="Size on the PDF">${PSZ.map(([v,l])=>`<option value="${v}" ${(a.size||'M')===v?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="btn sm" data-${px}-rep="${k}">Replace</button>`:''}
    ${opts.inPdf?`<label class="check"><input type="checkbox" data-${px}f="inPdf" ${a.inPdf!==false?'checked':''}>In PDF</label>`:''}</div></div>
    <button class="xbtn" type="button" data-${px}-rm="${k}" aria-label="Delete">✕</button></div>`;
@@ -984,9 +988,14 @@ async function storeAttachmentImage(file){
   let data=await compress(file,1600,.82);if(data.length>900000)data=await compress(file,1200,.72);if(data.length>900000)data=await compress(file,900,.65);
   const id=uid();await Store.put('images',id,{data,name:file.name,mime:'image/jpeg',createdBy:S.me.id,createdAt:new Date().toISOString()});IMG[id]=data;return 'img:'+id;
 }
-async function addAttachments(camera){
+async function addAttachments(camera,label){
   const files=await pickFiles({accept:camera||ED.type==='delivery'?'image/*':'image/*,application/pdf',camera});if(!files.length)return;
-  readEditor();const added=await uploadFiles(files,{proof:ED.type==='delivery'});if(!ED)return;readEditor();ED.attachments.push(...added);render();
+  readEditor();const added=await uploadFiles(files,{proof:ED.type==='delivery'});if(!ED)return;readEditor();
+  if(label)added.forEach(a=>{if(a.kind==='image')a.caption=label});
+  ED.attachments.push(...added);
+  // keep "before" photos ahead of "after" photos in the PDF
+  if(label)ED.attachments.sort((x,y)=>(x.caption===PHOTO_LABELS[1]?1:0)-(y.caption===PHOTO_LABELS[1]?1:0));
+  render();
 }
 function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
 // Search the products list (name, description, category, barcode) and pick one.
@@ -1048,6 +1057,7 @@ VIEWS_AFTER.edit=()=>{
   $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
   $('#att-add').onclick=()=>addAttachments(false);$('#att-cam').onclick=()=>addAttachments(true);
+  $('#att-before')&&($('#att-before').onclick=()=>addAttachments(true,PHOTO_LABELS[0]));$('#att-after')&&($('#att-after').onclick=()=>addAttachments(true,PHOTO_LABELS[1]));
   $$('[data-att-rep]').forEach(b=>b.onclick=async()=>{readEditor();if(await replacePhoto(ED.attachments[+b.dataset.attRep]))render()});
   $$('[data-att-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.attachments.splice(+b.dataset.attRm,1);render()});
   $$('[data-photo]').forEach(b=>b.onclick=async()=>{const f=await pickImage();if(!f)return;readEditor();toast('Uploading photo…');ED.items[+b.dataset.photo].photo=await storeImage(f,800);render()});
@@ -1102,7 +1112,7 @@ VIEWS.deliver=()=>{
   <div class="card pad grid"><h2>2. Receiver</h2><div class="grid g2"><label class="field"><span>Received by (name)</span><input id="rc-name" value="${h(DV.receiver)}"></label><label class="field"><span>Mobile</span><input id="rc-phone" value="${h(DV.receiverPhone)}" inputmode="tel"></label></div>
    <div class="row"><h3 class="grow">Receiver signature</h3><button class="btn sm" id="sig-clr">Clear</button></div><div class="sigpad" id="sig"></div></div>
   <div class="card pad grid"><div class="row"><div class="hgrow"><h2>3. ${h(rep(d).photos)} photos</h2><div class="muted" style="font-size:.82rem">Optional. Photos print on the delivery note as extra pages.</div></div><div class="row"><button class="btn primary" id="pod-cam" type="button">${I.scan}Take photo</button><button class="btn" id="pod-up" type="button">${I.plus}Upload</button></div></div>
-   ${DV.photos.length?`<div class="atts">${DV.photos.map((a,k)=>attRow(a,k,'pod',{ph:'Caption, e.g. Installed at reception'})).join('')}</div>`:''}</div>
+   ${DV.photos.length?`<div class="atts">${DV.photos.map((a,k)=>attRow(a,k,'pod',{ph:'Caption, e.g. Installed at reception',ba:(d.reportType||'delivery')!=='delivery'})).join('')}</div>`:''}</div>
   <div class="row"><span class="grow"></span><button class="btn" id="save-draft">Save without signing</button><button class="btn primary" id="confirm">Confirm delivery</button></div>`;
 };
 VIEWS_AFTER.deliver=()=>{
