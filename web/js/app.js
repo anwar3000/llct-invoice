@@ -496,7 +496,7 @@ async function downloadPdf(html,filename,merge=[]){
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;alignBrand(st);
     await Promise.all($$('img',st).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
     // Classic & Clean: leave room for a running header (pages 2+) and a footer on every page
-    const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=60,MB=40;
+    const mp=!!st.querySelector('.sheet')&&!isPrem();const MT=44,MB=38;
     if(mp)st.firstElementChild.classList.add('mp');
     const first=st.querySelector('.sheet');const tx=sel=>{const e=first&&first.querySelector(sel);if(!e)return '';const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);const parts=[];while(w.nextNode())parts.push(w.currentNode.nodeValue.trim());return parts.filter(Boolean).join(' ').replace(/\s+/g,' ')};
     const meta={client:(first&&first.dataset.client)||'',site:(first&&first.dataset.site)||'',ref:(first&&first.dataset.ref)||'',title:tx('.tbar .dt'),number:tx('.tbar .nb .no'),
@@ -526,20 +526,20 @@ function decoratePages(pdf,meta,MT,MB){
   const fit=(t,max)=>{t=String(t||'');if(pdf.getTextWidth(t)<=max)return t;while(t.length>3&&pdf.getTextWidth(t+'…')>max)t=t.slice(0,-1);return t+'…'};
   let bc='';try{bc=meta.number?barcodeData(meta.number):''}catch(e){}
   // header boxes (pages 2+): [company · document] [client · site / ref] [barcode · number]
-  const y=12,hh=38,c1=L,c2=L+250,c3=R-190;
+  const y=6,hh=32,c1=L,c2=L+250,c3=R-190;
   for(let i=1;i<=n;i++){pdf.setPage(i);
     if(i>1){
       pdf.setDrawColor(...line);pdf.setLineWidth(.8);pdf.roundedRect(L,y,R-L,hh,3,3,'S');pdf.line(c2,y,c2,y+hh);pdf.line(c3,y,c3,y+hh);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(fit(c.name,c2-c1-20),c1+10,y+15);
-      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...grey);pdf.text(fit(String(meta.title||'').toUpperCase(),c2-c1-20),c1+10,y+29);
-      pdf.setFontSize(6);pdf.setTextColor(...grey);pdf.text(meta.ref?'CLIENT  ·  REF '+fit(meta.ref,120):'CLIENT / SITE',c2+10,y+11);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(...dark);pdf.text(fit(meta.client||'—',c3-c2-20),c2+10,y+22);
-      pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...grey);pdf.text(fit(meta.site||'',c3-c2-20),c2+10,y+32);
-      if(bc){try{pdf.addImage(bc,'PNG',c3+12,y+5,R-c3-24,17)}catch(e){}}
-      pdf.setFont('courier','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(meta.number||'',(c3+R)/2,y+33,{align:'center'});
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(fit(c.name,c2-c1-20),c1+10,y+13);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...grey);pdf.text(fit(String(meta.title||'').toUpperCase(),c2-c1-20),c1+10,y+25);
+      pdf.setFontSize(6);pdf.setTextColor(...grey);pdf.text(meta.ref?'CLIENT  ·  REF '+fit(meta.ref,120):'CLIENT / SITE',c2+10,y+9);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(...dark);pdf.text(fit(meta.client||'—',c3-c2-20),c2+10,y+19);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...grey);pdf.text(fit(meta.site||'',c3-c2-20),c2+10,y+28);
+      if(bc){try{pdf.addImage(bc,'PNG',c3+12,y+4,R-c3-24,14)}catch(e){}}
+      pdf.setFont('courier','bold');pdf.setFontSize(8.5);pdf.setTextColor(...dark);pdf.text(meta.number||'',(c3+R)/2,y+28,{align:'center'});
     }
     // footer (every page)
-    const fy=H-MB+24;pdf.setDrawColor(...line);pdf.setLineWidth(.6);pdf.line(L,H-MB+10,R,H-MB+10);
+    const fy=H-MB+22;pdf.setDrawColor(...line);pdf.setLineWidth(.6);pdf.line(L,H-MB+9,R,H-MB+9);
     pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...grey);
     pdf.text(fit(c.name+(c.taxId?'  ·  '+c.taxIdLabel+' '+c.taxId:''),250),L,fy);
     pdf.setFont('helvetica','bold');pdf.setTextColor(...dark);pdf.text(`Page ${i} of ${n}`,W/2,fy,{align:'center'});

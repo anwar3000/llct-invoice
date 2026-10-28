@@ -807,3 +807,34 @@ input,select,textarea{background:var(--field)}
 .themesw button{border:0;background:none;padding:5px 10px;font:inherit;font-size:.78rem;cursor:pointer;color:var(--muted)}
 .themesw button.on{background:var(--solid);color:var(--on-solid)}
 .balbl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.chipbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font:inherit;font-size:.78rem;cursor:pointer;color:var(--ink)}.chipbtn.on{background:var(--solid);color:var(--on-solid);border-color:var(--solid)}
+
+/* compact documents: less top space and tighter gaps, more items per page */
+.sheet{padding-top:30px;gap:13px}
+.sheet .hd{padding-top:0;gap:22px}
+.sheet .co img.logo{max-height:68px;max-width:86px}
+.sheet .idn{gap:4px}
+.sheet .tbar{padding:7px 0}
+.sheet .tbar .dt{font-size:22px}
+.sheet .tbar .dt:before{height:20px}
+.sheet .tbar .dsub{margin-top:3px}
+.sheet .nb img.bc{height:28px}
+.sheet .meta{gap:14px}
+.sheet .box{padding:8px 12px}
+.sheet .dg span{padding:3px 0}
+.sheet thead th,.sheet tr.rephead th{padding-top:6px;padding-bottom:6px}
+.sheet tbody td{padding:7px 8px}
+.sheet .foot{gap:20px}
+.sheet .fl{gap:8px}
+.sheet .tot .tr{padding:4px 2px}
+.sheet .tot .gr{padding:9px 12px;margin-top:6px}
+.sheet .words{padding:6px 12px}
+.sheet .info{gap:20px}
+.sheet .hh{padding-bottom:3px;margin-bottom:4px}
+.sheet.clean{padding-top:32px;gap:13px}
+.sheet.clean .hd{gap:24px}
+.sheet.clean .co img.logo{max-width:64px;max-height:56px}
+.sheet.clean .tbar{padding:2px 0 0}
+.sheet.clean .tbar .dt{font-size:20px}
+.sheet.clean .meta{gap:30px}
+.sheet.clean tbody td{padding:6px 6px}
+.pdfdoc.mp .sheet:not(.premium){gap:12px}
