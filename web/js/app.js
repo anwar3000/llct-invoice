@@ -861,6 +861,8 @@ VIEWS.edit=()=>{
    <div class="grid g4 ed-top">
     <label class="field" style="grid-column:span 2"><span>Client</span><div class="row" style="flex-wrap:nowrap"><select id="e-client"><option value="">Choose a client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===d.clientId?'selected':''}>${h(c.name)}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-nc" title="Add client">${I.plus}</button>`:''}</div></label>
     ${(()=>{const c=S.clients.find(x=>x.id===d.clientId);const ss=sitesOf(c);return c&&(ss.length||can('clients'))?`<label class="field" style="grid-column:span 2"><span>Site</span><div class="row" style="flex-wrap:nowrap"><select id="e-site"><option value="">${ss.length?'Choose a site…':'No sites yet'}</option>${ss.map(si=>`<option value="${h(si.id)}" ${si.id===d.siteId?'selected':''}>${h(si.name)}${si.address?' — '+h(si.address.split('\n')[0]):''}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-ns" type="button" title="Add a site to this client">${I.plus}</button>`:''}</div></label>`:''})()}
+    ${!isDN&&d.clientId?(()=>{const c=S.clients.find(x=>x.id===d.clientId)||{};const v=d.clientTrn!=null?d.clientTrn:(c.taxId||(d.client&&d.client.taxId)||'');const miss=d.type==='invoice'&&!String(v).trim();
+      return `<label class="field trnf ${miss?'miss':''}" style="grid-column:span 2"><span>Customer ${h(S.cfg.taxIdLabel||'TRN')}${d.type==='invoice'?' <b class="req">required on tax invoices</b>':''}</span><input id="e-trn" inputmode="numeric" maxlength="20" value="${h(v)}" placeholder="15-digit TRN, e.g. 100XXXXXXXXXXX3">${miss?`<small class="trnwarn">⚠ This client has no TRN saved. Ask the customer and enter it here — it is saved to the client for next time.</small>`:''}</label>`})():''}
     <label class="field"><span>Number</span><input id="e-number" value="${h(d.number)}"></label>
     <label class="field"><span>Date</span><input type="date" id="e-date" value="${h(d.date)}"></label>
     ${d.type==='invoice'?`<label class="field"><span>Due date</span><input type="date" id="e-dueDate" value="${h(d.dueDate)}"></label>`:''}
@@ -902,6 +904,7 @@ function readEditor(){
   ['number','date','dueDate','validUntil','ref','salesperson','subject','deliveryAddress','notes','terms','discount','taxRate','reportType','contactName','contactMobile','contactEmail','technician','timeIn','timeOut','complaint','workDone'].forEach(k=>{const el=$('#e-'+k);if(el)d[k]=el.type==='number'?(+el.value||0):el.value});
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   readAtts(d.attachments||[],'att');
+  if($('#e-trn'))d.clientTrn=$('#e-trn').value.trim();
   if($('#o-site')){d.showSite=$('#o-site').checked;d.showWords=$('#o-words').checked;d.showBank=$('#o-bank').checked}
 }
 // One item in a full window: name, long description, qty, unit, rate / status.
@@ -1044,7 +1047,7 @@ VIEWS_AFTER.edit=()=>{
   $('#e-site')&&($('#e-site').onchange=e=>pickSite(sitesOf(S.clients.find(x=>x.id===ED.clientId)).find(x=>x.id===e.target.value)));
   $('#e-ns')&&($('#e-ns').onclick=()=>{const c=S.clients.find(x=>x.id===ED.clientId);if(!c)return;
     siteForm(null,async si=>{const x={...c,places:sitesOf(c).concat([si]),updatedAt:new Date().toISOString()};delete x.id;if(await save('clients',c.id,x,'Site added to '+c.name)){c.places=x.places;pickSite(si)}})});
-  $('#e-client').onchange=e=>{readEditor();if(ED.clientId!==e.target.value){ED.siteId='';ED.siteName='';ED.siteAddress=''}ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
+  $('#e-client').onchange=e=>{readEditor();if(ED.clientId!==e.target.value){ED.siteId='';ED.siteName='';ED.siteAddress='';ED.clientTrn=null}ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
   $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
@@ -1066,12 +1069,18 @@ VIEWS_AFTER.edit=()=>{
   $('#scan-add').onclick=()=>openScanner(code=>{const p=S.products.find(x=>x.barcode===code||x.sku===code);if(p){addProduct(p);toast('Added '+p.name)}else{readEditor();ED.items.push({name:code,desc:'',qty:1,unit:'pcs',price:0});render();toast('Code '+code+' is not in your product list. Added as a new line.')}},{title:'Scan product'});
   const doSave=async()=>{readEditor();const d=clone(ED);
     if(!d.clientId){toast('Choose a client first.',true);return}
+    const trn=String(d.clientTrn||'').replace(/\s+/g,'');
+    if(d.type==='invoice'&&!trn&&!await confirmBox('Customer TRN is missing','A tax invoice should show the customer\'s TRN. Save without it? You can add it later by editing the invoice.','Save without TRN')){const t=$('#e-trn');if(t){t.focus();t.scrollIntoView({block:'center'})}return}
+    if(trn&&!/^\d{15}$/.test(trn)&&!await confirmBox('Check the TRN','UAE TRNs have 15 digits; this one has '+trn.replace(/\D/g,'').length+'. Save anyway?','Save anyway'))return;
     d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length&&!(d.type==='delivery'&&(d.reportType||'delivery')!=='delivery')){toast('Add at least one item.',true);return}
     const b1=$('#sv'),b2=$('#sv2');b1.disabled=b2.disabled=true;
     try{
       if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
+      if(d.clientTrn!=null){if(d.client)d.client.taxId=trn;
+        if(c&&trn&&trn!==String(c.taxId||'')&&can('clients')){const x={...c,taxId:trn,updatedAt:new Date().toISOString()};delete x.id;Store.put('clients',c.id,x).then(()=>toast('TRN saved to '+c.name)).catch(()=>{})}}
+      delete d.clientTrn;
       delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
       if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};

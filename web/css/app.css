@@ -838,3 +838,4 @@ input,select,textarea{background:var(--field)}
 .sheet.clean .meta{gap:30px}
 .sheet.clean tbody td{padding:6px 6px}
 .pdfdoc.mp .sheet:not(.premium){gap:12px}
+.trnf .req{font-weight:600;color:var(--bad);font-size:.72rem;margin-left:4px}.trnf.miss input{border-color:var(--bad);background:var(--bad-soft)}.trnwarn{color:var(--bad);font-size:.76rem;margin-top:3px;display:block}
