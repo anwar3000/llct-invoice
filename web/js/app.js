@@ -2048,7 +2048,7 @@ async function applyTicket(){
     const t=s.data();const c=S.clients.find(x=>x.id===t.clientId);
     if(c){me.clientId=c.id;me.client=clientSnap(c);const cs=sitesOf(c).find(x=>x.id===t.siteId);if(cs){me.siteId=cs.id;me.siteName=cs.name;me.siteAddress=cs.address||''}}
     if(!me.deliveryAddress)me.deliveryAddress=[t.siteName,t.siteAddress].filter(Boolean).join(', ');
-    if(!me.subject)me.subject=SVC_TYPES[t.category]||'Service visit';
+    if(!me.subject)me.subject=(Array.isArray(t.categories)&&t.categories.length?t.categories:[t.category]).map(k=>SVC_TYPES[k]).filter(Boolean).join(', ')||'Service visit';
     me.ref=t.number||me.ticketId;me.ticketNo=t.number||me.ticketId;
     if(!me.complaint)me.complaint=[t.description,t.contactName?'Reported by '+t.contactName+(t.contactPhone?' ('+t.contactPhone+')':''):''].filter(Boolean).join('\n');
     if(S.view==='edit')render();

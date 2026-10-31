@@ -407,6 +407,12 @@ service cloud.firestore {
                         && getAfter(/databases/$(database)/documents/svcTickets/$(id)).data.portal == token);
         allow update: if isActive();
         allow delete: if isManagement();
+        // Photos the technician posts for the client (work done), one small photo per document.
+        match /photos/{pid} {
+          allow read: if isActive() || svcPortalOn(token);
+          allow create, update: if isActive();
+          allow delete: if isActive();
+        }
       }
     }
 
@@ -419,7 +425,7 @@ service cloud.firestore {
                         && request.resource.data.status == 'new' && request.resource.data.open == true
                         && request.resource.data.source == 'portal'
                         && request.resource.data.keys().hasOnly(['number', 'portal', 'clientId', 'clientName', 'siteId', 'siteName',
-                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'description',
+                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'description',
                              'priority', 'preferredDate', 'preferredSlot', 'photos', 'cameras', 'status', 'open', 'source',
                              'createdAt', 'updatedAt', 'log']));
       allow update: if svcAssigner()
@@ -433,7 +439,7 @@ service cloud.firestore {
                         && request.resource.data.get('assignedTo', null) == request.auth.uid
                         && request.resource.data.status in ['assigned', 'accepted', 'on_way', 'on_site', 'completed']
                         && onlyChanges(['status', 'acceptedAt', 'onWayAt', 'arrivedAt', 'completedAt', 'techNote',
-                                        'reportId', 'reportNo', 'log', 'updatedAt']))
+                                        'reportId', 'reportNo', 'log', 'updatedAt', 'scheduledAt', 'photosPosted']))
                     // …or hands it back to the queue
                     || (isActive() && resource.data.get('assignedTo', null) == request.auth.uid
                         && request.resource.data.status == 'new' && request.resource.data.assignedTo == null
