@@ -841,7 +841,7 @@ VIEWS.edit=()=>{
   if(p.id&&!S.docs.find(x=>x.id===p.id)&&(!ED||ED.id!==p.id))return '<div class="loading">Opening document…</div>';
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
-    else{ED=newDraft(p.type,p.rt);if(p.attSite){ED.attSiteId=p.attSite;ED.attSessionId=p.attSession||'';ED.attSiteName=p.attSiteName||'';ED._att=1}const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
+    else{ED=newDraft(p.type,p.rt);if(p.tk){ED.ticketId=String(p.tk);ED._tk=1}if(p.attSite){ED.attSiteId=p.attSite;ED.attSessionId=p.attSession||'';ED.attSiteName=p.attSiteName||'';ED._att=1}const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
       if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
         if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
     ED._key=JSON.stringify(p);
@@ -1016,6 +1016,7 @@ const fillItem=(it,p)=>Object.assign(it,{name:p.name,desc:p.desc||it.desc||'',pr
 function addProduct(p){readEditor();const blank=ED.items.findIndex(i=>!i.name);const it={name:p.name,desc:p.desc||'',qty:1,unit:p.unit||'pcs',price:+p.price||0,photo:p.photo||'',pid:p.id};if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()}
 VIEWS_AFTER.edit=()=>{
   if(ED&&ED._att&&!ED._attDone&&applyAttSite()){render();return}
+  if(ED&&ED._tk&&!ED._tkDone)applyTicket();
   {const app=$('#app');if(!app._draftHook){app._draftHook=1;let t;const kick=()=>{if(S.view!=='edit'||!ED)return;clearTimeout(t);t=setTimeout(saveDraft,800)};app.addEventListener('input',kick);app.addEventListener('change',kick)}}
   saveDraft();
   const cancel=()=>{const d=ED;ED=null;clearDraft();d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
@@ -1081,8 +1082,9 @@ VIEWS_AFTER.edit=()=>{
       if(d.clientTrn!=null){if(d.client)d.client.taxId=trn;
         if(c&&trn&&trn!==String(c.taxId||'')&&can('clients')){const x={...c,taxId:trn,updatedAt:new Date().toISOString()};delete x.id;Store.put('clients',c.id,x).then(()=>toast('TRN saved to '+c.name)).catch(()=>{})}}
       delete d.clientTrn;
-      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
-      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);go('view',{id:d.id})}
+      const wasNew=!!d._new;
+      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai','_tk','_tkDone','_tkBusy'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);if(wasNew)linkTicket(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
@@ -1154,7 +1156,7 @@ VIEWS_AFTER.deliver=()=>{
     const upd={...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString(),delivery:{receiver:DV.receiver.trim(),receiverPhone:DV.receiverPhone.trim(),signature:sigData,signedAt:new Date().toISOString(),deliveredBy:S.me.id,deliveredByName:S.me.name,gps:DV.gps||null}};
     if(!hasGPS(d.gps)&&DV.gps)upd.gps=DV.gps;
     const btn=$('#confirm');btn.disabled=true;
-    if(await save('docs',d.id,upd)){const who=DV.receiver.trim();DV=null;go('view',{id:d.id});thankYou(upd,who)}else btn.disabled=false};
+    if(await save('docs',d.id,upd)){linkTicket(upd);const who=DV.receiver.trim();DV=null;go('view',{id:d.id});thankYou(upd,who)}else btn.disabled=false};
 };
 function thankYou(d,who){
   const R=rep(d);const o=modal(R.done,`<div class="thanks"><div class="tick">✓</div><h2>Thank you${who?', '+h(who):''}!</h2>
@@ -2033,6 +2035,42 @@ function aiApply(r){
     if(d){closeModal();go('view',{id:d.id});return ''}return 'I couldn\'t find document '+r.number+'.'}
   if(r.action==='open_client'&&r.client){const c=bestMatch(S.clients,r.client);if(c){closeModal();go('client',{id:c.id});return ''}return 'I couldn\'t find client '+r.client+'.'}
   return ''}
+// ---------------------------------------------------------------- LLCT Service Desk
+// Opened from a service ticket (svcTickets/{id}): client, site, complaint and ticket number go into the report.
+const SVC_TYPES={camera:'CCTV camera not working',recording:'NVR / DVR not recording',remote:'No remote / mobile view',image:'Camera image blurry / dark / no night vision',hdd:'Hard disk / storage error',playback:'Footage backup / playback',power:'Power, cable or PoE issue',network:'Network / Wi-Fi / internet',access:'Access control / door / intercom',ppm:'Preventive maintenance (AMC visit)',install:'New camera / relocation',other:'Service visit'};
+async function applyTicket(){
+  if(!ED||!ED._tk||ED._tkDone||ED._tkBusy||!S.clients.length)return;
+  ED._tkBusy=1;const me=ED;
+  try{
+    const s=await getDoc(doc(fdb,'svcTickets',me.ticketId));
+    if(ED!==me)return;me._tkDone=1;
+    if(!s.exists()){toast('Service ticket '+me.ticketId+' not found.',true);return}
+    const t=s.data();const c=S.clients.find(x=>x.id===t.clientId);
+    if(c){me.clientId=c.id;me.client=clientSnap(c);const cs=sitesOf(c).find(x=>x.id===t.siteId);if(cs){me.siteId=cs.id;me.siteName=cs.name;me.siteAddress=cs.address||''}}
+    if(!me.deliveryAddress)me.deliveryAddress=[t.siteName,t.siteAddress].filter(Boolean).join(', ');
+    if(!me.subject)me.subject=SVC_TYPES[t.category]||'Service visit';
+    me.ref=t.number||me.ticketId;me.ticketNo=t.number||me.ticketId;
+    if(!me.complaint)me.complaint=[t.description,t.contactName?'Reported by '+t.contactName+(t.contactPhone?' ('+t.contactPhone+')':''):''].filter(Boolean).join('\n');
+    if(S.view==='edit')render();
+    toast('Filled from service ticket '+me.ticketNo+(c?'':' — choose the client'));
+  }catch(e){console.warn('ticket',e);me._tkDone=1;toast('Could not read the service ticket.',true)}
+  finally{delete me._tkBusy}
+}
+// After saving / signing a service report: put its number on the ticket (and on the client's tracking link).
+async function linkTicket(d){
+  if(!d||!d.ticketId)return;
+  try{
+    const ref=doc(fdb,'svcTickets',d.ticketId);const s=await getDoc(ref);if(!s.exists())return;const t=s.data();
+    const signed=!!(d.delivery&&d.delivery.signedAt);const at=new Date();
+    const up={reportId:d.id,reportNo:d.number,updatedAt:serverTimestamp(),log:arrayUnion({at,by:S.me.id,byName:S.me.name||'',t:'Service report '+d.number+(signed?' signed by customer':' created')})};
+    if(signed&&t.open&&['assigned','accepted','on_way','on_site'].includes(t.status)){up.status='completed';up.completedAt=serverTimestamp()}
+    const b=writeBatch(fdb);b.update(ref,up);
+    if(t.portal){const pub={reportNo:d.number,updatedAt:serverTimestamp(),log:arrayUnion({at,t:signed?'Work completed — service report '+d.number:'Service report '+d.number+' prepared'})};if(up.status)pub.status=up.status;
+      b.set(doc(fdb,'svcPortals',t.portal,'tickets',d.ticketId),pub,{merge:true})}
+    await b.commit();
+    if(up.status)toast('Ticket '+(t.number||d.ticketId)+' marked completed');
+  }catch(e){console.warn('ticket link',e)}
+}
 // Opened from the attendance app: use the client and site of the employee's check-in.
 function applyAttSite(){
   if(!ED||!ED._att||ED._attDone)return false;const si=S.sites.find(x=>x.id===ED.attSiteId);if(!si&&!S.sites.length)return false;
@@ -2132,7 +2170,7 @@ function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
   Store.sub('sites',r=>{S.sites=r;if(S.view==='edit'&&ED&&ED._att&&!ED._attDone){applyAttSite();render()}},null,true);
   Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
-  Store.sub('clients',r=>{S.clients=r;soon()});
+  Store.sub('clients',r=>{S.clients=r;soon();if(S.view==='edit'&&ED&&ED._tk&&!ED._tkDone)applyTicket()});
   Store.sub('products',r=>{S.products=r;soon()});
   if(isAdmin())setTimeout(runSeeds,1500);
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});

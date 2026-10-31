@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// COMBINED RULES for the shared Firebase project: LLCT Attendance + LLCT Invoicing.
+// COMBINED RULES for the shared Firebase project: LLCT Attendance + LLCT Invoicing + LLCT Service Desk.
 // Both apps use ONE Firebase project, so they share this ONE rules file.
 // Paste the WHOLE file into Firebase Console → Firestore Database → Rules → Publish.
 // (Publishing only part of it would switch off the other app.)
@@ -25,6 +25,10 @@ service cloud.firestore {
     function isDocs() { return isActive() && role() == 'docs'; }
     // Admin can let a person view & download everyone's ID documents (and see the staff list) in the app.
     function canIds() { return isActive() && me().get('canViewIds', false) == true; }
+    // Admin can let a person (manager or employee) view the Accounts page read-only.
+    function canAccounts() { return isActive() && (me().get('canViewAccounts', false) == true || me().get('canEditAccounts', false) == true); }
+    // …and to make changes, which wait in acctRequests until an admin approves them.
+    function canAccountsEdit() { return isActive() && me().get('canEditAccounts', false) == true; }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
     function owns() { return isActive() && resource.data.employeeId == request.auth.uid; }
     function createsOwn() { return isActive() && request.resource.data.employeeId == request.auth.uid; }
@@ -33,7 +37,8 @@ service cloud.firestore {
     // ---------------------------------------------------------------- users
     match /users/{uid} {
       // Staff can see the list of company drivers (to pick one for a ride).
-      allow read: if isSelf(uid) || isManagement() || isDocs() || canIds() || (isActive() && resource.data.get('isDriver', false) == true);
+      // Service-desk assigners see staff (name + live location) to pick the nearest technician.
+      allow read: if isSelf(uid) || isManagement() || isDocs() || canIds() || svcAssigner() || (isActive() && resource.data.get('isDriver', false) == true);
       allow create, delete: if isAdmin();
       // Admins edit profiles; staff may only update their own live location.
       // Staff may update their own live location, and their own mobile number / email.
@@ -103,19 +108,36 @@ service cloud.firestore {
 
     // Payments made to drivers (accounts → admin). Each driver sees their own, so the balance tallies.
     match /driverPayments/{id} {
-      allow read: if isAdmin() || owns();
+      allow read: if isAdmin() || owns() || canAccounts();
       allow write: if isAdmin();
     }
 
     // Company accounts: income & expense entries and their receipt copies (admin only).
     match /acctEntries/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || canAccounts();
+      allow write: if isAdmin();
     }
     match /acctFiles/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || canAccounts();
+      allow write: if isAdmin();
     }
     match /acctSettings/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || canAccounts();
+      allow write: if isAdmin();
+    }
+    // Changes asked for by people with "Edit accounts" — applied only when an admin approves.
+    match /acctRequests/{id} {
+      allow read: if isAdmin() || canAccountsEdit();
+      allow create: if canAccountsEdit() && request.resource.data.status == 'pending'
+                    && request.resource.data.requestedById == request.auth.uid;
+      // the person who asked can cancel it while it is still waiting
+      allow delete: if isAdmin() || (canAccountsEdit() && resource.data.requestedById == request.auth.uid && resource.data.status == 'pending');
+      allow update: if isAdmin();
+    }
+    // Pending payments: money still to pay / to receive, with due dates (projection on the Accounts page).
+    match /acctPending/{id} {
+      allow read: if isAdmin() || canAccounts();
+      allow write: if isAdmin();
     }
 
     // Claims on a place / site name so the same new site can't be added twice (first one wins).
@@ -164,7 +186,7 @@ service cloud.firestore {
 
     // ---------------------------------------------------------------- petty (accounts: admin only)
     match /petty/{id} {
-      allow read: if isAdmin() || owns();
+      allow read: if isAdmin() || owns() || canAccounts();
       // Staff entries always start as pending.
       allow create: if isAdmin() || (createsOwn() && request.resource.data.status == 'pending');
       allow update: if isAdmin();
@@ -252,16 +274,16 @@ service cloud.firestore {
     }
 
     // ------------------------------------------- company documents
-    // Trade licenses, Chamber of Commerce, WC insurance… Management manages; people allowed to view IDs can view.
+    // Trade licenses, Chamber of Commerce, WC insurance… Management manages; every active staff member can view & download.
     match /companyDocs/{id} {
-      allow read: if isManagement() || canIds();
+      allow read: if isActive();
       allow write: if isManagement();
     }
     match /companyFiles/{fileId} {
-      allow read: if isManagement() || canIds();
+      allow read: if isActive();
       allow write: if isManagement();
       match /chunks/{n} {
-        allow read: if isManagement() || canIds();
+        allow read: if isActive();
         allow write: if isManagement();
       }
     }
@@ -363,6 +385,61 @@ service cloud.firestore {
                     || (invHas('deliver') && resource.data.type == 'delivery'
                         && onlyChanges(['items', 'delivery', 'attachments', 'updatedAt']));
       allow delete: if invHas('delete');
+    }
+
+    // ======================================================== LLCT Service Desk
+    // Clients raise service requests (CCTV AMC etc.) from their own private link: svcPortals/{token}.
+    // The token in the link is the secret — no client login. Staff work the tickets in svcTickets.
+    // svcPortals/{token}/tickets/{id} is the client's view of each ticket (status, technician, visit time).
+    // Assign permission: admins, managers, and staff with users/{uid}.canAssignService == true.
+    function svcAssigner() { return isManagement() || (isActive() && me().get('canAssignService', false) == true); }
+    function svcPortalPath(t) { return /databases/$(database)/documents/svcPortals/$(t); }
+    function svcPortalOn(t) { return t is string && exists(svcPortalPath(t)) && get(svcPortalPath(t)).data.get('active', false) == true; }
+
+    match /svcPortals/{token} {
+      allow get: if isActive() || resource.data.get('active', false) == true;
+      allow list: if isActive();
+      allow create, update: if svcAssigner();
+      allow delete: if isManagement();
+      match /tickets/{id} {
+        allow read: if isActive() || svcPortalOn(token);
+        allow create: if isActive() || (svcPortalOn(token) && request.resource.data.status == 'new'
+                        && getAfter(/databases/$(database)/documents/svcTickets/$(id)).data.portal == token);
+        allow update: if isActive();
+        allow delete: if isManagement();
+      }
+    }
+
+    match /svcTickets/{id} {
+      allow read: if isActive();
+      // Staff can raise a ticket for a client (phone call); a client only through an active link, as 'new'.
+      allow create: if isActive()
+                    || (svcPortalOn(request.resource.data.portal)
+                        && request.resource.data.clientId == get(svcPortalPath(request.resource.data.portal)).data.clientId
+                        && request.resource.data.status == 'new' && request.resource.data.open == true
+                        && request.resource.data.source == 'portal'
+                        && request.resource.data.keys().hasOnly(['number', 'portal', 'clientId', 'clientName', 'siteId', 'siteName',
+                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'description',
+                             'priority', 'preferredDate', 'preferredSlot', 'photos', 'cameras', 'status', 'open', 'source',
+                             'createdAt', 'updatedAt', 'log']));
+      allow update: if svcAssigner()
+                    // anyone on the team may pick up a request nobody has yet
+                    || (isActive() && resource.data.status == 'new' && resource.data.get('assignedTo', null) == null
+                        && request.resource.data.assignedTo == request.auth.uid && request.resource.data.status == 'accepted'
+                        && onlyChanges(['assignedTo', 'assignedName', 'assignedAt', 'assignedBy', 'assignedByName',
+                                        'acceptedAt', 'scheduledAt', 'status', 'log', 'updatedAt']))
+                    // the assigned technician moves the job along (accept → on the way → at site → completed, service report)
+                    || (isActive() && resource.data.get('assignedTo', null) == request.auth.uid
+                        && request.resource.data.get('assignedTo', null) == request.auth.uid
+                        && request.resource.data.status in ['assigned', 'accepted', 'on_way', 'on_site', 'completed']
+                        && onlyChanges(['status', 'acceptedAt', 'onWayAt', 'arrivedAt', 'completedAt', 'techNote',
+                                        'reportId', 'reportNo', 'log', 'updatedAt']))
+                    // …or hands it back to the queue
+                    || (isActive() && resource.data.get('assignedTo', null) == request.auth.uid
+                        && request.resource.data.status == 'new' && request.resource.data.assignedTo == null
+                        && onlyChanges(['assignedTo', 'assignedName', 'assignedAt', 'assignedBy', 'assignedByName',
+                                        'acceptedAt', 'scheduledAt', 'status', 'log', 'updatedAt']));
+      allow delete: if isAdmin();
     }
   }
 }
