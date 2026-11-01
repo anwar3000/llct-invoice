@@ -414,6 +414,11 @@ service cloud.firestore {
           allow delete: if isActive();
         }
       }
+      // Building photo of each site, copied here by the Service Desk so the client page can show it.
+      match /sitePhotos/{sid} {
+        allow read: if isActive() || svcPortalOn(token);
+        allow write: if svcAssigner();
+      }
     }
 
     // Service options customers can tick (set by an admin in the Service Desk settings). Public, read-only.
