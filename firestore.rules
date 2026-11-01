@@ -437,6 +437,17 @@ service cloud.firestore {
       }
     }
 
+    // Service profile per client: trade license, equipment under maintenance (NVRs, cameras) per site,
+    // building photo per site (sitePhotos). Staff only; the equipment list is copied to the client's link.
+    match /svcClients/{cid} {
+      allow read: if isActive();
+      allow write: if svcAssigner();
+      match /sitePhotos/{sid} {
+        allow read: if isActive();
+        allow write: if svcAssigner();
+      }
+    }
+
     match /svcTickets/{id} {
       allow read: if isActive();
       // Staff can raise a ticket for a client (phone call); a client only through an active link, as 'new';
@@ -455,7 +466,7 @@ service cloud.firestore {
                         && request.resource.data.status == 'new' && request.resource.data.open == true
                         && request.resource.data.source == 'portal'
                         && request.resource.data.keys().hasOnly(['number', 'portal', 'clientId', 'clientName', 'siteId', 'siteName',
-                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'categoryLabels', 'preferredTime', 'description',
+                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'categoryLabels', 'preferredTime', 'faults', 'description',
                              'priority', 'preferredDate', 'preferredSlot', 'photos', 'cameras', 'status', 'open', 'source',
                              'createdAt', 'updatedAt', 'log']));
       allow update: if svcAssigner()
@@ -469,7 +480,7 @@ service cloud.firestore {
                         && request.resource.data.get('assignedTo', null) == request.auth.uid
                         && request.resource.data.status in ['assigned', 'accepted', 'on_way', 'on_site', 'completed']
                         && onlyChanges(['status', 'acceptedAt', 'onWayAt', 'arrivedAt', 'completedAt', 'techNote',
-                                        'reportId', 'reportNo', 'log', 'updatedAt', 'scheduledAt', 'photosPosted']))
+                                        'reportId', 'reportNo', 'log', 'updatedAt', 'scheduledAt', 'photosPosted', 'faults']))
                     // …or hands it back to the queue
                     || (isActive() && resource.data.get('assignedTo', null) == request.auth.uid
                         && request.resource.data.status == 'new' && request.resource.data.assignedTo == null

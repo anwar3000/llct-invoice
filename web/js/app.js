@@ -58,9 +58,9 @@ const REPORT={
   delivery:{t:'Delivery Note',a:'DN',p:'DLN',who:'Deliver to',sign:'Received by',ok:'Received in good condition. Thank you for your acceptance.',ty:'Thank you for accepting the delivery.',done:'Delivery confirmed',act:'Deliver: scan & sign',photos:'Proof of delivery',
     st:['Delivered','Delivered & installed','Installed','Partially delivered','Pending']},
   service:{t:'Service Report',a:'SR',p:'SRV',who:'Customer',sign:'Customer confirmation',ok:'Work completed to satisfaction. Thank you for your acceptance.',ty:'Thank you for confirming our service visit.',done:'Report signed',act:'Sign off: customer signature',photos:'Site photos',
-    st:['Completed','Attended','Repaired','Replaced','Pending parts','Follow-up required']},
+    st:['Completed','Rectified','Working','Attended','Repaired','Replaced','Need replacement','Pending parts','Not checked','Follow-up required']},
   callout:{t:'Call-out Attendance Report',a:'CO',p:'COR',who:'Customer',sign:'Customer confirmation',ok:'Call-out attended. Thank you for your acceptance.',ty:'Thank you for confirming our call-out attendance.',done:'Report signed',act:'Sign off: customer signature',photos:'Site photos',
-    st:['Attended','Completed','Temporary fix','Pending parts','Follow-up required']}};
+    st:['Attended','Completed','Rectified','Working','Temporary fix','Need replacement','Pending parts','Not checked','Follow-up required']}};
 const rep=d=>REPORT[(d&&d.reportType)||'delivery']||REPORT.delivery;
 const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
@@ -2051,6 +2051,13 @@ async function applyTicket(){
     if(!me.subject)me.subject=(Array.isArray(t.categoryLabels)&&t.categoryLabels.length?t.categoryLabels:(Array.isArray(t.categories)&&t.categories.length?t.categories:[t.category]).map(k=>SVC_TYPES[k])).filter(Boolean).join(', ')||'Service visit';
     me.ref=t.number||me.ticketId;me.ticketNo=t.number||me.ticketId;
     if(!me.complaint)me.complaint=[t.description,t.contactName?'Reported by '+t.contactName+(t.contactPhone?' ('+t.contactPhone+')':''):''].filter(Boolean).join('\n');
+    // equipment the client reported, with the technician's results → report lines and work carried out
+    if(Array.isArray(t.faults)&&t.faults.length&&!(me.items||[]).some(i=>i.name)){
+      let eq=[];try{const pr=await getDoc(doc(fdb,'svcClients',t.clientId||'-'));const e=pr.exists()&&(pr.data().sites||{})[t.siteId];if(e)eq=[...(e.nvrs||[]),...(e.cameras||[])]}catch(e){}
+      const lbl=f=>f.kind==='nvr'?('NVR '+(f.no||'')+(f.name?' – '+f.name:'')).trim():('Camera '+(f.no||'')+(f.name?' – '+f.name:'')+(f.nvr?' (NVR '+f.nvr+(f.ch?', ch '+f.ch:'')+')':'')).trim();
+      const st=rep(me).st;
+      me.items=t.faults.map(f=>{const m=eq.find(x=>x.id===f.id)||{};return {name:lbl(f),desc:[m.model?'Model '+m.model:'',f.note||''].filter(Boolean).join(' · '),qty:1,unit:'pcs',price:0,photo:'',status:st.includes(f.result)?f.result:st[0],serials:m.serial?[m.serial]:[]}});
+      const done=t.faults.filter(f=>f.result||f.note).map(f=>lbl(f)+': '+(f.result||'')+(f.note?' — '+f.note:'')).join('\n');if(done&&!me.workDone)me.workDone=done}
     if(S.view==='edit')render();
     toast('Filled from service ticket '+me.ticketNo+(c?'':' — choose the client'));
   }catch(e){console.warn('ticket',e);me._tkDone=1;toast('Could not read the service ticket.',true)}
