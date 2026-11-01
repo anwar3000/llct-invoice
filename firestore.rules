@@ -416,16 +416,46 @@ service cloud.firestore {
       }
     }
 
+    // Service options customers can tick (set by an admin in the Service Desk settings). Public, read-only.
+    match /svcConfig/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Walk-in requests from the public support page (no client link). Each gets a private tracking page
+    // svcPublic/{publicId}; only someone with that long random id can open it.
+    match /svcPublic/{pid} {
+      allow get: if true;
+      allow list: if isActive();
+      allow create: if isActive() || (request.resource.data.status == 'new' && request.resource.data.number is string
+                      && getAfter(/databases/$(database)/documents/svcTickets/$(request.resource.data.number)).data.publicId == pid);
+      allow update: if isActive();
+      allow delete: if isManagement();
+      match /photos/{ph} {
+        allow read: if true;
+        allow create, update, delete: if isActive();
+      }
+    }
+
     match /svcTickets/{id} {
       allow read: if isActive();
-      // Staff can raise a ticket for a client (phone call); a client only through an active link, as 'new'.
+      // Staff can raise a ticket for a client (phone call); a client only through an active link, as 'new';
+      // a walk-in customer through the public support page (source 'walkin', with its tracking id).
       allow create: if isActive()
+                    || (request.resource.data.source == 'walkin' && request.resource.data.status == 'new'
+                        && request.resource.data.open == true && request.resource.data.number == id
+                        && request.resource.data.publicId is string && request.resource.data.publicId.size() >= 16
+                        && request.resource.data.description is string && request.resource.data.description.size() < 4000
+                        && request.resource.data.keys().hasOnly(['number', 'publicId', 'clientId', 'clientName', 'brand', 'siteName',
+                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'categoryLabels', 'preferredTime',
+                             'description', 'priority', 'preferredDate', 'preferredSlot', 'photos', 'cameras', 'status', 'open',
+                             'source', 'createdAt', 'updatedAt', 'log']))
                     || (svcPortalOn(request.resource.data.portal)
                         && request.resource.data.clientId == get(svcPortalPath(request.resource.data.portal)).data.clientId
                         && request.resource.data.status == 'new' && request.resource.data.open == true
                         && request.resource.data.source == 'portal'
                         && request.resource.data.keys().hasOnly(['number', 'portal', 'clientId', 'clientName', 'siteId', 'siteName',
-                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'description',
+                             'siteAddress', 'lat', 'lng', 'contactName', 'contactPhone', 'contactEmail', 'category', 'categories', 'categoryLabels', 'preferredTime', 'description',
                              'priority', 'preferredDate', 'preferredSlot', 'photos', 'cameras', 'status', 'open', 'source',
                              'createdAt', 'updatedAt', 'log']));
       allow update: if svcAssigner()
