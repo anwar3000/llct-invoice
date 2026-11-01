@@ -2053,8 +2053,8 @@ async function applyTicket(){
     if(!me.complaint)me.complaint=[t.description,t.contactName?'Reported by '+t.contactName+(t.contactPhone?' ('+t.contactPhone+')':''):''].filter(Boolean).join('\n');
     // equipment the client reported, with the technician's results → report lines and work carried out
     if(Array.isArray(t.faults)&&t.faults.length&&!(me.items||[]).some(i=>i.name)){
-      let eq=[];try{const pr=await getDoc(doc(fdb,'svcClients',t.clientId||'-'));const e=pr.exists()&&(pr.data().sites||{})[t.siteId];if(e)eq=[...(e.nvrs||[]),...(e.cameras||[])]}catch(e){}
-      const lbl=f=>f.kind==='nvr'?('NVR '+(f.no||'')+(f.name?' – '+f.name:'')).trim():('Camera '+(f.no||'')+(f.name?' – '+f.name:'')+(f.nvr?' (NVR '+f.nvr+(f.ch?', ch '+f.ch:'')+')':'')).trim();
+      let eq=[];try{const pr=await getDoc(doc(fdb,'svcClients',t.clientId||'-'));const e=pr.exists()&&(pr.data().sites||{})[t.siteId];if(e)eq=[...(e.nvrs||[]),...(e.cameras||[]),...(e.others||[])]}catch(e){}
+      const lbl=f=>f.kind==='other'?((f.type||'Device')+(f.name?' – '+f.name:'')).trim():f.kind==='nvr'?('NVR '+(f.no||'')+(f.name?' – '+f.name:'')).trim():('Camera '+(f.no||'')+(f.name?' – '+f.name:'')+(f.nvr?' (NVR '+f.nvr+(f.ch?', ch '+f.ch:'')+')':'')).trim();
       const st=rep(me).st;
       me.items=t.faults.map(f=>{const m=eq.find(x=>x.id===f.id)||{};return {name:lbl(f),desc:[m.model?'Model '+m.model:'',f.note||''].filter(Boolean).join(' · '),qty:1,unit:'pcs',price:0,photo:'',status:st.includes(f.result)?f.result:st[0],serials:m.serial?[m.serial]:[]}});
       const done=t.faults.filter(f=>f.result||f.note).map(f=>lbl(f)+': '+(f.result||'')+(f.note?' — '+f.note:'')).join('\n');if(done&&!me.workDone)me.workDone=done}
