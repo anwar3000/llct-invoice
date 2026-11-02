@@ -2211,7 +2211,7 @@ onAuthStateChanged(auth,async u=>{
   }catch(e){messageScreen('Could not load your account',h(e.code||e.message)+'<br>Check your internet connection and the Firestore rules.',true);return}
   const back=parseHash();const dr=getDraft();
   if(back&&back.v==='edit'&&dr&&JSON.stringify(dr.params)===JSON.stringify(back.p)){ED=dr.ed;ED._key=JSON.stringify(dr.params);S.view='edit';S.params=dr.params}
-  else if(back&&(back.v!=='edit'||back.p.id||back.p.attSite)){S.view=back.v;S.params=back.p}
+  else if(back&&(back.v!=='edit'||back.p.id||back.p.attSite||back.p.tk||back.p.type)){S.view=back.v;S.params=back.p}
   else{S.view='home';S.params={}}
   render();navPush(true);startData();logSession();
 });
