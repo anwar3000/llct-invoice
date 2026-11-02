@@ -2054,7 +2054,7 @@ async function applyTicket(){
     // equipment the client reported, with the technician's results → report lines and work carried out
     if(Array.isArray(t.faults)&&t.faults.length&&!(me.items||[]).some(i=>i.name)){
       let eq=[];try{const pr=await getDoc(doc(fdb,'svcClients',t.clientId||'-'));const e=pr.exists()&&(pr.data().sites||{})[t.siteId];if(e)eq=[...(e.nvrs||[]),...(e.cameras||[]),...(e.others||[])]}catch(e){}
-      const lbl=f=>f.kind==='other'?((f.type||'Device')+(f.name?' – '+f.name:'')).trim():f.kind==='nvr'?('NVR '+(f.no||'')+(f.name?' – '+f.name:'')).trim():('Camera '+(f.no||'')+(f.name?' – '+f.name:'')+(f.nvr?' (NVR '+f.nvr+(f.ch?', ch '+f.ch:'')+')':'')).trim();
+      const lbl=f=>{const n=String(f.name||'').trim(),no=f.no||'';if(f.kind==='nvr')return no?('NVR '+no+(n?' – '+n:'')):(/^(nvr|dvr|xvr)/i.test(n)?n:'NVR – '+n);if(f.kind==='other'){const ty=String(f.type||'').trim();if(!ty||ty==='Other'||n.toLowerCase().startsWith(ty.toLowerCase().split(/[ /]/)[0]))return n||ty||'Device';return ty+(n?' – '+n:'')}const w=f.nvr?' (NVR '+f.nvr+(f.ch?', ch '+f.ch:'')+')':'';return ((no?'Camera '+no+(n?' – '+n:''):(/^(cam|camera)\b/i.test(n)?n:'Camera – '+n))+w).trim()};
       const st=rep(me).st;
       me.items=t.faults.map(f=>{const m=eq.find(x=>x.id===f.id)||{};return {name:lbl(f),desc:[m.model?'Model '+m.model:'',f.note||''].filter(Boolean).join(' · '),qty:1,unit:'pcs',price:0,photo:'',status:st.includes(f.result)?f.result:st[0],serials:m.serial?[m.serial]:[]}});
       const done=t.faults.filter(f=>f.result||f.note).map(f=>lbl(f)+': '+(f.result||'')+(f.note?' — '+f.note:'')).join('\n');if(done&&!me.workDone)me.workDone=done}
