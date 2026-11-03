@@ -1903,7 +1903,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1942,16 +1942,19 @@ async function runSeeds(){
       for(const p of seed.products||[]){if(haveP.has(p.name.trim().toLowerCase()))continue;
         await setDoc(doc(fdb,COL.products,uid()),{...p,createdBy:S.me.id,createdAt:now,updatedAt:now});np++}
       const made=[];
-      for(const d0 of seed.docs||[]){const date=today(),id=uid(),pf=S.me.profile||{};
+      for(const d00 of seed.docs||[]){const date=today(),id=uid(),pf=S.me.profile||{};
+        // "clientName": link the document to a client in the list (added by this seed or already there)
+        const d0={...d00};if(d0.clientName){const cl=cMap.get(String(d0.clientName).trim().toLowerCase())||bestMatch(S.clients,d0.clientName);
+          if(cl){d0.clientId=cl.id;d0.client=clientSnap(cl);if(d0.type==='delivery'&&!d0.deliveryAddress)d0.deliveryAddress=cl.address||''}delete d0.clientName}
         const number=await reserveNumber(d0.type,date,d0.reportType);
-        const d={...d0,number,date,validUntil:d0.type==='quotation'?addDays(date,S.cfg.validDays):'',dueDate:d0.type==='invoice'?addDays(date,S.cfg.dueDays):'',ref:d0.ref||'',salesperson:S.me.name||'',
-          status:d0.type==='quotation'?'draft':'',attachments:[],createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:pf.mobile||'',contactEmail:pf.email||'',createdAt:now,updatedAt:now};
+        const d={terms:S.cfg.terms[d0.type]||'',...d0,number,date,validUntil:d0.type==='quotation'?addDays(date,S.cfg.validDays):'',dueDate:d0.type==='invoice'?addDays(date,S.cfg.dueDays):'',ref:d0.ref||'',salesperson:S.me.name||'',
+          status:d0.type==='quotation'?'draft':'',attachments:[],createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:d0.type==='delivery'?'':(pf.mobile||''),contactEmail:d0.type==='delivery'?(S.cfg.dnEmail||DEFAULT_CFG.dnEmail):(pf.email||''),createdAt:now,updatedAt:now};
         await setDoc(doc(fdb,COL.docs,id),d);made.push(number);
         for(const i of d.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
           await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:+i.price||0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:number})}}
       await setDoc(doc(fdb,COL.config,'company'),{seeds:{...done,[seed.id]:now}},{merge:true});
       if(nc||np)toast(`Added ${nc} customer${nc===1?'':'s'} and ${np} product${np===1?'':'s'}`);
-      if(made.length)setTimeout(()=>toast('Quotation '+made.join(', ')+' created. Open Documents → Quotations.'),2600);
+      if(made.length)setTimeout(()=>toast(made.join(', ')+' created. Open Documents to check it.'),2600);
     }catch(e){console.warn('seed',url,e)}
   }
 }

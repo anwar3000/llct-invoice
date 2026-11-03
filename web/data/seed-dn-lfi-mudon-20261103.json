@@ -1,0 +1,222 @@
+{
+ "id": "dn-lfi-mudon-20261103",
+ "clients": [
+  {
+   "name": "Lycée Français International – Mudon",
+   "contact": "",
+   "phone": "+971 4 491 9599",
+   "email": "accueil.lfimudon@aflec-fr.org",
+   "taxId": "",
+   "address": "Lycée Français International (AFLEC) – Mudon Campus\nMudon, Dubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0,
+   "notes": "French school Mudon (AFLEC)"
+  }
+ ],
+ "docs": [
+  {
+   "type": "delivery",
+   "reportType": "delivery",
+   "clientName": "Lycée Français International – Mudon",
+   "subject": "CCTV system – materials delivered (122 cameras)",
+   "notes": "Total cameras: 122 (dome fixed 60, dome varifocal 8, bullet fixed 5, bullet varifocal 49).",
+   "items": [
+    {
+     "name": "15U rack",
+     "desc": "",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "27U rack",
+     "desc": "",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "32-channel NVR",
+     "desc": "",
+     "qty": 6,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "42U rack",
+     "desc": "",
+     "qty": 4,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Back box",
+     "desc": "",
+     "qty": 61,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cable manager / organizer",
+     "desc": "",
+     "qty": 26,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Core switch",
+     "desc": "",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "D-Link switch",
+     "desc": "",
+     "qty": 14,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre patch panel",
+     "desc": "",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Keystone",
+     "desc": "",
+     "qty": 527,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Patch cable",
+     "desc": "",
+     "qty": 263,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Patch panel",
+     "desc": "",
+     "qty": 23,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "PDU",
+     "desc": "",
+     "qty": 13,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Pole",
+     "desc": "",
+     "qty": 10,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode fibre patch cable",
+     "desc": "",
+     "qty": 11,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hard disk 6TB",
+     "desc": "",
+     "qty": 7,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision Monitor 43 inch",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "HDMI cable 10 m & 15 m",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode SFP module",
+     "desc": "",
+     "qty": 9,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Logitech wireless mouse",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Dome camera – fixed lens",
+     "desc": "",
+     "qty": 60,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Dome camera – varifocal",
+     "desc": "",
+     "qty": 8,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Bullet camera – fixed lens",
+     "desc": "",
+     "qty": 5,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Bullet camera – varifocal",
+     "desc": "",
+     "qty": 49,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "attachments": []
+  }
+ ]
+}
