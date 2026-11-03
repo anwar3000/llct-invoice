@@ -405,6 +405,11 @@ service cloud.firestore {
     function svcPortalPath(t) { return /databases/$(database)/documents/svcPortals/$(t); }
     function svcPortalOn(t) { return t is string && exists(svcPortalPath(t)) && get(svcPortalPath(t)).data.get('active', false) == true; }
 
+    // Staff list every client's documents at once (Service Desk → Customers).
+    match /{path=**}/docs/{id} {
+      allow read: if isActive();
+    }
+
     match /svcPortals/{token} {
       allow get: if isActive() || resource.data.get('active', false) == true;
       allow list: if isActive();
@@ -421,6 +426,25 @@ service cloud.firestore {
           allow read: if isActive() || svcPortalOn(token);
           allow create, update: if isActive();
           allow delete: if isActive();
+        }
+      }
+      // Customer documents (trade licence, SIRA certificate / NOC, drawings…) uploaded from the client link
+      // or by staff. The file is kept in pieces in chunks/{n}. Clients add and remove their own unchecked ones.
+      match /docs/{id} {
+        allow read: if isActive() || svcPortalOn(token);
+        allow create: if isActive() || (svcPortalOn(token) && request.resource.data.by == 'client'
+                        && request.resource.data.get('verified', false) == false
+                        && request.resource.data.size <= 8388608 && request.resource.data.chunks <= 16);
+        allow update: if isActive() || (svcPortalOn(token) && resource.data.by == 'client'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['complete']));
+        allow delete: if isActive() || (svcPortalOn(token) && resource.data.by == 'client' && resource.data.get('verified', false) != true);
+        match /chunks/{n} {
+          allow read: if isActive() || svcPortalOn(token);
+          allow create: if isActive() || (svcPortalOn(token)
+                          && getAfter(/databases/$(database)/documents/svcPortals/$(token)/docs/$(id)).data.by == 'client');
+          allow delete: if isActive() || (svcPortalOn(token) && !exists(/databases/$(database)/documents/svcPortals/$(token)/docs/$(id)))
+                          || (svcPortalOn(token) && get(/databases/$(database)/documents/svcPortals/$(token)/docs/$(id)).data.by == 'client'
+                              && get(/databases/$(database)/documents/svcPortals/$(token)/docs/$(id)).data.get('verified', false) != true);
         }
       }
       // Building photo of each site, copied here by the Service Desk so the client page can show it.
