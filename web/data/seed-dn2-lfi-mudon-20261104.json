@@ -1,0 +1,257 @@
+{
+ "id": "dn2-lfi-mudon-20261104",
+ "docs": [
+  {
+   "type": "delivery",
+   "reportType": "delivery",
+   "clientName": "Lycée Français International – Mudon",
+   "subject": "CCTV system – materials delivered (119 cameras)",
+   "notes": "Total cameras: 119 (Hikvision dome fixed 54, dome varifocal 8, bullet fixed 5, bullet varifocal 52).",
+   "items": [
+    {
+     "name": "15U rack 600 × 600",
+     "desc": "",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "27U rack",
+     "desc": "",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision 32-channel NVR",
+     "desc": "",
+     "qty": 6,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "MDF 42U rack 800 × 1000",
+     "desc": "",
+     "qty": 4,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "5 × 5\" round waterproof PVC box for CCTV camera",
+     "desc": "",
+     "qty": 61,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cable manager / organizer",
+     "desc": "",
+     "qty": 23,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre core switch TP-Link 10G",
+     "desc": "",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "D-Link PoE 24-port switch",
+     "desc": "",
+     "qty": 13,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "D-Link Gigabit 24-port switch",
+     "desc": "",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre patch panel",
+     "desc": "",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Optical fibre patch cable",
+     "desc": "",
+     "qty": 10,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre splice box",
+     "desc": "",
+     "qty": 5,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Schneider Cat6 keystone",
+     "desc": "",
+     "qty": 192,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cat6 keystone jack (CCTV)",
+     "desc": "",
+     "qty": 290,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single faceplate (data)",
+     "desc": "",
+     "qty": 24,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cat6 patch cable",
+     "desc": "",
+     "qty": 263,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Schneider patch panel",
+     "desc": "",
+     "qty": 19,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "PDU 32A 6-way",
+     "desc": "",
+     "qty": 16,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "CCTV industrial pole 2 m",
+     "desc": "",
+     "qty": 10,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode fibre patch cable",
+     "desc": "",
+     "qty": 11,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Surveillance hard disk 6TB (24×7)",
+     "desc": "",
+     "qty": 7,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision monitor 43 inch",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Video wall monitor wall bracket",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "HDMI 2.0 cable – MDF to video wall",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode SFP module",
+     "desc": "",
+     "qty": 11,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Wireless mouse",
+     "desc": "",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision dome camera – fixed lens",
+     "desc": "",
+     "qty": 54,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision dome camera – varifocal",
+     "desc": "",
+     "qty": 8,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision bullet camera – fixed lens",
+     "desc": "",
+     "qty": 5,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision bullet camera – varifocal",
+     "desc": "",
+     "qty": 52,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "attachments": []
+  }
+ ]
+}
