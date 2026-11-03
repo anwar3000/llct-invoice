@@ -1903,7 +1903,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn3-lfi-mudon-20261104.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn4-lfi-mudon-20261104.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -1948,7 +1948,7 @@ async function runSeeds(){
           if(cl){d0.clientId=cl.id;d0.client=clientSnap(cl);if(d0.type==='delivery'&&!d0.deliveryAddress)d0.deliveryAddress=cl.address||''}delete d0.clientName}
         // "replaceSubject": an earlier, unsigned version of this document is updated in place (same number) instead of adding another
         if(d0.replaceSubject){const old=(await getDocsFromServer(collection(fdb,COL.docs))).docs.map(x=>({...x.data(),id:x.id}))
-            .find(x=>x.type===d0.type&&x.clientId===d0.clientId&&x.subject===d0.replaceSubject&&!(x.delivery&&x.delivery.signedAt));
+            .find(x=>x.type===d0.type&&x.clientId===d0.clientId&&[].concat(d0.replaceSubject).includes(x.subject)&&!(x.delivery&&x.delivery.signedAt));
           delete d0.replaceSubject;
           if(old){await setDoc(doc(fdb,COL.docs,old.id),{items:d0.items,subject:d0.subject,notes:d0.notes,updatedAt:now},{merge:true});made.push(old.number+' (updated)');
             for(const i of d0.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
