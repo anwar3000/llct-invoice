@@ -1,0 +1,258 @@
+{
+ "id": "dn3-lfi-mudon-20261104",
+ "docs": [
+  {
+   "type": "delivery",
+   "reportType": "delivery",
+   "clientName": "Lycée Français International – Mudon",
+   "replaceSubject": "CCTV system – materials delivered (119 cameras)",
+   "subject": "CCTV system – materials delivered (119 cameras, 4MP)",
+   "notes": "Total cameras: 119 Hikvision 4MP (dome fixed 54, dome varifocal 8, bullet fixed 5, bullet varifocal 52).",
+   "items": [
+    {
+     "name": "15U rack 600 × 600",
+     "desc": "15U wall-mount network cabinet, 600 W × 600 D.\nGlass front door, lockable, with side panels and cooling fan.",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "27U rack",
+     "desc": "27U floor-standing network cabinet.\nLockable front door, removable side panels, ventilated top.",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision 32-channel NVR",
+     "desc": "32-channel network video recorder for IP cameras, 4K output.\nSupports multiple surveillance hard disks for continuous recording.",
+     "qty": 6,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "MDF 42U rack 800 × 1000",
+     "desc": "42U floor-standing MDF rack, 800 W × 1000 D.\nPerforated front and rear doors, fans, castors and levelling feet.",
+     "qty": 4,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "5 × 5\" round waterproof PVC box for CCTV camera",
+     "desc": "Weatherproof PVC junction / back box for camera mounting.\nHides cable joints and connectors at each camera point.",
+     "qty": 61,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cable manager / organizer",
+     "desc": "1U rack-mount horizontal cable manager.\nKeeps patch cords tidy between panels and switches.",
+     "qty": 23,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre core switch TP-Link 10G",
+     "desc": "Managed core switch with 10G SFP+ fibre ports.\nAggregates all access switches and NVRs on the fibre backbone.",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "D-Link PoE 24-port switch",
+     "desc": "24-port Gigabit PoE switch with uplink ports.\nPowers and connects the IP cameras over a single Cat6 cable.",
+     "qty": 13,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "D-Link Gigabit 24-port switch",
+     "desc": "24-port Gigabit network switch (non-PoE).\nFor NVRs, workstations and monitoring equipment.",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre patch panel",
+     "desc": "Rack-mount fibre patch panel with adapters.\nTerminates and organises the fibre backbone cores.",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Optical fibre patch cable",
+     "desc": "Duplex optical fibre patch cord.\nConnects the fibre patch panel to switch SFP ports.",
+     "qty": 10,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Fibre splice box",
+     "desc": "Fibre termination / splice enclosure.\nProtects fusion splices at each fibre end.",
+     "qty": 5,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Schneider Cat6 keystone",
+     "desc": "Cat6 RJ45 keystone jack, unshielded.\nFor patch panel and faceplate terminations.",
+     "qty": 192,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cat6 keystone jack (CCTV)",
+     "desc": "Cat6 RJ45 keystone jack for camera points.\nTerminates the camera cable at the back box.",
+     "qty": 290,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single faceplate (data)",
+     "desc": "Single-port data faceplate with shutter.\nWall outlet for data points.",
+     "qty": 24,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Cat6 patch cable",
+     "desc": "Cat6 RJ45 patch cord with moulded boots.\nConnects patch panels, switches and devices.",
+     "qty": 263,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Schneider patch panel",
+     "desc": "24-port Cat6 rack-mount patch panel, 1U.\nTerminates horizontal cabling in the racks.",
+     "qty": 19,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "PDU 32A 6-way",
+     "desc": "Rack-mount power distribution unit, 32A, 6 sockets.\nPowers switches, NVRs and rack equipment.",
+     "qty": 16,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "CCTV industrial pole 2 m",
+     "desc": "Galvanised steel camera pole, 2 m height.\nFor outdoor camera mounting with base plate.",
+     "qty": 10,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode fibre patch cable",
+     "desc": "Single-mode duplex fibre patch cord.\nLinks SFP modules to the fibre patch panels.",
+     "qty": 11,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Surveillance hard disk 6TB (24×7)",
+     "desc": "6TB surveillance-grade hard disk rated for 24×7 recording.\nInstalled in the NVRs for continuous video storage.",
+     "qty": 7,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision monitor 43 inch",
+     "desc": "43-inch Full HD monitor for 24×7 surveillance viewing.\nFor the video wall in the control room.",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Video wall monitor wall bracket",
+     "desc": "Wall-mount bracket for video wall monitors.\nAdjustable for flush, aligned installation.",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "HDMI 2.0 cable – MDF to video wall",
+     "desc": "High-speed HDMI 2.0 cable, 10 m / 15 m lengths.\nConnects NVR outputs in the MDF to the video wall monitors.",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Single-mode SFP module",
+     "desc": "1G / 10G single-mode SFP transceiver module.\nFibre uplink between core and access switches.",
+     "qty": 11,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Wireless mouse",
+     "desc": "Wireless optical mouse with USB receiver.\nFor NVR and video wall operation.",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision dome camera 4MP – fixed lens",
+     "desc": "4MP IP dome camera with fixed lens and IR night vision.\nIndoor coverage, PoE powered.",
+     "qty": 54,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision dome camera 4MP – varifocal",
+     "desc": "4MP IP dome camera with motorised varifocal lens and IR.\nAdjustable zoom for wider or longer views, PoE powered.",
+     "qty": 8,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision bullet camera 4MP – fixed lens",
+     "desc": "4MP IP bullet camera with fixed lens, IR night vision.\nWeatherproof for outdoor use, PoE powered.",
+     "qty": 5,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    },
+    {
+     "name": "Hikvision bullet camera 4MP – varifocal",
+     "desc": "4MP IP bullet camera with motorised varifocal lens and IR.\nWeatherproof outdoor coverage with adjustable zoom, PoE powered.",
+     "qty": 52,
+     "unit": "pcs",
+     "price": 0,
+     "photo": ""
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "attachments": []
+  }
+ ]
+}
