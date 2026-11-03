@@ -29,6 +29,8 @@ service cloud.firestore {
     function canAccounts() { return isActive() && (me().get('canViewAccounts', false) == true || me().get('canEditAccounts', false) == true); }
     // …and to make changes, which wait in acctRequests until an admin approves them.
     function canAccountsEdit() { return isActive() && me().get('canEditAccounts', false) == true; }
+    // Admin can let a person push BOQs (bill of quantities) to projects / sites.
+    function canBoq() { return isActive() && me().get('canPushBoq', false) == true; }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
     function owns() { return isActive() && resource.data.employeeId == request.auth.uid; }
     function createsOwn() { return isActive() && request.resource.data.employeeId == request.auth.uid; }
@@ -57,6 +59,13 @@ service cloud.firestore {
     match /projects/{id} {
       allow read: if isActive();
       allow write: if isManagement();
+    }
+
+    // ---------------------------------------------------------------- BOQs pushed to projects / sites
+    // Everyone signed in can read and print them; admin and people with the BOQ permission push / edit them.
+    match /boqs/{id} {
+      allow read: if isActive();
+      allow write: if isAdmin() || canBoq();
     }
 
     // ---------------------------------------------------------------- sites
