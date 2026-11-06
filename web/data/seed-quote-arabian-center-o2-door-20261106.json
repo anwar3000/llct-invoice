@@ -1,0 +1,59 @@
+{
+ "id": "quote-arabian-center-o2-door-20261106",
+ "clients": [
+  {
+   "name": "Arabian Center",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Arabian Center (Shopping Mall)\nAl Khawaneej Street, Al Mizhar 1\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  }
+ ],
+ "docs": [
+  {
+   "type": "quotation",
+   "clientName": "Arabian Center",
+   "replaceSubject": [
+    "Door monitoring system with Oxygen IoT – 9 doors"
+   ],
+   "subject": "Oxygen O2 Exit Door Monitoring System – 9 doors",
+   "items": [
+    {
+     "name": "Oxygen O2 Exit Door Monitoring System",
+     "desc": "Central monitoring system for 9 doors – real-time door status, instant alarms and event recording",
+     "qty": 1,
+     "unit": "system",
+     "price": 5950
+    },
+    {
+     "name": "Door Monitoring Point",
+     "desc": "Supply, fixing and testing per door",
+     "qty": 9,
+     "unit": "door",
+     "price": 350
+    },
+    {
+     "name": "Monitoring, Alerts & Reporting Package",
+     "desc": "Mobile alerts, live dashboard and event history for management",
+     "qty": 1,
+     "unit": "lot",
+     "price": 1000
+    },
+    {
+     "name": "Programming, Commissioning & Training",
+     "desc": "Complete system setup, testing, handover and user training",
+     "qty": 1,
+     "unit": "lot",
+     "price": 500
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "notes": "24/7 monitoring of 9 doors with instant mobile alerts, live status and full event history. Made in the UAE by Leaders Line.",
+   "terms": "Prices are valid for 15 days from the quotation date.\nPayment: 50% advance with LPO, balance on completion.\nDelivery & installation: 1–2 weeks from LPO.\nWarranty: 1 year on system and workmanship.\nExclusions: cabling and containment, power points, network/internet connection, civil works and mall permits."
+  }
+ ]
+}
