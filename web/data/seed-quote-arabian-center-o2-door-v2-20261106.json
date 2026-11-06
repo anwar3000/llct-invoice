@@ -1,11 +1,18 @@
 {
- "id": "quote-arabian-center-o2-door-20261106",
+ "id": "quote-arabian-center-o2-door-v2-20261106",
  "clients": [
   {
    "name": "Arabian Center",
-   "contact": "",
-   "phone": "",
-   "email": "",
+   "update": true,
+   "replace": [
+    "contact",
+    "phone",
+    "email",
+    "address"
+   ],
+   "contact": "Attn: Mall Management Office",
+   "phone": "+971 4 284 5555",
+   "email": "arabian.info@lalsgroup.com",
    "taxId": "",
    "address": "Arabian Center (Shopping Mall)\nAl Khawaneej Street, Al Mizhar 1\nDubai, United Arab Emirates",
    "creditDays": 30,
@@ -17,6 +24,7 @@
    "type": "quotation",
    "clientName": "Arabian Center",
    "replaceSubject": [
+    "Oxygen O2 Exit Door Monitoring System – 9 doors",
     "Door monitoring system with Oxygen IoT – 9 doors"
    ],
    "subject": "Oxygen O2 Exit Door Monitoring System – 9 doors",
