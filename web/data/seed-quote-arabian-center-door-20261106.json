@@ -1,12 +1,22 @@
 {
- "id": "quote-bfl-arabian-door-20261106",
+ "id": "quote-arabian-center-door-20261106",
+ "clients": [
+  {
+   "name": "Arabian Center",
+   "contact": "",
+   "phone": "",
+   "email": "",
+   "taxId": "",
+   "address": "Arabian Center (Shopping Mall)\nAl Khawaneej Street, Al Mizhar 1\nDubai, United Arab Emirates",
+   "creditDays": 30,
+   "openingBalance": 0
+  }
+ ],
  "docs": [
   {
    "type": "quotation",
-   "clientName": "BFL Group",
-   "siteName": "Brands For Less – Arabian Center",
-   "siteAddress": "Ground Floor, Arabian Center, Al Khawaneej St, Al Mizhar 1, Dubai, UAE",
-   "subject": "Door monitoring system with Oxygen IoT – 9 doors, Arabian Center",
+   "clientName": "Arabian Center",
+   "subject": "Door monitoring system with Oxygen IoT – 9 doors",
    "items": [
     {
      "name": "Oxygen IoT Smart Gateway",
