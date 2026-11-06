@@ -1,0 +1,313 @@
+{
+ "id": "quote-ai-12branch-20261106",
+ "docs": [
+  {
+   "type": "quotation",
+   "subject": "Centralised AI camera & monitoring system – 12 branches (face recognition, customer analytics, drive-up vehicle alerts, cleaning compliance, central dashboard)",
+   "client": {
+    "name": "Client (to be confirmed)"
+   },
+   "clientId": "",
+   "items": [
+    {
+     "name": "Dahua AI Face Recognition Camera 4MP",
+     "desc": "WizMind deep-learning bullet, 1/1.8\" Starlight, motorized vari-focal lens · customer face capture & recognition, new vs returning, entry frequency, staff exclusion · 2 per branch × 12 branches",
+     "qty": 24,
+     "unit": "pcs",
+     "price": 1812
+    },
+    {
+     "name": "Dahua AI 3D People Counting Camera 4MP",
+     "desc": "Dual-lens overhead stereo counting camera · accurate in/out footfall per branch with staff filtering · 1 per branch × 12",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1688
+    },
+    {
+     "name": "Dahua ANPR Vehicle Recognition Camera 4MP",
+     "desc": "Number-plate recognition camera with IR & motorized lens · drive-up vehicle arrival trigger and plate capture · 1 per branch × 12",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 2625
+    },
+    {
+     "name": "Dahua AI Vehicle Detection Camera 4MP",
+     "desc": "WizMind vari-focal bullet with AI vehicle/human classification · drive-up bay presence & staff-arrival detection · 1 per branch × 12",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 975
+    },
+    {
+     "name": "Dahua AI Dome Camera 4MP",
+     "desc": "WizMind vandal-proof dome 2.8 mm, audio & alarm I/O · customer areas, tables & floors – zone presence for cleaning-cycle monitoring, people-in-area, abandoned object · 4 per branch × 12",
+     "qty": 48,
+     "unit": "pcs",
+     "price": 650
+    },
+    {
+     "name": "Dahua 16-Channel AI Network Video Recorder",
+     "desc": "16 ch, 2 SATA bays, AI by recorder, H.265+ · local recording at each branch, linked to central DSS Pro · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1562
+    },
+    {
+     "name": "Surveillance Hard Disk 8TB",
+     "desc": "24/7 surveillance-rated 3.5\" SATA · 2 per branch = 16 TB, approx. 70 days recording for 9 cameras (4MP H.265)",
+     "qty": 24,
+     "unit": "pcs",
+     "price": 900
+    },
+    {
+     "name": "16-Port PoE Network Switch",
+     "desc": "16 × PoE + 2 uplink, 135 W PoE budget · power & data for branch cameras · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 812
+    },
+    {
+     "name": "Site-to-Site VPN Router",
+     "desc": "Business-grade secure VPN router · encrypted link from branch to central management server · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1188
+    },
+    {
+     "name": "9U Wall-Mount Network Rack",
+     "desc": "With PDU, 24-port Cat6 patch panel and cable managers · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 938
+    },
+    {
+     "name": "UPS 1.5 kVA",
+     "desc": "Line-interactive UPS · backup for NVR, switch and router · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1875
+    },
+    {
+     "name": "Staff Alert Display 43\"",
+     "desc": "43\" FHD commercial display with wall bracket · internal screen for drive-up arrival and cleaning-overdue alerts · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1588
+    },
+    {
+     "name": "Alert Display Controller PC",
+     "desc": "Mini PC Core i5 / 16 GB / Windows 11 Pro running DSS client in alarm pop-up mode · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 2875
+    },
+    {
+     "name": "Indoor Strobe Sounder",
+     "desc": "12 V visual/audible alert driven from camera alarm output · drive-up arrival & 30-second escalation · 2 per branch",
+     "qty": 24,
+     "unit": "pcs",
+     "price": 119
+    },
+    {
+     "name": "NFC Cleaning Checkpoint Tag",
+     "desc": "Rugged NFC tag per cleaning zone · staff check-in each 20-minute cycle · 6 per branch",
+     "qty": 72,
+     "unit": "pcs",
+     "price": 31
+    },
+    {
+     "name": "Cat6 UTP Cable (305 m box)",
+     "desc": "23 AWG Cat6 UTP · approx. 30 m per camera point · 1 box per branch",
+     "qty": 12,
+     "unit": "box",
+     "price": 688
+    },
+    {
+     "name": "Cable Containment & Accessories",
+     "desc": "PVC conduit, flexible, junction/back boxes, RJ45 connectors and fixings · per branch",
+     "qty": 12,
+     "unit": "lot",
+     "price": 1500
+    },
+    {
+     "name": "Galvanised Camera Pole 3 m",
+     "desc": "Pole with brackets for drive-up ANPR camera (supply only; foundation by client) · 1 per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1125
+    },
+    {
+     "name": "Dahua DSS Pro V8 – Video Base Licence",
+     "desc": "Central video management platform for all 12 branches, includes 16 video channels · perpetual licence",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 4680
+    },
+    {
+     "name": "Dahua DSS Pro V8 – Video Channel Licence",
+     "desc": "One per AI camera above the 16 included · 108 cameras in total · perpetual",
+     "qty": 92,
+     "unit": "pcs",
+     "price": 222
+    },
+    {
+     "name": "Dahua DSS Pro V8 – Retail Analytics Module",
+     "desc": "Customer traffic analysis, people-counting reports, branch-by-branch comparison · perpetual",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 4200
+    },
+    {
+     "name": "Dahua DSS Pro V8 – AcuPick Cross-Branch Search Module",
+     "desc": "Search the same person/face across all branches by image · perpetual",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 3000
+    },
+    {
+     "name": "Dahua DSS Pro V8 – Vehicle Entrance Management Module",
+     "desc": "ANPR arrival/exit records and vehicle lists per branch · perpetual",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 3960
+    },
+    {
+     "name": "Central Management Server",
+     "desc": "Enterprise rack server: Xeon, 64 GB RAM, 2 × 960 GB SSD RAID1, 4 × 8 TB RAID5 for face/ANPR/event data, dual PSU, 3-year vendor support",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 32500
+    },
+    {
+     "name": "Windows Server Standard Licence",
+     "desc": "Server operating system licence (16-core)",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 4500
+    },
+    {
+     "name": "Operator Workstation",
+     "desc": "Core i7, 32 GB, discrete graphics, 2 × 27\" monitors, Windows 11 Pro · live view & alarm handling",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 8125
+    },
+    {
+     "name": "Monitoring Display 55\"",
+     "desc": "55\" FHD professional display with wall bracket · 12-branch live view and KPI dashboard",
+     "qty": 2,
+     "unit": "pcs",
+     "price": 3850
+    },
+    {
+     "name": "Head-Office Firewall / VPN Gateway",
+     "desc": "Next-generation firewall with 1-year security subscription · terminates 12 branch VPN tunnels",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 5250
+    },
+    {
+     "name": "24-Port Gigabit Managed Switch",
+     "desc": "Head-office LAN switch",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 1500
+    },
+    {
+     "name": "Online UPS 3 kVA",
+     "desc": "Double-conversion UPS for server and network",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 5250
+    },
+    {
+     "name": "18U Floor-Standing Rack",
+     "desc": "With PDU, patch panel and cable management",
+     "qty": 1,
+     "unit": "pcs",
+     "price": 2000
+    },
+    {
+     "name": "Camera Installation & Configuration",
+     "desc": "Mounting, termination, aiming, focusing and IP configuration",
+     "qty": 108,
+     "unit": "pcs",
+     "price": 250
+    },
+    {
+     "name": "Cable Pulling",
+     "desc": "Cat6 in surface/ceiling conduit, up to 30 m per point",
+     "qty": 108,
+     "unit": "pcs",
+     "price": 180
+    },
+    {
+     "name": "Branch Head-End Setup",
+     "desc": "Rack dressing, NVR, switch, VPN router, UPS, alert screen & strobe wiring · per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1800
+    },
+    {
+     "name": "ANPR Pole Installation",
+     "desc": "Pole fixing & cabling (civil foundation by client) · per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 400
+    },
+    {
+     "name": "AI Configuration & Tuning",
+     "desc": "Face libraries & staff exclusion, people counting, ANPR, drive-up zones, cleaning zones, alarm plans · per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1500
+    },
+    {
+     "name": "Central DSS Pro Deployment",
+     "desc": "Server build, software & licence activation, 12-site VPN, device onboarding, user roles, analytics modules",
+     "qty": 1,
+     "unit": "lot",
+     "price": 12000
+    },
+    {
+     "name": "KPI Integration & Management Dashboard",
+     "desc": "Middleware on DSS Pro API: 30-second drive-up response timer & escalation, 20-minute cleaning compliance, cross-branch customer visit history, daily/weekly/monthly branch reports",
+     "qty": 1,
+     "unit": "lot",
+     "price": 48000
+    },
+    {
+     "name": "SIRA / ADMCC Drawings & Approvals",
+     "desc": "Design drawings, documentation and approval handling (authority fees excluded) · per branch",
+     "qty": 12,
+     "unit": "pcs",
+     "price": 1500
+    },
+    {
+     "name": "Testing, Commissioning & Handover",
+     "desc": "Site acceptance tests, as-built drawings, O&M manuals",
+     "qty": 1,
+     "unit": "lot",
+     "price": 6000
+    },
+    {
+     "name": "Training",
+     "desc": "Operator and management training – 2 sessions",
+     "qty": 1,
+     "unit": "lot",
+     "price": 3500
+    },
+    {
+     "name": "Project Management & Supervision",
+     "desc": "Project management and site supervision across 12 branches",
+     "qty": 1,
+     "unit": "lot",
+     "price": 15000
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "notes": "Design basis per branch: 9 Dahua WizMind AI cameras (2 face recognition, 1 people counting, 2 drive-up vehicle, 4 customer-area domes), local AI NVR with 16 TB, staff alert screen and strobes, VPN link to one central Dahua DSS Pro V8 platform at head office – 108 cameras in total.\nFace recognition, people counting, new vs returning customers, vehicle detection and alerts run natively on DSS Pro. The 30-second response-time report, 20-minute cleaning compliance and cross-branch visit history are delivered by the KPI integration & dashboard.\nCleaning monitoring verifies that staff visit each zone every cycle (camera presence + NFC check-in); camera AI cannot judge dust or surface cleanliness.\nMinimum internet: 10 Mbps upload per branch, 150 Mbps at head office (static IP).",
+   "terms": "Prices are valid for 15 days from the quotation date.\nPayment: 50% advance with LPO, 40% on delivery of materials, 10% on testing & commissioning.\nImplementation: approx. 16 weeks for all 12 branches, starting with a pilot branch.\nWarranty: Dahua equipment as per manufacturer warranty; 1 year on workmanship and support. Annual maintenance from Year 2 quoted separately.\nSoftware licences are perpetual.\nExclusions: internet lines & static IPs, civil works, pole foundations, core drilling, false-ceiling works, power points, authority fees.\nFacial recognition of customers is biometric personal data; customer notice/signage and compliance with UAE PDPL are the client's responsibility."
+  }
+ ]
+}
