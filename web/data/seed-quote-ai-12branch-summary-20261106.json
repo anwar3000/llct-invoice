@@ -1,0 +1,82 @@
+{
+ "id": "quote-ai-12branch-summary-20261106",
+ "docs": [
+  {
+   "type": "quotation",
+   "subject": "Centralised AI camera & monitoring system – 12 branches (face recognition, customer analytics, drive-up vehicle alerts, cleaning compliance, central dashboard) – summary",
+   "client": {
+    "name": "Client (to be confirmed)"
+   },
+   "clientId": "",
+   "items": [
+    {
+     "name": "AI Camera Set – per Branch",
+     "desc": "Dahua WizMind AI cameras per branch: 2 face recognition, 1 people counting, 1 ANPR vehicle recognition, 1 drive-up vehicle detection, 4 AI domes for customer areas (9 cameras per branch, 108 in total)",
+     "qty": 12,
+     "unit": "set",
+     "price": 11512
+    },
+    {
+     "name": "Branch Recording & Network Equipment",
+     "desc": "Per branch: Dahua 16-channel AI NVR with 16 TB storage, PoE switch, site-to-site VPN router, wall rack and UPS",
+     "qty": 12,
+     "unit": "set",
+     "price": 8175
+    },
+    {
+     "name": "Staff Alert System – per Branch",
+     "desc": "Per branch: 43\" alert display with controller, strobe sounders and NFC cleaning checkpoints for drive-up and cleaning alerts",
+     "qty": 12,
+     "unit": "set",
+     "price": 4887
+    },
+    {
+     "name": "Cabling, Containment & Accessories",
+     "desc": "Per branch: Cat6 cabling, conduits, junction boxes, fixings and camera pole for drive-up area",
+     "qty": 12,
+     "unit": "lot",
+     "price": 3313
+    },
+    {
+     "name": "Dahua DSS Pro V8 Central Software Licences",
+     "desc": "Central management platform for all 12 branches – 108 camera channels, retail analytics, cross-branch search and vehicle management modules (perpetual)",
+     "qty": 1,
+     "unit": "lot",
+     "price": 36264
+    },
+    {
+     "name": "Central Server & Monitoring Room",
+     "desc": "Management server, operator workstations, monitoring displays, firewall, network and UPS at head office",
+     "qty": 1,
+     "unit": "lot",
+     "price": 74950
+    },
+    {
+     "name": "Installation & AI Configuration – per Branch",
+     "desc": "Supply-side installation, cabling, configuration and AI tuning of all branch equipment",
+     "qty": 12,
+     "unit": "lot",
+     "price": 7570
+    },
+    {
+     "name": "Central Deployment & KPI Management Dashboard",
+     "desc": "Central platform setup and management dashboard: customer analytics, 30-second drive-up response, cleaning compliance and branch reports",
+     "qty": 1,
+     "unit": "lot",
+     "price": 60000
+    },
+    {
+     "name": "Approvals, Commissioning, Training & Project Management",
+     "desc": "SIRA / ADMCC approvals, testing & commissioning, training and project management for 12 branches",
+     "qty": 1,
+     "unit": "lot",
+     "price": 42500
+    }
+   ],
+   "discount": 0,
+   "taxRate": 5,
+   "notes": "Design basis: 9 Dahua WizMind AI cameras per branch (108 in total) with local recording, linked by secure VPN to one central Dahua DSS Pro V8 management platform at head office.\nIncludes customer face recognition & visit analytics, drive-up vehicle alerts with 30-second response tracking, cleaning-cycle compliance and a central management dashboard with daily, weekly and monthly reports.\nMinimum internet: 10 Mbps upload per branch, 150 Mbps at head office (static IP).",
+   "terms": "Prices are valid for 15 days from the quotation date.\nPayment: 50% advance with LPO, 40% on delivery of materials, 10% on testing & commissioning.\nImplementation: approx. 16 weeks for all 12 branches, starting with a pilot branch.\nWarranty: Dahua equipment as per manufacturer warranty; 1 year on workmanship and support. Annual maintenance from Year 2 quoted separately.\nSoftware licences are perpetual.\nExclusions: internet lines & static IPs, civil works, pole foundations, core drilling, false-ceiling works, power points, authority fees.\nFacial recognition of customers is biometric personal data; customer notice/signage and compliance with UAE PDPL are the client's responsibility."
+  }
+ ]
+}
