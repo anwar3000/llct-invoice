@@ -202,6 +202,14 @@ service cloud.firestore {
       allow delete: if isAdmin() || (owns() && resource.data.status == 'pending');
     }
 
+    // Receipt photo of a petty cash entry, kept apart so the petty records stay small: pettyFiles/{pettyId} = { d, employeeId }.
+    match /pettyFiles/{id} {
+      allow read: if isAdmin() || owns() || canAccounts();
+      allow create: if isAdmin() || createsOwn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || owns();
+    }
+
     // ------------------------------------------------------------- off days
     match /offDays/{id} {
       allow read: if isManagement() || owns();
@@ -434,7 +442,8 @@ service cloud.firestore {
         allow read: if isActive() || svcPortalOn(token);
         allow create: if isActive() || (svcPortalOn(token) && request.resource.data.by == 'client'
                         && request.resource.data.get('verified', false) == false
-                        && request.resource.data.size <= 8388608 && request.resource.data.chunks <= 16);
+                        && request.resource.data.size <= (request.resource.data.get('storage', '') == 'server' ? 26214400 : 8388608)
+                        && request.resource.data.chunks <= 16);
         allow update: if isActive() || (svcPortalOn(token) && resource.data.by == 'client'
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['complete']));
         allow delete: if isActive() || (svcPortalOn(token) && resource.data.by == 'client' && resource.data.get('verified', false) != true);
