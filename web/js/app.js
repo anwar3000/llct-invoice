@@ -881,7 +881,7 @@ VIEWS.edit=()=>{
      ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${rep(d).st.map(x=>`<option ${(i.status||rep(d).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
      <div class="ibtns"><button class="xbtn ex" type="button" data-full="${n}" aria-label="Open item in full window" title="Open in full window">${I.expand}</button><button class="xbtn" type="button" data-rm="${n}" aria-label="Remove item" title="Remove item">✕</button></div></div>`).join('')}</div>
-   <div><button class="btn" id="add-item">${I.plus}Add item</button></div>
+   <div class="row" style="gap:8px;flex-wrap:wrap">${S.products.length?`<button class="btn primary" id="add-prod">${I.search}Add from products</button>`:''}<button class="btn" id="add-item">${I.plus}Add item</button></div>
    ${isDN?'':`<div class="totals"><div class="tr"><span class="muted">Subtotal</span><span class="num" id="t-sub">${money(t.sub)}</span></div>
     <div class="tr" style="align-items:center"><span class="muted">Discount</span><input type="number" step="any" id="e-discount" value="${h(d.discount)}" style="width:120px;text-align:right"></div>
     <div class="tr" style="align-items:center"><span class="muted">${h(S.cfg.taxLabel)} %</span><input type="number" step="any" id="e-taxRate" value="${h(d.taxRate)}" style="width:120px;text-align:right"></div>
@@ -1057,6 +1057,9 @@ VIEWS_AFTER.edit=()=>{
   $$('[data-now]').forEach(b=>b.onclick=()=>{const el=$('#'+b.dataset.now);const n=new Date();el.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');el.dispatchEvent(new Event('change',{bubbles:true}))});
   $('.moredet')&&$('.moredet').addEventListener('toggle',e=>{if(ED)ED._more=e.target.open});
   $$('[data-findp]').forEach(b=>b.onclick=()=>{readEditor();const n=+b.dataset.findp;productPicker(p=>{if(!p)return;readEditor();fillItem(ED.items[n],p);render()},ED.items[n].name||'')});
+  // tapping an empty item name opens the product list (close it to type the item by hand)
+  $$('.items [data-i]').forEach(row=>{const inp=$('[data-f="name"]',row);if(!inp)return;inp.addEventListener('click',()=>{if(inp.value.trim()||row._pp)return;row._pp=1;readEditor();const n=+row.dataset.i;productPicker(p=>{if(!p){setTimeout(()=>inp.focus(),30);return}readEditor();fillItem(ED.items[n],p);render()},'')})});
+  const ap=$('#add-prod');if(ap)ap.onclick=()=>productPicker(p=>{if(p)addProduct(p)});
   // description boxes grow with the text, so long descriptions are easy to read and edit
   $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
