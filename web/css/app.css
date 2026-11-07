@@ -151,6 +151,7 @@ table.tbl{width:100%;border-collapse:collapse}
 .sheet *{box-sizing:border-box}
 .sheet .band{position:absolute;left:0;right:0;top:0;height:6px;background:var(--c)}
 .sheet .band:after{content:"";position:absolute;left:0;top:0;height:6px;width:28%;background:var(--b)}
+.sheet.rep .band{display:none}
 .sheet .hd{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center;padding-top:4px}
 .sheet .co{display:flex;gap:16px;align-items:center;min-width:0}
 .sheet .co img.logo{width:auto;max-width:96px;max-height:88px;object-fit:contain}

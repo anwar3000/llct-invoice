@@ -362,7 +362,8 @@ function sheetFoot(){const c=S.cfg;
   if(isPrem())return `<div class="pft"><div class="pfl">${c.website?`<span>${ico('globe','#ffffff')}${h(c.website)}</span>`:''}${c.email?`<span>${ico('mail','#ffffff')}${h(c.email)}</span>`:''}${c.phone?`<span>${ico('phone','#ffffff')}${h(c.phone)}</span>`:''}</div><div class="pfr">${h(c.tagline||'')}</div></div>`;
   return `<div class="ft"><span>${h(c.name)}${c.taxId?' · '+h(c.taxIdLabel)+' '+h(c.taxId):''}</span><span>This is a computer-generated document</span><span>${h((c.website||'').split('·')[0].trim())}</span></div>`}
 // Photos attached to a document print as extra pages after it.
-function renderAnnex(d){
+function renderAnnex(d){_repCls=d.type==='delivery';try{return _renderAnnex(d)}finally{_repCls=false}}
+function _renderAnnex(d){
   const ims=(d.attachments||[]).filter(a=>a.kind==='image'&&a.inPdf!==false);if(!ims.length)return '';
   const U={S:1,M:2,L:4},c=S.cfg,pages=[];let cur=[],used=0;
   for(const a of ims){const u=U[a.size||'M']||2;if(used+u>4&&cur.length){pages.push(cur);cur=[];used=0}cur.push(a);used+=u}
@@ -372,8 +373,11 @@ function renderAnnex(d){
    <div class="agrid">${pg.map(a=>{no++;const z=a.size||'M';return `<figure class="af sz-${z}"><div class="abox">${img(a.ref)}</div><figcaption><b>${String(no).padStart(2,'0')}</b>${h(a.caption||'')}</figcaption></figure>`}).join('')}</div>
    ${sheetFoot()}</div>`).join('');
 }
-const docCls=()=>(S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean')+' f-'+(S.cfg.docFont||'gothic');
-const isPrem=()=>S.cfg.docStyle==='premium';
+// Service reports / delivery notes always print in the classic style (logo colours as fine accents only),
+// without the colour bar on top — easier to read and print on paper. _repCls is set while one is drawn.
+let _repCls=false;
+const docCls=()=>(_repCls?' rep':S.cfg.docStyle==='classic'?'':S.cfg.docStyle==='premium'?' premium':' clean')+' f-'+(S.cfg.docFont||'gothic');
+const isPrem=()=>!_repCls&&S.cfg.docStyle==='premium';
 // Small line icons for the Premium style (as images, so they print into the PDF).
 const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5 0 110 5a2.5 2.5 0 110-5z',
   phone:'M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
@@ -401,7 +405,8 @@ function bankHtml(b){
   return `<div class="bk">${String(b).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^([^:]{2,22}):\s*(.+)$/);return m?`<span>${h(m[1])}</span><b>${h(m[2])}</b>`:`<b class="full">${h(x)}</b>`}).join('')}</div>`;
 }
 const pdfRefs=d=>(d.attachments||[]).filter(a=>a.kind==='pdf'&&a.inPdf!==false).map(a=>a.ref);
-function renderSheet(d){
+function renderSheet(d){_repCls=d.type==='delivery';try{return _renderSheet(d)}finally{_repCls=false}}
+function _renderSheet(d){
   const c=S.cfg,t=totals(d),cl=d.client||{},isDN=d.type==='delivery',isQ=d.type==='quotation';
   const showPrice=!isDN||c.showPricesOnDN;const hasImg=!isDN&&(d.items||[]).some(i=>i.photo);
   const PX={S:44,M:72,L:112};const psz=i=>PX[i.photoSize||c.photoSize||'M']||72;
