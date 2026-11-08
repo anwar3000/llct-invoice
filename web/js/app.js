@@ -1092,23 +1092,46 @@ VIEWS_AFTER.edit=()=>{
       delete d.clientTrn;
       const wasNew=!!d._new;
       delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai','_tk','_tkDone','_tkBusy'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
-      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();syncProducts(d);rememberPlace(d);if(wasNew)linkTicket(d);go('view',{id:d.id})}
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();rememberPlace(d);if(wasNew)linkTicket(d);await syncProducts(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
-// Every item typed on a document is kept in the product list for next time.
+// New items typed on a document are added to the product list only after asking; products added by
+// anyone other than an admin / manager wait for their approval before they show in the lists.
+const canApproveProducts=()=>S.me.role==='admin'||S.me.role==='manager';
+function askNewProducts(names){
+  return new Promise(res=>{
+    const ok=canApproveProducts();
+    const o=modal('Add new items to the product list?',`<p style="margin-top:0">These items are not in the product list yet. Tick the ones to keep for next time${ok?'':' — an admin or manager approves them before they appear in the list'}.</p>
+      <div class="grid" style="gap:6px">${names.map((n,k)=>`<label class="row" style="flex-wrap:nowrap;gap:10px;padding:8px 10px;border:1px solid var(--line,#e3e1dd);border-radius:8px"><input type="checkbox" data-np="${k}" checked style="width:18px;height:18px"><span>${h(n)}</span></label>`).join('')}</div>`,
+      `<button class="btn" id="np-no">Don't add</button><button class="btn primary" id="np-yes">${ok?'Add to product list':'Send for approval'}</button>`);
+    let done=false;const fin=v=>{if(done)return;done=true;closeModal();res(v)};
+    $('#np-no',o).onclick=()=>fin([]);
+    $('#np-yes',o).onclick=()=>fin(names.filter((n,k)=>$(`[data-np="${k}"]`,o).checked));
+    $$('[data-x]',o).forEach(b=>b.addEventListener('click',()=>fin([])));
+  });
+}
 async function syncProducts(d){
-  const seen=new Set();
+  const seen=new Set();const fresh=[];
   for(const i of d.items||[]){
     const name=String(i.name||'').trim();const key=name.toLowerCase();if(!name||seen.has(key))continue;seen.add(key);
-    const p=S.products.find(x=>String(x.name||'').trim().toLowerCase()===key);
+    const p=(S.allProducts||S.products).find(x=>String(x.name||'').trim().toLowerCase()===key);
+    if(!p){fresh.push(i);continue}
     try{
-      if(!p){const np={name,desc:i.desc||'',unit:i.unit||'pcs',price:d.type==='delivery'?0:(+i.price||0),photo:i.photo||'',barcode:'',createdBy:S.me.id,createdAt:new Date().toISOString(),source:d.number};
-        const id=uid();await Store.put('products',id,np);S.products.push({...np,id})}
-      else if(can('clients')){const upd={};if(!p.photo&&i.photo)upd.photo=i.photo;if(!p.desc&&i.desc)upd.desc=i.desc;if(d.type!=='delivery'&&+i.price&&+i.price!==+p.price)upd.price=+i.price;
+      if(p.status!=='pending'&&can('clients')){const upd={};if(!p.photo&&i.photo)upd.photo=i.photo;if(!p.desc&&i.desc)upd.desc=i.desc;if(d.type!=='delivery'&&+i.price&&+i.price!==+p.price)upd.price=+i.price;
         if(Object.keys(upd).length)await Store.put('products',p.id,{...p,...upd,updatedAt:new Date().toISOString()})}
     }catch(e){console.warn('product save',e)}
   }
+  if(!fresh.length)return;
+  const pick=await askNewProducts(fresh.map(i=>String(i.name).trim()));
+  if(!pick.length)return;
+  const ok=canApproveProducts();let n=0;
+  for(const i of fresh.filter(i=>pick.includes(String(i.name).trim()))){
+    const np={name:String(i.name).trim(),desc:i.desc||'',unit:i.unit||'pcs',price:d.type==='delivery'?0:(+i.price||0),photo:i.photo||'',barcode:'',createdBy:S.me.id,createdByName:S.me.name||'',createdAt:new Date().toISOString(),source:d.number,
+      status:ok?'approved':'pending',...(ok?{approvedBy:S.me.name||'',approvedAt:new Date().toISOString()}:{})};
+    try{await Store.put('products',uid(),np);n++}catch(e){console.warn('product save',e)}
+  }
+  if(n)toast(ok?`${n} item${n>1?'s':''} added to the product list`:`${n} item${n>1?'s':''} sent to admin / manager for approval`);
 }
 const clientSnap=c=>({name:c.name,contact:c.contact||'',address:c.address||'',phone:c.phone||'',email:c.email||'',taxId:c.taxId||''});
 
@@ -1519,11 +1542,19 @@ VIEWS.products=()=>{
   const q=(S.params.q||'').toLowerCase(),cat=S.params.cat||'';
   const cats=[...new Set(S.products.map(p=>p.category||'Other'))].sort();
   const list=S.products.filter(p=>(!cat||(p.category||'Other')===cat)&&(!q||[p.name,p.desc,p.barcode,p.category].join(' ').toLowerCase().includes(q))).sort((a,b)=>String(a.category||'Other').localeCompare(String(b.category||'Other'))||a.name.localeCompare(b.name));
+  const pend=canApproveProducts()?(S.pendingProducts||[]):[];
   return `<div class="head"><div><h1>Products</h1><div class="sub">${S.products.length} items · saved items fill in descriptions, prices and photos</div></div><div class="row"><button class="btn" id="imp">Import</button><button class="btn primary" id="npd">${I.plus}Add product</button></div></div>
+  ${pend.length?`<div class="card" style="border:1px solid #efd9a7;background:#fffaf0"><div style="padding:12px 14px 4px"><b>Waiting for approval (${pend.length})</b><div class="sub">New items added by staff from their documents. Approve to add them to the product list.</div></div>
+    ${pend.map(p=>`<div class="row" style="padding:10px 14px;border-top:1px solid #f1e6cc;flex-wrap:wrap;gap:8px"><div class="grow" style="min-width:180px"><b>${h(p.name)}</b>${p.desc?`<div class="sub">${h(p.desc)}</div>`:''}<div class="sub">${h(p.unit||'')}${p.createdByName?' · by '+h(p.createdByName):''}${p.source?' · from '+h(p.source):''}</div></div>
+      <button class="btn primary" data-pa="${p.id}">Approve</button><button class="btn" data-pe="${p.id}">Edit</button><button class="btn danger" data-pr="${p.id}">Reject</button></div>`).join('')}</div>`:''}
   <div class="row"><input class="search" id="pq" placeholder="Search products, model or barcode" value="${h(S.params.q||'')}">${cats.length>1?`<select id="pcat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>`:''}</div>
   <div class="card list">${list.length?list.map((p,k)=>`${(k===0||String(list[k-1].category||'Other')!==String(p.category||'Other'))?`<div class="pcat">${h(p.category||'Other')}</div>`:''}`+`<button class="li" data-pd="${p.id}">${p.photo?img(p.photo,'style="width:36px;height:36px;border-radius:8px;object-fit:cover"'):'<span class="ico q">ITEM</span>'}<span style="min-width:0"><div class="t">${h(p.name)}</div><div class="s">${h(p.desc||'')}${p.barcode?' · <span class="num">'+h(p.barcode)+'</span>':''}</div></span><span class="r num">${money(p.price)}<div class="muted" style="font-size:.75rem">per ${h(p.unit||'pcs')}</div></span></button>`).join(''):`<div class="empty"><b>No products saved</b>Add the items you sell most so quotations fill in by themselves.</div>`}</div>`;
 };
-VIEWS_AFTER.products=()=>{$('#npd').onclick=()=>productForm();$('#imp').onclick=()=>importForm('products');$('#pcat')&&($('#pcat').onchange=e=>{S.params.cat=e.target.value;render()});$$('[data-pd]').forEach(b=>b.onclick=()=>productForm(S.products.find(p=>p.id===b.dataset.pd)));
+VIEWS_AFTER.products=()=>{$('#npd').onclick=()=>productForm();
+  const pp=id=>(S.pendingProducts||[]).find(p=>p.id===id);
+  $$('[data-pa]').forEach(b=>b.onclick=async()=>{const p=pp(b.dataset.pa);if(!p)return;const {id,...rest}=p;await Store.put('products',id,{...rest,status:'approved',approvedBy:S.me.name||'',approvedAt:new Date().toISOString()});toast('Approved — '+p.name)});
+  $$('[data-pe]').forEach(b=>b.onclick=()=>productForm(pp(b.dataset.pe)));
+  $$('[data-pr]').forEach(b=>b.onclick=async()=>{const p=pp(b.dataset.pr);if(!p||!await confirmBox('Reject product?',p.name+' will not be added to the product list. Documents that use it keep it.'))return;await Store.remove('products',p.id);toast('Rejected')});$('#imp').onclick=()=>importForm('products');$('#pcat')&&($('#pcat').onchange=e=>{S.params.cat=e.target.value;render()});$$('[data-pd]').forEach(b=>b.onclick=()=>productForm(S.products.find(p=>p.id===b.dataset.pd)));
   const pq=$('#pq');pq.oninput=()=>{S.params.q=pq.value;clearTimeout(pq._t);pq._t=setTimeout(()=>{render();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)}};
 function productForm(p){
   const e={unit:'pcs',...(p||{})};
@@ -1536,7 +1567,9 @@ function productForm(p){
   $('#pd-ph',o).onclick=async()=>{const f=await pickImage();if(!f)return;toast('Uploading photo…');e.photo=await storeImage(f,800);$('#pd-ph',o).innerHTML=img(e.photo)};
   $('#pd-scan',o).onclick=()=>openScanner(c=>{$('#pd-barcode',o).value=c},{title:'Scan product barcode'});
   $('#pd-save',o).onclick=async()=>{const d={...e,category:$('#pd-category',o).value.trim(),name:$('#pd-name',o).value.trim(),desc:$('#pd-desc',o).value.trim(),price:+$('#pd-price',o).value||0,unit:$('#pd-unit',o).value.trim(),barcode:$('#pd-barcode',o).value.trim()};
-    if(!d.name){toast('Enter the product name.',true);return}if(await save('products',e.id||uid(),d,'Product saved'))closeModal()};
+    if(!d.name){toast('Enter the product name.',true);return}
+    if(canApproveProducts()){if(d.status==='pending'){d.approvedBy=S.me.name||'';d.approvedAt=new Date().toISOString()}d.status='approved'}else if(!e.id){d.status='pending';d.createdBy=S.me.id;d.createdByName=S.me.name||''}
+    if(await save('products',e.id||uid(),d,d.status==='pending'?'Sent for approval':'Product saved'))closeModal()};
   $('#pd-del',o)&&($('#pd-del',o).onclick=async()=>{if(!await confirmBox('Delete product?',e.name+' will be removed from the list. Existing documents keep it.'))return;await Store.remove('products',e.id);closeModal()});
 }
 
@@ -2200,7 +2233,8 @@ function startData(){
   Store.sub('sites',r=>{S.sites=r;if(S.view==='edit'&&ED&&ED._att&&!ED._attDone){applyAttSite();render()}},null,true);
   Store.sub('projects',r=>{S.projects=Object.fromEntries(r.map(x=>[x.id,x]))},null,true);
   Store.sub('clients',r=>{S.clients=r;soon();if(S.view==='edit'&&ED&&ED._tk&&!ED._tkDone)applyTicket()});
-  Store.sub('products',r=>{S.products=r;soon()});
+  // Products waiting for admin / manager approval are kept out of the lists and pickers until approved.
+  Store.sub('products',r=>{S.allProducts=r;S.products=r.filter(p=>p.status!=='pending');S.pendingProducts=r.filter(p=>p.status==='pending');soon()});
   if(isAdmin())setTimeout(runSeeds,1500);
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
