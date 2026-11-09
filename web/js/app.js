@@ -583,16 +583,22 @@ async function openAttachment(a){
 }
 
 /* ================= shell ================= */
+// Side menu in three groups; each item has its own colour (c-…) used on its icon and highlight.
 function navItems(){
-  const n=[['home','Overview',I.home]];
-  if(can('quotation')||can('invoice')||can('viewAll'))n.push(['docs','Documents',I.doc]);
-  if(can('delivery')||can('deliver'))n.push(['deliveries','Deliveries',I.truck]);
-  if(can('clients')||can('reports'))n.push(['clients','Clients & SOA',I.users]);
-  if(can('payments')||can('reports'))n.push(['payments','Payments',I.cash]);
-  if(can('clients'))n.push(['products','Products',I.box]);
-  if(isAdmin()){n.push(['accounts','Accounts',I.book]);n.push(['logins','Login log',I.clock]);n.push(['sep']);n.push(['staff','Staff & access',I.shield]);n.push(['settings','Company & template',I.gear])}
+  const n=[['grp','Work'],['home','Overview',I.home,'indigo']];
+  if(can('quotation')||can('invoice')||can('viewAll'))n.push(['docs','Documents',I.doc,'blue']);
+  if(can('delivery')||can('deliver'))n.push(['deliveries','Deliveries',I.truck,'orange']);
+  const cu=[];
+  if(can('clients')||can('reports'))cu.push(['clients','Clients & SOA',I.users,'teal']);
+  if(can('payments')||can('reports'))cu.push(['payments','Payments',I.cash,'green']);
+  if(can('clients'))cu.push(['products','Products',I.box,'violet']);
+  if(cu.length)n.push(['grp','Customers'],...cu);
+  if(isAdmin())n.push(['grp','Admin'],['accounts','Accounts',I.book,'amber'],['logins','Login log',I.clock,'cyan'],['staff','Staff & access',I.shield,'rose'],['settings','Company & template',I.gear,'slate']);
   return n;
 }
+// Colour class of a document's icon: quotation blue, invoice green, service / call-out violet, delivery orange.
+const icoCls=d=>d.type==='delivery'&&(d.reportType||'delivery')!=='delivery'?'s':TYPE[d.type].c;
+const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function render(){
   const app=$('#app');
   if(S.me.role==='loading'){app.innerHTML='<div class="loading">Loading your workspace…</div>';return}
@@ -603,8 +609,10 @@ function render(){
   const v=VIEWS[cur]?VIEWS[cur]():VIEWS.home();
   const logo='<img src="assets/mark.png" alt="">';
   app.innerHTML=`<div class="app"><aside class="rail"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b><small>Invoicing</small></div></div>
-    ${nav.map(([k,l,ic])=>k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}">${ic}${l}</button>`).join('')}
-    <div class="who"><div style="margin-bottom:8px">${themeSwitch()}</div><div style="color:var(--ink);font-weight:600">${h(S.me.name)}</div>${isAdmin()?'Admin':'Staff'} · <button class="btn ghost sm" data-myinfo style="color:inherit;padding:0 4px;min-height:0">My details</button> · <button class="btn ghost sm" data-logout style="color:inherit;padding:0 4px;min-height:0">Sign out</button></div></aside>
+    <nav class="navgrp">${nav.map(([k,l,ic,c])=>k==='grp'?`<div class="nav-grp">${h(l)}</div>`:k==='sep'?'<div class="nav-sep"></div>':`<button class="nav-btn c-${c||'slate'} ${cur===k||(S.params.from===k)?'on':''}" data-go="${k}"><span class="ni">${ic}</span>${l}</button>`).join('')}</nav>
+    <div class="who"><div style="margin-bottom:10px">${themeSwitch()}</div>
+      <div class="whocard"><span class="av">${h(initials(S.me.name))}</span><span style="min-width:0"><b>${h(S.me.name)}</b><small>${isAdmin()?'Admin':'Staff'}</small></span></div>
+      <div class="whoacts"><button class="btn ghost sm" data-myinfo>My details</button><button class="btn ghost sm" data-logout>Sign out</button></div></div></aside>
     <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-ai aria-label="AI assistant">✨ AI</button><button class="btn sm" data-menu>${I.menu}</button></div>
     <main class="main"><div class="wrap">${v}</div></main></div>
     <nav class="tabbar">${tabbar(cur)}</nav>${cur==='edit'||cur==='deliver'?'':`<button class="aifab" data-ai title="AI assistant" aria-label="AI assistant">✨ <span>Ask AI</span></button>`}</div>`;
@@ -626,7 +634,7 @@ function bindCommon(root){
   $$('[data-logout]',root).forEach(b=>b.onclick=logOut);
   $$('[data-myinfo]',root).forEach(b=>b.onclick=profileForm);
   $$('[data-ai]',root).forEach(b=>b.onclick=aiPanel);
-  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<div class="li" style="cursor:default"><span class="ico q">◐</span><span class="t">Theme</span><span>${themeSwitch()}</span></div><button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
+  $$('[data-menu]',root).forEach(b=>b.onclick=()=>{const o=modal('Menu',`<div class="list card">${navItems().filter(n=>n[0]!=='sep'&&n[0]!=='grp').map(([k,l,ic])=>`<button class="li" data-g="${k}"><span class="ico q">${ic.replace('<svg','<svg width="18" height="18"')}</span><span class="t">${l}</span><span></span></button>`).join('')}<div class="li" style="cursor:default"><span class="ico q">◐</span><span class="t">Theme</span><span>${themeSwitch()}</span></div><button class="li" data-mi><span class="ico q">ME</span><span class="t">My contact details</span><span></span></button><button class="li" data-lo><span class="ico q">⏻</span><span class="t">Sign out (${h(S.me.name)})</span><span></span></button></div>`);$('[data-lo]',o).onclick=()=>{closeModal();logOut()};$('[data-mi]',o).onclick=profileForm;$$('[data-g]',o).forEach(b=>b.onclick=()=>go(b.dataset.g))});
   $$('[data-open]',root).forEach(b=>b.onclick=()=>go('view',{id:b.dataset.open}));
 }
 function newMenu(){
@@ -673,7 +681,7 @@ const themeSwitch=()=>`<span class="themesw" role="group" aria-label="Theme">${[
 applyTheme();try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themePref()==='auto')applyTheme()})}catch(e){}
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
-  return `<button class="li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
+  return `<button class="li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
   <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span>${d.createdByName?`<small class="byline">${h(d.createdByName)}</small>`:''}</span></button>`;
 }
 VIEWS.home=()=>{
@@ -688,14 +696,16 @@ VIEWS.home=()=>{
   const boxes=['quotation','invoice','service','delivery'].filter(t=>DOC_TABS[t].ok()||docs.some(DOC_TABS[t].f));
   const actRow=d=>{const sg=d.delivery&&d.delivery.signedAt;const t=lastTouched(d);const [st,k]=docStatus(d);
     const who=d.createdByName||(S.users[d.createdBy]||{}).name||'';
-    return `<button class="li act-li" data-open="${d.id}"><span class="ico ${TYPE[d.type].c}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
+    return `<button class="li act-li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
       <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
       <span class="r who"><b>${h(who||'—')}</b><small>${ago(sg&&Math.abs(new Date(t)-new Date(sg))<3e5?sg:t)}</small></span></button>`};
   const recentBox=t=>{const T=DOC_TABS[t];const list=docs.filter(T.f).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,5);
-    return `<div class="card actbox"><button class="pad row actbox-h" data-box="${t}" type="button"><h2 class="grow" style="font-size:1rem">${T.p}</h2><span class="muted" style="font-size:.78rem">${docs.filter(T.f).length} · open all ›</span></button>
+    return `<div class="card actbox bx-${t}"><button class="pad row actbox-h" data-box="${t}" type="button"><h2 class="grow" style="font-size:1rem">${T.p}</h2><span class="muted" style="font-size:.78rem">${docs.filter(T.f).length} · open all ›</span></button>
       <div class="list">${list.length?list.map(actRow).join(''):`<div class="empty" style="padding:18px"><b>None yet</b></div>`}</div></div>`};
   const money4=can('reports');
-  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div><div class="row ovbtns">${boxes.map(t=>`<button class="btn" data-box="${t}">${I.doc||''}${DOC_TABS[t].p}</button>`).join('')}</div></div>
+  return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div></div>
+  <div class="tiles">${boxes.map(t=>{const T=DOC_TABS[t],all=docs.filter(T.f),mon=all.filter(d=>(d.date||'').startsWith(today().slice(0,7))).length;
+    return `<div class="tile t-${t}"><button class="tile-main" data-box="${t}" type="button"><span class="tile-ic">${t==='delivery'?I.truck:t==='service'?I.gear:I.doc}</span><span class="tile-tx"><b>${T.p}</b><small>${all.length} total · ${mon} this month</small></span></button>${canNew(t)?`<button class="tile-new" data-newt="${t}" type="button" title="New ${T.one}">${I.plus}<span>New</span></button>`:''}</div>`}).join('')}</div>
   ${(()=>{const dr=getDraft();if(!dr||!dr.ed)return '';const e=dr.ed;const nm=e.type==='delivery'?rep(e).t:TYPE[e.type].t;
     return `<div class="notice row" style="align-items:center"><span class="grow"><b>Unfinished ${h(nm.toLowerCase())}</b> ${h(e.number||'')}${e.client&&e.client.name?' · '+h(e.client.name):''} — not saved yet (${ago(new Date(dr.at).toISOString())})</span><button class="btn sm primary" id="dr-go">Continue</button><button class="btn sm ghost" id="dr-x">Discard</button></div>`})()}
   <div class="gsearch"><input type="search" class="search" id="ovq" placeholder="Search all documents — number, client, site, LPO, item, serial no…" value="${h(S.params.oq||'')}" autocomplete="off"></div>
@@ -712,7 +722,7 @@ VIEWS.home=()=>{
   ${!(S.params.oq||'').trim()&&pend.length&&can('deliver')?`<div class="card"><div class="pad row"><h2 class="grow">Waiting to be delivered</h2><button class="btn sm" data-go="deliveries">All deliveries</button></div><div class="list">${pend.slice(0,5).map(docRow).join('')}</div></div>`:''}
   ${!(S.params.oq||'').trim()&&money4&&overdue.length?`<div class="card"><div class="pad"><h2>Overdue invoices</h2></div><div class="list">${overdue.slice(0,5).map(docRow).join('')}</div></div>`:''}`;
 };
-VIEWS_AFTER.home=()=>($('#ovq')&&(()=>{const i=$('#ovq');i.oninput=()=>{S.params.oq=i.value;clearTimeout(i._t);i._t=setTimeout(()=>{const p=i.selectionStart;render();const n=$('#ovq');n.focus();n.setSelectionRange(p,p)},220)};$('#ovq-x')&&($('#ovq-x').onclick=()=>{S.params.oq='';render()})})(),$('#dr-go')&&($('#dr-go').onclick=resumeDraft),$('#dr-x')&&($('#dr-x').onclick=async()=>{if(await confirmBox('Discard the unsaved document?','What you typed will be lost.','Discard')){clearDraft();render()}}),$$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
+VIEWS_AFTER.home=()=>($$('[data-newt]').forEach(b=>b.onclick=e=>{e.stopPropagation();newDoc(b.dataset.newt)}),$('#ovq')&&(()=>{const i=$('#ovq');i.oninput=()=>{S.params.oq=i.value;clearTimeout(i._t);i._t=setTimeout(()=>{const p=i.selectionStart;render();const n=$('#ovq');n.focus();n.setSelectionRange(p,p)},220)};$('#ovq-x')&&($('#ovq-x').onclick=()=>{S.params.oq='';render()})})(),$('#dr-go')&&($('#dr-go').onclick=resumeDraft),$('#dr-x')&&($('#dr-x').onclick=async()=>{if(await confirmBox('Discard the unsaved document?','What you typed will be lost.','Discard')){clearDraft();render()}}),$$('[data-box]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.box})),$$('[data-q]').forEach(b=>b.onclick=()=>b.dataset.q==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:b.dataset.q})));
 
 // Document lists: quotations, invoices, service reports (incl. call-out), delivery notes — newest first.
 const DOC_TABS={
