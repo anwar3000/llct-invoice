@@ -922,3 +922,9 @@ body,.main{background:var(--page)}
 .kpis:has(>.kpi.hl:last-child)>.kpi:nth-child(2){--kc:var(--c-rose)}
 .kpis:has(>.kpi.hl:last-child)>.kpi:nth-child(3){--kc:var(--c-slate)}
 @media (max-width:560px){.tile-tx b{font-size:.84rem;line-height:1.2}}
+/* advance proforma invoice */
+.ico.pf{background:color-mix(in srgb,var(--c-amber) 15%,transparent);color:var(--c-amber)}
+.advbox{margin-top:10px;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--c-amber) 55%,transparent);border-radius:12px;background:color-mix(in srgb,var(--c-amber) 6%,transparent);display:flex;flex-direction:column;gap:6px}
+.advbox select,.advbox input{min-height:36px}
+.advq{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.advq .chip{cursor:pointer;border:1px solid var(--card-line,#ddd);background:var(--card,#fff)}

@@ -43,9 +43,10 @@ function numWords(n){
 /* ================= config & permissions ================= */
 const DEFAULT_CFG={dnEmail:'service@llct.net / mekha@llct.net',name:'LEADERS LINE TRADING LLC',address:'M05, Al Nisf, Airport Road\nDubai, UAE',phone:'04 880 5577',email:'anwar@llct.net',website:'www.llct.net  ·  www.o2iot.ae',taxId:'100362683300003',taxIdLabel:'TRN',
   currency:'AED',currencyName:'dirhams',minorName:'fils',taxLabel:'VAT',taxRate:5,
-  prefix:{quotation:'QTN',invoice:'INV',delivery:'DLN',receipt:'RCT'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
+  prefix:{quotation:'QTN',invoice:'INV',proforma:'PFI',delivery:'DLN',receipt:'RCT'},seqStart:{quotation:1,invoice:1,delivery:1},validDays:15,dueDays:30,
   terms:{quotation:'Prices valid for 15 days from the quotation date.\nDelivery: 3–5 working days from confirmed order.\nPayment: 50% advance, balance on delivery.',
          invoice:'Payment due within 30 days of invoice date.\nPlease quote the invoice number with your payment.',
+         proforma:'This is a proforma invoice requesting an advance payment. It is not a tax invoice.\nA tax invoice will be issued once the advance is received.\nWork / order will be processed on receipt of the advance.',
          delivery:'Goods received in good condition. Please check serial numbers against this note.'},
   photoSize:'M',docStyle:'clean',docFont:'gothic',gps:'',tagline:'SECURITY | IoT | AUTOMATION | SOLUTIONS',stamp:'',bank:'Account name: LEADERS LINE TRADING LLC\nWIO Bank, Dubai · IBAN AE250860000009674830642\nRAK Bank (Amal), Dubai · Account 8882060635901 · IBAN AE510400008882060635901',brand:'#B8285E',charcoal:'#17375F',logo:'assets/logo.png',signature:'',signName:'',showPricesOnDN:false};
 const PERMS=[
@@ -62,7 +63,19 @@ const REPORT={
   callout:{t:'Call-out Attendance Report',a:'CO',p:'COR',who:'Customer',sign:'Customer confirmation',ok:'Call-out attended. Thank you for your acceptance.',ty:'Thank you for confirming our call-out attendance.',done:'Report signed',act:'Sign off: customer signature',photos:'Site photos',
     st:['Attended','Completed','Rectified','Working','Temporary fix','Need replacement','Pending parts','Not checked','Follow-up required']}};
 const rep=d=>REPORT[(d&&d.reportType)||'delivery']||REPORT.delivery;
-const docTitle=d=>d.type==='delivery'?rep(d).t:TYPE[d.type].t;
+// Advance proforma invoice: an invoice-type document with kind 'proforma' that asks the client for an advance.
+// It is not a tax invoice, so it never counts as billed, receivable or on the client statement.
+const isPF=d=>!!d&&d.type==='invoice'&&d.kind==='proforma';
+const isInv=d=>!!d&&d.type==='invoice'&&d.kind!=='proforma';
+const PF={t:'Proforma Invoice',a:'PFI'};
+function advanceOf(d){const tot=totals(d).total;const byAmt=d.advMode==='amount';
+  const amt=byAmt?r2(Math.min(+d.advAmount||0,tot)):r2(tot*(+d.advPct||0)/100);
+  return {tot,amt,pct:byAmt?(tot?Math.round(amt/tot*1000)/10:0):(+d.advPct||0),bal:r2(tot-amt),byAmt}}
+const pfPays=d=>S.payments.filter(p=>p.pfId===d.id);
+const pfRecd=d=>r2(pfPays(d).reduce((s,p)=>s+(+p.amount||0),0));
+const docTitle=d=>d.type==='delivery'?rep(d).t:isPF(d)?PF.t:TYPE[d.type].t;
+const docAbbr=d=>d.type==='delivery'?rep(d).a:isPF(d)?PF.a:TYPE[d.type].a;
+const docTab=d=>d&&(isPF(d)?'proforma':d.type==='delivery'&&(d.reportType||'delivery')!=='delivery'?'service':d.type);
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
@@ -190,13 +203,15 @@ function invStatus(d){
   return od?['overdue','bad']:['unpaid','warn'];
 }
 function docStatus(d){
+  if(isPF(d)){const r=pfRecd(d);if(d.status!=='cancelled'&&r>0){const full=r>=advanceOf(d).amt-0.005;return [full?'advance received':'part advance',full?'good':'warn']};
+    const m={draft:'',sent:'brand',cancelled:'bad'};return [d.status||'draft',m[d.status||'draft']||'']}
   if(d.type==='invoice')return invStatus(d);
   if(d.type==='delivery')return d.delivery&&d.delivery.signedAt?['delivered','good']:['pending','warn'];
   const m={draft:'',sent:'brand',accepted:'good',rejected:'bad'};return [d.status||'draft',m[d.status||'draft']];
 }
 function clientBalance(cid){
   const c=S.clients.find(x=>x.id===cid)||{};
-  const inv=S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).reduce((s,d)=>s+totals(d).total,0);
+  const inv=S.docs.filter(d=>isInv(d)&&d.clientId===cid).reduce((s,d)=>s+totals(d).total,0);
   const pay=S.payments.filter(p=>p.clientId===cid).reduce((s,p)=>s+(+p.amount||0),0);
   return r2((+c.openingBalance||0)+inv-pay);
 }
@@ -204,7 +219,7 @@ function soaData(cid,from,to){
   const c=S.clients.find(x=>x.id===cid)||{};
   const tx=[];
   if(+c.openingBalance) tx.push({date:c.openingDate||'2000-01-01',kind:'Opening balance',no:'',ref:'',dr:+c.openingBalance,cr:0,open:true});
-  S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:d.legacy?'Invoice (previous)':'Invoice',no:d.number,ref:[d.subject,d.ref].filter(Boolean).join(' · '),dr:totals(d).total,cr:0,id:d.id,due:d.dueDate,legacy:!!d.legacy}));
+  S.docs.filter(d=>isInv(d)&&d.clientId===cid).forEach(d=>tx.push({date:d.date,kind:d.legacy?'Invoice (previous)':'Invoice',no:d.number,ref:[d.subject,d.ref].filter(Boolean).join(' · '),dr:totals(d).total,cr:0,id:d.id,due:d.dueDate,legacy:!!d.legacy}));
   S.payments.filter(p=>p.clientId===cid).forEach(p=>{const inv=S.docs.find(d=>d.id===p.invoiceId);tx.push({date:p.date,kind:(/credit|adjust/i.test(p.method||'')?'':'Payment · ')+(p.method||''),no:p.ref||'',ref:inv?'Against '+inv.number:(p.note||''),dr:0,cr:+p.amount||0,pid:p.id})});
   tx.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(b.dr-a.dr));
   let open=0;const rows=[];let bal;
@@ -213,7 +228,7 @@ function soaData(cid,from,to){
   for(const t of tx){ if(t.date>=from&&t.date<=to){bal+=t.dr-t.cr;rows.push({...t,bal:r2(bal)})} }
   const invd=rows.reduce((s,r)=>s+r.dr,0),recd=rows.reduce((s,r)=>s+r.cr,0);
   // aging as of `to`: allocated payments first, then unallocated credit FIFO
-  const invs=S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid&&d.date<=to).sort((a,b)=>a.date<b.date?-1:1)
+  const invs=S.docs.filter(d=>isInv(d)&&d.clientId===cid&&d.date<=to).sort((a,b)=>a.date<b.date?-1:1)
     .map(d=>({d,out:r2(totals(d).total-S.payments.filter(p=>p.invoiceId===d.id&&p.date<=to).reduce((s,p)=>s+(+p.amount||0),0))}));
   if(+c.openingBalance) invs.unshift({d:{date:c.openingDate||'2000-01-01',dueDate:c.openingDate||'2000-01-01'},out:+c.openingBalance});
   let pool=S.payments.filter(p=>p.clientId===cid&&p.date<=to&&!S.docs.some(d=>d.id===p.invoiceId)).reduce((s,p)=>s+(+p.amount||0),0);
@@ -228,7 +243,7 @@ function soaData(cid,from,to){
 const OLD_PREFIX=['QT-','INV-','DN-','QUT'];
 const numPrefix=type=>{const p=(S.cfg.prefix||{})[type];return p&&!OLD_PREFIX.includes(p)?p:DEFAULT_CFG.prefix[type]};const _np=type=>({quotation:'QTN',invoice:'INV',delivery:'DLN'})[type];
 const ddmmyy=iso=>{const d=(iso||today());return d.slice(8,10)+d.slice(5,7)+d.slice(2,4)};
-const prefixFor=(type,rt)=>type==='delivery'&&rt&&rt!=='delivery'&&REPORT[rt]?REPORT[rt].p:numPrefix(type);
+const prefixFor=(type,rt)=>type==='delivery'&&rt&&rt!=='delivery'&&REPORT[rt]?REPORT[rt].p:type==='invoice'&&rt==='proforma'?numPrefix('proforma'):numPrefix(type);
 const fmtNumber=(type,date,seq,rt)=>prefixFor(type,rt)+ddmmyy(date)+String(seq).padStart(3,'0');
 const rand3=()=>String(1+Math.floor(Math.random()*999)).padStart(3,'0');
 function nextNumber(type,date,rt){const pre=prefixFor(type,rt)+ddmmyy(date);const used=new Set(S.docs.map(d=>d.number));
@@ -258,6 +273,7 @@ const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d
 
 /* ================= icons ================= */
 const I={
+ send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg>',
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>',
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
@@ -320,7 +336,7 @@ const DRAFT_KEY='ll_draft';
 function saveDraft(){try{if(!ED||!S.me.id)return;readEditor();localStorage.setItem(DRAFT_KEY,JSON.stringify({u:S.me.id,at:Date.now(),params:S.params,ed:ED}))}catch(e){}}
 function getDraft(){try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');if(!d||d.u!==S.me.id||Date.now()-d.at>7*864e5)return null;return d}catch(e){return null}}
 function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch(e){}}
-function resumeDraft(){const d=getDraft();if(!d)return false;ED=d.ed;ED._key=JSON.stringify(d.params);S.view='edit';S.params=d.params;render();navPush();toast('Unsaved '+(ED.type==='delivery'?rep(ED).t.toLowerCase():TYPE[ED.type].t.toLowerCase())+' restored');return true}
+function resumeDraft(){const d=getDraft();if(!d)return false;ED=d.ed;ED._key=JSON.stringify(d.params);S.view='edit';S.params=d.params;render();navPush();toast('Unsaved '+docTitle(ED).toLowerCase()+' restored');return true}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&S.view==='edit')saveDraft()});
 window.addEventListener('pagehide',()=>{if(S.view==='edit')saveDraft()});
 
@@ -389,7 +405,7 @@ const ICO={pin:'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z M12 6.5a2.5 2.5
   gps:'M12 2v4 M12 18v4 M2 12h4 M18 12h4 M12 7a5 5 0 110 10a5 5 0 110-10z M12 11a1 1 0 110 2a1 1 0 110-2z'};
 const ico=(n,color)=>`<img class="ic" alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${color||'#17375F'}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='${ICO[n]||ICO.doc}'/></svg>`)}">`;
 const icoFor=k=>/^contact|received by/i.test(k)?'user':/^bank/i.test(k)?'building':/mobile|phone/i.test(k)?'phone':/mail/i.test(k)?'mail':/due|valid/i.test(k)?'calchk':/date|period/i.test(k)?'cal':/sales|techn/i.test(k)?'user':/time|credit/i.test(k)?'clock':'doc';
-const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
+const subFor=d=>d.type==='quotation'?'Thank you for your enquiry':isPF(d)?'Advance payment request':d.type==='invoice'?'Thank you for your business':({delivery:'Goods delivered as listed',service:'Service visit report',callout:'Call-out attendance'})[d.reportType||'delivery'];
 function detHtml(det){
   if(!isPrem())return `<div class="box dg">${det.map(([k,v])=>`<span>${h(k)}</span><span>${h(v)}</span>`).join('')}</div>`;
   return `<div class="box pdet">${det.map(([k,v],i)=>`<div class="pr"><span class="pico ${i%2?'pk2':''}">${ico(icoFor(k),i%2?S.cfg.brand:S.cfg.charcoal)}</span><span class="pk">${h(k)}</span><span class="pv${String(v).length>44?' wrap':String(v).length>32?' sm':''}">${h(v)}</span></div>`).join('')}</div>`;
@@ -411,15 +427,15 @@ function _renderSheet(d){
   const showPrice=!isDN||c.showPricesOnDN;const hasImg=!isDN&&(d.items||[]).some(i=>i.photo);
   const PX={S:44,M:72,L:112};const psz=i=>PX[i.photoSize||c.photoSize||'M']||72;
   const imgW=hasImg?Math.max(...(d.items||[]).filter(i=>i.photo).map(psz))+16:0;
-  const title=d.type==='invoice'?(+t.rate?'Tax Invoice':'Invoice'):docTitle(d);const R=rep(d);const isSvc=isDN&&(d.reportType||'delivery')!=='delivery';
+  const pf=isPF(d),adv=pf?advanceOf(d):null;const title=pf?PF.t:d.type==='invoice'?(+t.rate?'Tax Invoice':'Invoice'):docTitle(d);const R=rep(d);const isSvc=isDN&&(d.reportType||'delivery')!=='delivery';
   const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const det=[['Date',fdate(d.date)]];
-  if(d.type==='invoice'&&d.dueDate)det.push(['Due date',fdate(d.dueDate)]);
+  if(d.type==='invoice'&&d.dueDate)det.push([pf?'Advance due by':'Due date',fdate(d.dueDate)]);
   if(isQ&&d.validUntil)det.push(['Valid until',fdate(d.validUntil)]);
   if(d.ref)det.push([isQ?'Your ref':'LPO / Ref',d.ref]);
   if(d.contactName)det.push(['Contact',d.contactName]);
   if(d.contactMobile||d.contactEmail)det.push([d.contactMobile&&d.contactEmail?'Mobile / Email':d.contactMobile?'Mobile':'Email',[d.contactMobile,d.contactEmail].filter(Boolean).join('  |  ')]);
-  if(src)det.push([TYPE[src.type].a+' ref',src.number]);
+  if(src)det.push([(isPF(src)?'Proforma':src.type==='quotation'?'Quotation':docAbbr(src))+' ref',src.number]);
   if(d.salesperson)det.push(['Salesperson',d.salesperson]);
   if(isSvc&&d.technician)det.push(['Technician',d.technician]);
   if(isSvc&&(d.timeIn||d.timeOut))det.push(['Time in / out',[d.timeIn||'—',d.timeOut||'—'].join(' – ')]);
@@ -433,14 +449,18 @@ function _renderSheet(d){
     ${isDN?`<td class="c"><span class="st ${stClass(i.status||rep(d).st[0])}">${h(i.status||rep(d).st[0])}</span></td>`:''}</tr>`}).join('');
   const head=`<tr><th class="c" style="width:34px">#</th>${hasImg?`<th style="width:${imgW}px">Image</th>`:''}<th>Item & description</th><th class="r" style="width:50px">Qty</th><th style="width:48px">Unit</th>${showPrice?`<th class="r" style="width:96px">Unit price${isPrem()?` <small>(${h(c.currency)})</small>`:''}</th><th class="r" style="width:108px">Amount${isPrem()?` <small>(${h(c.currency)})</small>`:''}</th>`:''}${isDN?'<th class="c" style="width:136px">Status</th>':''}</tr>`;
   let stamp='';
-  if(d.type==='invoice'){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
+  if(pf&&pfRecd(d)>=advanceOf(d).amt-0.005&&advanceOf(d).amt>0)stamp='<span class="stamp">ADVANCE RECEIVED</span>';
+  if(isInv(d)){const [s]=invStatus(d);if(s==='paid')stamp='<span class="stamp">PAID</span>';else if(s.includes('overdue'))stamp='<span class="stamp due">OVERDUE</span>'}
   if(isDN&&d.delivery&&d.delivery.signedAt)stamp=`<span class="stamp">${isSvc?'SIGNED OFF':'DELIVERED'}</span>`;
-  const paid=d.type==='invoice'?paidOn(d.id):0;
+  const paid=isInv(d)?paidOn(d.id):0;
   const totalsHtml=showPrice?`<div class="tot">
     <div class="tr"><span>Subtotal</span><span class="m">${money(t.sub)}</span></div>
     ${t.disc?`<div class="tr"><span>Discount</span><span class="m">− ${money(t.disc)}</span></div>`:''}
     ${+t.rate?`<div class="tr"><span>${h(c.taxLabel)} ${t.rate}%</span><span class="m">${money(t.tax)}</span></div>`:''}
-    <div class="tr gr"><span>Total <small>${h(c.currency)}</small></span><span class="m">${money(t.total)}</span></div>
+    ${pf?`<div class="tr" style="font-weight:700"><span>Total order value</span><span class="m">${money(t.total)}</span></div>
+    <div class="tr gr"><span>Advance payable${adv.byAmt?'':` (${adv.pct}%)`} <small>${h(c.currency)}</small></span><span class="m">${money(adv.amt)}</span></div>
+    <div class="tr"><span>Balance on ${h(d.balanceOn||'completion')}</span><span class="m">${money(adv.bal)}</span></div>`
+    :`<div class="tr gr"><span>Total <small>${h(c.currency)}</small></span><span class="m">${money(t.total)}</span></div>`}
     ${d.type==='invoice'&&paid?`<div class="tr"><span>Paid</span><span class="m">${money(paid)}</span></div><div class="tr" style="font-weight:700"><span>Balance due</span><span class="m">${money(t.total-paid)}</span></div>`:''}</div>`
     :!(d.items||[]).length?'':`<div class="tot"><div class="tr"><span>Total items</span><span class="m">${(d.items||[]).length}</span></div><div class="tr"><span>Total quantity</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(+i.qty||0),0)}</span></div><div class="tr"><span>Serials recorded</span><span class="m">${(d.items||[]).reduce((s,i)=>s+(i.serials||[]).length,0)}</span></div></div>`;
   const dl=d.delivery||{};
@@ -455,7 +475,7 @@ function _renderSheet(d){
   ${d.subject?`<div class="subj">${h(d.subject)}</div>`:''}
   ${isSvc&&(d.complaint||d.workDone)?`<div class="svc">${d.complaint?`<div><div class="hh">Complaint / request</div><div class="terms">${h(d.complaint)}</div></div>`:''}${d.workDone?`<div><div class="hh">Work carried out</div><div class="terms">${h(d.workDone)}</div></div>`:''}</div>`:''}
   ${rows||!isSvc?`<table><thead>${head}</thead><tbody>${rows||`<tr><td colspan="8" style="color:#999;text-align:center;padding:20px">No items</td></tr>`}</tbody></table>`:''}
-  ${(()=>{const words=showPrice&&(isDN||showWords(d))?`<div class="words">${isPrem()?`<span class="wico">${ico('doc',c.charcoal)}</span>`:''}<span>Amount in words</span><b>${h(numWords(t.total))}</b></div>`:'';
+  ${(()=>{const words=showPrice&&(isDN||showWords(d))?`<div class="words">${isPrem()?`<span class="wico">${ico('doc',c.charcoal)}</span>`:''}<span>${pf?'Advance in words':'Amount in words'}</span><b>${h(numWords(pf?adv.amt:t.total))}</b></div>`:'';
     return `<div class="foot"><div class="fl">${d.notes?`<div class="note"><div class="hh">Notes</div><div class="terms">${h(d.notes)}</div></div>`:''}${stamp?`<div>${stamp}</div>`:''}${isPrem()?words:''}</div>${totalsHtml}</div>${isPrem()?'':words}`})()}
   ${(d.terms||(d.type!=='delivery'&&c.bank&&showBank(d)))?`<div class="info${d.type!=='delivery'&&c.bank&&showBank(d)?'':' nobank'}">${d.terms?`<div><div class="hh">Terms & conditions</div>${termsHtml(d.terms)}</div>`:''}${d.type!=='delivery'&&c.bank&&showBank(d)?`<div><div class="hh">Bank details</div>${bankHtml(c.bank)}</div>`:''}</div>`:''}
   <div class="sigs"><div class="sig"><div class="img">${c.stamp?img(c.stamp,'class="stampimg"'):''}${c.signature?img(c.signature,'class="sigimg"'):''}</div><div class="ln"><b>For ${h(c.name)}</b><br>${h(c.signName||'Authorised signatory')}${isDN&&dl.deliveredBy?' · Delivered by '+h(nameOf(dl.deliveredBy,dl.deliveredByName)):''}</div></div>${right}</div>
@@ -486,13 +506,17 @@ function fitPreview(host){const w=host.clientWidth-24;const k=Math.min(1,w/794);
 const isNative=()=>!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 function b64(bytes){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(out)}
 function dataToBytes(du){const bin=atob(du.split(',')[1]||'');const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
-async function saveFile(bytes,filename,mime,shareTitle){
-  if(isNative()){const P=window.Capacitor.Plugins;const r=await P.Filesystem.writeFile({path:filename,data:b64(bytes),directory:'CACHE'});await P.Share.share({title:filename,url:r.uri,dialogTitle:shareTitle||'Send or save'});return}
+// share (optional): {subject, text, to, mode:'share'|'mail'} — the covering letter that goes with the file.
+async function saveFile(bytes,filename,mime,shareTitle,share){
+  const sm=share&&share.mode!=='mail';
+  if(isNative()&&(!share||sm)){const P=window.Capacitor.Plugins;const r=await P.Filesystem.writeFile({path:filename,data:b64(bytes),directory:'CACHE'});await P.Share.share({title:share?share.subject:filename,...(share?{text:share.text}:{}),url:r.uri,dialogTitle:shareTitle||'Send or save'});return}
   const blob=new Blob([bytes],{type:mime});const file=new File([blob],filename,{type:mime});
-  if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:filename});return}
+  if((sm||(!share&&matchMedia('(pointer:coarse)').matches))&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:share?share.subject:filename,...(share?{text:share.text}:{})});return}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast('Downloaded '+filename);
+  if(share){setTimeout(()=>{location.href=mailtoUrl(share)},600);toast('PDF downloaded — attach it to the email that opens')}
 }
-async function downloadPdf(html,filename,merge=[]){
+const mailtoUrl=sh=>'mailto:'+encodeURIComponent(sh.to||'').replace(/%40/g,'@').replace(/%2C/gi,',')+'?subject='+encodeURIComponent(sh.subject||'')+'&body='+encodeURIComponent(sh.text||'');
+async function downloadPdf(html,filename,merge=[],share=null){
   if(!window.html2pdf){toast('PDF tool is still loading. Try again in a moment.',true);return}
   toast('Preparing PDF…');
   const st=document.createElement('div');st.className='pdf-stage';st.innerHTML=`<div class="pdfdoc">${html}</div>`;document.body.appendChild(st);
@@ -519,7 +543,7 @@ async function downloadPdf(html,filename,merge=[]){
           const src=await PDFLib.PDFDocument.load(dataToBytes(data),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}catch(e){bad++}}
         bytes=await out.save();if(bad)toast(bad+' attached PDF could not be joined (it may be protected).',true)}
     }
-    await saveFile(bytes,filename,'application/pdf','Send or save PDF');
+    await saveFile(bytes,filename,'application/pdf',share?'Send '+filename:'Send or save PDF',share);
   }catch(e){if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Could not create the PDF: '+(e.message||e),true)}
   finally{st.remove()}
 }
@@ -597,7 +621,7 @@ function navItems(){
   return n;
 }
 // Colour class of a document's icon: quotation blue, invoice green, service / call-out violet, delivery orange.
-const icoCls=d=>d.type==='delivery'&&(d.reportType||'delivery')!=='delivery'?'s':TYPE[d.type].c;
+const icoCls=d=>d.type==='delivery'&&(d.reportType||'delivery')!=='delivery'?'s':isPF(d)?'pf':TYPE[d.type].c;
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function render(){
   const app=$('#app');
@@ -641,12 +665,13 @@ function newMenu(){
   const opts=[];
   if(can('quotation'))opts.push(['quotation','Quotation','Price offer with product photos']);
   if(can('invoice'))opts.push(['invoice','Invoice','Bill a client, track payment']);
+  if(can('invoice'))opts.push(['proforma','Advance proforma invoice','Ask the client for an advance before the work']);
   if(can('delivery'))opts.push(['service','Service report','Technician visit, work done and customer sign-off']);
   if(can('delivery'))opts.push(['delivery','Delivery note','Items, serial numbers and signature']);
   if(can('payments'))opts.push(['payment','Payment received','Record money from a client']);
   if(!opts.length){toast('You don\'t have permission to create documents.',true);return}
-  const o=modal('Create new',`<div class="list card">${opts.map(([k,t,s])=>`<button class="li" data-k="${k}"><span class="ico ${k==='payment'?'p':k==='service'?TYPE.delivery.c:TYPE[k].c}">${k==='payment'?'PAY':k==='service'?REPORT.service.a:TYPE[k].a}</span><span style="min-width:0"><div class="t">${t}</div><div class="s">${s}</div></span><span></span></button>`).join('')}</div>`);
-  $$('[data-k]',o).forEach(b=>b.onclick=()=>{closeModal();const k=b.dataset.k;k==='payment'?paymentForm():k==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:k})});
+  const o=modal('Create new',`<div class="list card">${opts.map(([k,t,s])=>`<button class="li" data-k="${k}"><span class="ico ${k==='payment'?'p':k==='service'?'s':k==='proforma'?'pf':TYPE[k].c}">${k==='payment'?'PAY':k==='service'?REPORT.service.a:k==='proforma'?PF.a:TYPE[k].a}</span><span style="min-width:0"><div class="t">${t}</div><div class="s">${s}</div></span><span></span></button>`).join('')}</div>`);
+  $$('[data-k]',o).forEach(b=>b.onclick=()=>{closeModal();const k=b.dataset.k;k==='payment'?paymentForm():newDoc(k)});
 }
 
 /* ================= views ================= */
@@ -681,12 +706,12 @@ const themeSwitch=()=>`<span class="themesw" role="group" aria-label="Theme">${[
 applyTheme();try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themePref()==='auto')applyTheme()})}catch(e){}
 function docRow(d){
   const [s,k]=docStatus(d);const t=totals(d);
-  return `<button class="li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
+  return `<button class="li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${docAbbr(d)}</span><span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span> · ${fdate(d.date)}${d.legacy?' · previous':''}${d.ref?' · '+h(d.ref):''}</div></span>
   <span class="r">${d.type!=='delivery'?`<div class="num">${money(t.total)}</div>`:`<div class="num muted">${(d.items||[]).length} items</div>`}<span class="pill ${k}">${h(s)}</span>${d.createdByName?`<small class="byline">${h(d.createdByName)}</small>`:''}</span></button>`;
 }
 VIEWS.home=()=>{
   const ym=today().slice(0,7);const docs=visibleDocs();
-  const inv=S.docs.filter(d=>d.type==='invoice');
+  const inv=S.docs.filter(isInv);
   const out=r2(S.clients.reduce((s,c)=>s+clientBalance(c.id),0));
   const monthInv=r2(inv.filter(d=>(d.date||'').startsWith(ym)).reduce((s,d)=>s+totals(d).total,0));
   const monthRec=r2(S.payments.filter(p=>(p.date||'').startsWith(ym)).reduce((s,p)=>s+(+p.amount||0),0));
@@ -696,7 +721,7 @@ VIEWS.home=()=>{
   const boxes=['quotation','invoice','service','delivery'].filter(t=>DOC_TABS[t].ok()||docs.some(DOC_TABS[t].f));
   const actRow=d=>{const sg=d.delivery&&d.delivery.signedAt;const t=lastTouched(d);const [st,k]=docStatus(d);
     const who=d.createdByName||(S.users[d.createdBy]||{}).name||'';
-    return `<button class="li act-li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${d.type==='delivery'?rep(d).a:TYPE[d.type].a}</span>
+    return `<button class="li act-li" data-open="${d.id}"><span class="ico ${icoCls(d)}">${docAbbr(d)}</span>
       <span style="min-width:0"><div class="t">${h(d.client&&d.client.name||'No client')}</div>${siteLine(d)}<div class="s"><span class="num">${h(d.number)}</span>${d.type!=='delivery'&&(can('reports')||can(d.type))?` · <span class="num">${money(totals(d).total)}</span>`:''} · <span class="pill ${k}">${h(st)}</span></div></span>
       <span class="r who"><b>${h(who||'—')}</b><small>${ago(sg&&Math.abs(new Date(t)-new Date(sg))<3e5?sg:t)}</small></span></button>`};
   const recentBox=t=>{const T=DOC_TABS[t];const list=docs.filter(T.f).sort((a,b)=>lastTouched(b).localeCompare(lastTouched(a))).slice(0,5);
@@ -706,7 +731,7 @@ VIEWS.home=()=>{
   return `<div class="head"><div><h1>Overview</h1><div class="sub">${fdate(today())}</div></div></div>
   <div class="tiles">${boxes.map(t=>{const T=DOC_TABS[t],all=docs.filter(T.f),mon=all.filter(d=>(d.date||'').startsWith(today().slice(0,7))).length;
     return `<div class="tile t-${t}"><button class="tile-main" data-box="${t}" type="button"><span class="tile-ic">${t==='delivery'?I.truck:t==='service'?I.gear:I.doc}</span><span class="tile-tx"><b>${T.p}</b><small>${all.length} total · ${mon} this month</small></span></button>${canNew(t)?`<button class="tile-new" data-newt="${t}" type="button" title="New ${T.one}">${I.plus}<span>New</span></button>`:''}</div>`}).join('')}</div>
-  ${(()=>{const dr=getDraft();if(!dr||!dr.ed)return '';const e=dr.ed;const nm=e.type==='delivery'?rep(e).t:TYPE[e.type].t;
+  ${(()=>{const dr=getDraft();if(!dr||!dr.ed)return '';const e=dr.ed;const nm=docTitle(e);
     return `<div class="notice row" style="align-items:center"><span class="grow"><b>Unfinished ${h(nm.toLowerCase())}</b> ${h(e.number||'')}${e.client&&e.client.name?' · '+h(e.client.name):''} — not saved yet (${ago(new Date(dr.at).toISOString())})</span><button class="btn sm primary" id="dr-go">Continue</button><button class="btn sm ghost" id="dr-x">Discard</button></div>`})()}
   <div class="gsearch"><input type="search" class="search" id="ovq" placeholder="Search all documents — number, client, site, LPO, item, serial no…" value="${h(S.params.oq||'')}" autocomplete="off"></div>
   ${(()=>{const q=(S.params.oq||'').trim().toLowerCase();if(!q)return '';const res=docs.filter(d=>docMatch(d,q)).sort(newestFirst);
@@ -727,16 +752,17 @@ VIEWS_AFTER.home=()=>($$('[data-newt]').forEach(b=>b.onclick=e=>{e.stopPropagati
 // Document lists: quotations, invoices, service reports (incl. call-out), delivery notes — newest first.
 const DOC_TABS={
   quotation:{p:'Quotations',one:'quotation',f:d=>d.type==='quotation',ok:()=>can('quotation')||can('viewAll')},
-  invoice:{p:'Invoices',one:'invoice',f:d=>d.type==='invoice',ok:()=>can('invoice')||can('viewAll')},
+  invoice:{p:'Invoices',one:'invoice',f:isInv,ok:()=>can('invoice')||can('viewAll')},
+  proforma:{p:'Proforma invoices',one:'proforma invoice',f:isPF,ok:()=>can('invoice')||can('viewAll')},
   service:{p:'Service reports',one:'service report',f:d=>d.type==='delivery'&&(d.reportType||'delivery')!=='delivery',ok:()=>seesAllDN()||can('viewAll')},
   delivery:{p:'Delivery notes',one:'delivery note',f:d=>d.type==='delivery'&&(d.reportType||'delivery')==='delivery',ok:()=>seesAllDN()||can('viewAll')}};
-const newDoc=t=>t==='service'?go('edit',{type:'delivery',rt:'service'}):go('edit',{type:t});
-const canNew=t=>t==='service'||t==='delivery'?can('delivery'):can(t);
+const newDoc=t=>t==='service'?go('edit',{type:'delivery',rt:'service'}):t==='proforma'?go('edit',{type:'invoice',rt:'proforma'}):go('edit',{type:t});
+const canNew=t=>t==='service'||t==='delivery'?can('delivery'):t==='proforma'?can('invoice'):can(t);
 VIEWS.docs=()=>{
   const tabs=Object.keys(DOC_TABS).filter(t=>DOC_TABS[t].ok()||visibleDocs().some(DOC_TABS[t].f));
   const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
   const list=visibleDocs().filter(T.f).filter(d=>!q||docMatch(d,q)).sort(newestFirst);
-  const money_=tab==='quotation'||tab==='invoice';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
+  const money_=tab==='quotation'||tab==='invoice'||tab==='proforma';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
   return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
    ${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div>
   <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, site, LPO, item, serial no, person…" value="${h(S.params.q||'')}"></div>
@@ -761,10 +787,10 @@ VIEWS_AFTER.deliveries=()=>{$$('[data-tab]').forEach(b=>b.onclick=()=>go('delive
 VIEWS.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);if(!d)return `<div class="empty"><b>Document not found</b>It may have been deleted.</div>`;
   const [s,k]=docStatus(d);const t=totals(d);const canEdit=can(d.type)&&(can('viewAll')||d.createdBy===S.me.id)&&!(d.type==='delivery'&&d.delivery&&d.delivery.signedAt&&!isAdmin());
-  const paid=d.type==='invoice'?paidOn(d.id):0;const kids=S.docs.filter(x=>x.sourceId===d.id);const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
+  const paid=isInv(d)?paidOn(d.id):0;const kids=S.docs.filter(x=>x.sourceId===d.id);const src=d.sourceId&&S.docs.find(x=>x.id===d.sourceId);
   const pays=S.payments.filter(p=>p.invoiceId===d.id);
   return `<div class="head"><div class="row"><button class="btn ghost sm" id="bk">${I.back}Back</button><div><h1 class="num" style="font-family:var(--f-display)">${h(d.number)}</h1><div class="sub">${h(docTitle(d))} · ${h(d.client&&d.client.name||'')}</div></div></div>
-   <div class="row">${d.legacy?'':`<button class="btn primary" id="pdf">${I.pdf}Download PDF</button>`}${canEdit?`<button class="btn" id="ed">${I.pen}Edit</button>`:''}</div></div>
+   <div class="row">${d.legacy?'':`<button class="btn primary" id="send">${I.send}Send</button><button class="btn" id="pdf">${I.pdf}Download PDF</button>`}${canEdit?`<button class="btn" id="ed">${I.pen}Edit</button>`:''}</div></div>
   <div class="view-grid">${d.legacy?`<div class="card pad grid"><span class="pill">Previous invoice · entered manually</span><h2 class="num">${h(d.number)}</h2>
     <div class="grid g2"><div class="kv"><span class="muted">Date</span><span>${fdate(d.date)}</span></div><div class="kv"><span class="muted">Due</span><span>${fdate(d.dueDate)}</span></div>
     <div class="kv"><span class="muted">LPO / ref</span><span>${h(d.ref||'—')}</span></div><div class="kv"><span class="muted">VAT included</span><span class="num">${money(d.vat||0)}</span></div></div>
@@ -772,48 +798,108 @@ VIEWS.view=()=>{
   <aside class="side">
    <div class="card pad"><div class="row" style="margin-bottom:8px"><h3 class="grow">Status</h3><span class="pill ${k}">${h(s)}</span></div>
     ${d.type!=='delivery'?`<div class="kv"><span class="muted">Total</span><span class="num">${cur(t.total)}</span></div>`:''}
-    ${d.type==='invoice'?`<div class="kv"><span class="muted">Paid</span><span class="num">${money(paid)}</span></div><div class="kv"><span class="muted">Balance</span><b class="num">${money(t.total-paid)}</b></div>`:''}
+    ${isPF(d)?(a=>`<div class="kv"><span class="muted">Advance requested</span><b class="num">${money(a.amt)}</b></div><div class="kv"><span class="muted">Advance received</span><span class="num">${money(pfRecd(d))}</span></div>`)(advanceOf(d)):''}
+    ${isInv(d)?`<div class="kv"><span class="muted">Paid</span><span class="num">${money(paid)}</span></div><div class="kv"><span class="muted">Balance</span><b class="num">${money(t.total-paid)}</b></div>`:''}
     <div class="kv"><span class="muted">Created by</span><span>${h(nameOf(d.createdBy,d.createdByName))}</span></div>
+    ${d.sentAt?`<div class="kv"><span class="muted">Sent</span><span>${fdt(d.sentAt)}${d.sentTo?' · '+h(d.sentTo):''}</span></div>`:''}
     ${d.delivery&&d.delivery.signedAt?`<div class="kv"><span class="muted">Signed</span><span>${fdt(d.delivery.signedAt)}</span></div>`:''}
     ${src?`<div class="kv"><span class="muted">From</span><a href="#" data-open="${src.id}">${h(src.number)}</a></div>`:''}
-    ${kids.map(x=>`<div class="kv"><span class="muted">${TYPE[x.type].t}</span><a href="#" data-open="${x.id}">${h(x.number)}</a></div>`).join('')}
+    ${kids.map(x=>`<div class="kv"><span class="muted">${h(docTitle(x))}</span><a href="#" data-open="${x.id}">${h(x.number)}</a></div>`).join('')}
    </div>
    <div class="card pad" style="display:flex;flex-direction:column;gap:8px"><h3>Actions</h3>
     ${d.type==='delivery'&&!(d.delivery&&d.delivery.signedAt)&&can('deliver')?`<button class="btn primary" id="dlv">${I.scan}${h(rep(d).act)}</button>`:''}
-    ${d.type==='invoice'&&can('payments')&&paid<t.total?`<button class="btn primary" id="pay">${I.cash}Record payment</button>`:''}
+    ${isPF(d)&&can('payments')&&d.status!=='cancelled'?`<button class="btn primary" id="pfpay">${I.cash}Record advance received</button>`:''}
+    ${isPF(d)&&can('invoice')?`<select id="pfs" aria-label="Proforma status">${['draft','sent','cancelled'].map(x=>`<option ${(d.status||'draft')===x?'selected':''} value="${x}">Mark as ${x}</option>`).join('')}</select>`:''}
+    ${isInv(d)&&can('payments')&&paid<t.total?`<button class="btn primary" id="pay">${I.cash}Record payment</button>`:''}
     ${d.type==='quotation'&&can('quotation')?`<select id="qs" aria-label="Quotation status">${['draft','sent','accepted','rejected'].map(x=>`<option ${(d.status||'draft')===x?'selected':''} value="${x}">Mark as ${x}</option>`).join('')}</select>`:''}
-    ${d.type==='quotation'&&can('invoice')?`<button class="btn" data-conv="invoice">Convert to invoice</button>`:''}
-    ${!d.legacy&&(d.type==='quotation'||d.type==='invoice')&&can('delivery')?`<button class="btn" data-conv="delivery">Make delivery note</button>`:''}
+    ${d.type==='quotation'&&can('invoice')?`<button class="btn" data-conv="invoice" data-rt="proforma">Advance proforma invoice</button>`:''}
+    ${(d.type==='quotation'||isPF(d))&&can('invoice')?`<button class="btn" data-conv="invoice">Convert to ${isPF(d)?'tax ':''}invoice</button>`:''}
+    ${!d.legacy&&(d.type==='quotation'||isInv(d))&&can('delivery')?`<button class="btn" data-conv="delivery">Make delivery note</button>`:''}
     ${!d.legacy&&can(d.type)?`<button class="btn" id="dup">Duplicate</button>`:''}
     ${d.client&&d.clientId&&can('reports')?`<button class="btn" id="soa">Client statement (SOA)</button>`:''}
     ${can('delete')||isAdmin()?`<button class="btn danger" id="del">Delete</button>`:''}
    </div>
    ${(d.attachments||[]).length?`<div class="card pad"><h3 style="margin-bottom:8px">Attachments</h3><div class="attmini">${d.attachments.map((a,k)=>`<button class="am" data-openatt="${k}" title="${h(a.caption||a.name||'')}">${a.kind==='image'?img(a.ref):'<span>PDF</span>'}<small>${h(a.caption||a.name||'')}</small></button>`).join('')}</div></div>`:''}
+   ${isPF(d)&&pfPays(d).length?`<div class="card pad"><h3 style="margin-bottom:6px">Advance received</h3>${pfPays(d).map(p=>`<div class="kv"><span>${fdate(p.date)} · ${h(p.method||'')}</span><span class="row" style="gap:6px"><span class="num">${money(p.amount)}</span><button class="btn ghost sm" data-rcpt="${p.id}" title="Download receipt">${I.pdf}</button></span></div>`).join('')}</div>`:''}
    ${pays.length?`<div class="card pad"><h3 style="margin-bottom:6px">Payments</h3>${pays.map(p=>`<div class="kv"><span>${fdate(p.date)} · ${h(p.method||'')}</span><span class="row" style="gap:6px"><span class="num">${money(p.amount)}</span><button class="btn ghost sm" data-rcpt="${p.id}" title="Download receipt">${I.pdf}</button></span></div>`).join('')}</div>`:''}
   </aside></div>`;
 };
 VIEWS_AFTER.view=()=>{
-  const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:d&&d.type}));
+  const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:docTab(d)}));
   if(!d)return;
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
   $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
     .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d)));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
+  $('#send')&&($('#send').onclick=()=>sendDoc(d));
   $$('[data-rcpt]').forEach(b=>b.onclick=()=>downloadReceipt(S.payments.find(x=>x.id===b.dataset.rcpt)));
   $('#ed')&&($('#ed').onclick=()=>d.legacy?legacyForm(d):go('edit',{id:d.id}));
   $('#dlv')&&($('#dlv').onclick=()=>go('deliver',{id:d.id}));
   $('#pay')&&($('#pay').onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
+  $('#pfpay')&&($('#pfpay').onclick=()=>paymentForm({clientId:d.clientId,pfId:d.id,amount:r2(Math.max(advanceOf(d).amt-pfRecd(d),0))||'',note:'Advance against proforma '+d.number}));
+  $('#pfs')&&($('#pfs').onchange=e=>save('docs',d.id,{...d,status:e.target.value,updatedAt:new Date().toISOString()},'Status updated'));
   $('#qs')&&($('#qs').onchange=e=>save('docs',d.id,{...d,status:e.target.value,updatedAt:new Date().toISOString()},'Status updated'));
-  $$('[data-conv]').forEach(b=>b.onclick=()=>go('edit',{type:b.dataset.conv,from:d.id}));
-  $('#dup')&&($('#dup').onclick=()=>go('edit',{type:d.type,copy:d.id}));
+  $$('[data-conv]').forEach(b=>b.onclick=()=>go('edit',{type:b.dataset.conv,...(b.dataset.rt?{rt:b.dataset.rt}:{}),from:d.id}));
+  $('#dup')&&($('#dup').onclick=()=>go('edit',{type:d.type,...(isPF(d)?{rt:'proforma'}:{}),copy:d.id}));
   $('#soa')&&($('#soa').onclick=()=>go('client',{id:d.clientId}));
-  $('#del')&&($('#del').onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','This removes the document for everyone. Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted');go('docs',{tab:d.type})}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
+  $('#del')&&($('#del').onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','This removes the document for everyone. Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted');go('docs',{tab:docTab(d)})}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
 };
+
+/* ----- send with a covering letter ----- */
+// A short, neutral covering letter for each kind of document. Always editable before sending.
+function coverLetter(d){
+  const c=S.cfg,cl=d.client||{},t=totals(d),cc=c.currency||'AED',m=v=>cc+' '+money(v);
+  const sj=String(d.subject||'').trim();const what=sj?` for ${/^[A-Z][a-z]/.test(sj)?sj[0].toLowerCase()+sj.slice(1):sj}`:'';const site=docSite(d)&&docSite(d)!==cl.name?docSite(d):'';
+  const vat=+t.rate?` (inclusive of ${c.taxLabel||'VAT'})`:'';const ref=d.ref?` against your reference ${d.ref}`:'';
+  const hi=`Dear ${(cl.contact||'').trim()||'Sir / Madam'},`;let subj,body;
+  if(d.type==='quotation'){subj=`Quotation ${d.number}${d.subject?' – '+d.subject:''}`;
+    body=[`Please find attached our quotation ${d.number} dated ${fdate(d.date)}${what}${site?' at '+site:''}.`,
+      `The total amount is ${m(t.total)}${vat}${d.validUntil?`, and the quotation is valid until ${fdate(d.validUntil)}`:''}.`,
+      `Please review it and let us know if you need any clarification or changes. We will proceed on receipt of your confirmation or purchase order.`]}
+  else if(isPF(d)){const a=advanceOf(d);subj=`Proforma invoice ${d.number} – advance payment${d.subject?' – '+d.subject:''}`;
+    body=[`Please find attached our proforma invoice ${d.number} dated ${fdate(d.date)}${what}${ref}.`,
+      `To proceed with the work, we request an advance payment of ${m(a.amt)}${a.byAmt?'':` (${a.pct}% of the total order value of ${m(a.tot)})`}${d.dueDate?`, by ${fdate(d.dueDate)}`:''}. The bank details are shown on the document.`,
+      `A tax invoice will be issued once the advance is received. Please share the payment confirmation when it is done.`]}
+  else if(d.type==='invoice'){const due=r2(t.total-paidOn(d.id));subj=`${+t.rate?'Tax invoice':'Invoice'} ${d.number}${d.subject?' – '+d.subject:''}`;
+    body=[`Please find attached our ${+t.rate?'tax ':''}invoice ${d.number} dated ${fdate(d.date)}${what}${ref}.`,
+      `The amount due is ${m(due>0?due:t.total)}${vat}${d.dueDate?`, payable by ${fdate(d.dueDate)}`:''}. ${showBank(d)?'The bank details are shown on the invoice. ':''}Please quote the invoice number with your payment.`,
+      `If you have any questions about this invoice, please let us know.`]}
+  else{const R=rep(d),svc=(d.reportType||'delivery')!=='delivery';const at=site||d.deliveryAddress&&String(d.deliveryAddress).split('\n')[0]||'';
+    subj=`${R.t} ${d.number}${at?' – '+at:d.subject?' – '+d.subject:''}`;
+    body=svc?[`Please find attached our ${R.t.toLowerCase()} ${d.number} for the visit on ${fdate(d.date)}${at?' at '+at:''}.`,
+        `${d.subject?`It covers: ${d.subject}. `:''}Please review the work recorded and let us know if anything needs further attention.`]
+      :[`Please find attached delivery note ${d.number} dated ${fdate(d.date)}${ref} for the items delivered${at?' to '+at:''}.`,
+        `Please check the items and serial numbers against the note and let us know if there is any discrepancy.`]}
+  const pr=S.me.profile||{};
+  const sign=['Kind regards,',S.me.name||'',c.name||'',[pr.mobile||c.phone,pr.email||c.email].filter(Boolean).join(' | '),c.website?String(c.website).split('·')[0].trim():''].filter(Boolean).join('\n');
+  return {subject:subj,text:[hi,'',body.join('\n\n'),'',sign].join('\n')};
+}
+function sendDoc(d){
+  const L=coverLetter(d),cl=d.client||{};const phone=matchMedia('(pointer:coarse)').matches||isNative();
+  const o=modal('Send '+docTitle(d).replace('Tax ','').toLowerCase(),`<div class="grid">
+    <div class="muted" style="font-size:.84rem">The PDF of <b class="num">${h(d.number)}</b> goes with this covering letter. Change anything you like before sending.</div>
+    <label class="field"><span>To (email)</span><input id="sd-to" type="email" value="${h(cl.email||'')}" placeholder="client@example.com"></label>
+    <label class="field"><span>Subject</span><input id="sd-subj" value="${h(L.subject)}"></label>
+    <label class="field"><span>Covering letter</span><textarea id="sd-body" rows="14" class="bigta">${h(L.text)}</textarea></label>
+    <div class="muted" style="font-size:.78rem">${phone?'<b>Share PDF</b> opens your phone\'s share list — pick Gmail, Outlook or WhatsApp; the letter and the PDF go together.':'<b>Email</b> downloads the PDF and opens your email app with the letter filled in — attach the downloaded PDF and send.'}</div></div>`,
+    `<button class="btn ghost" id="sd-copy">Copy letter</button><span class="grow"></span>${phone?`<button class="btn" id="sd-mail">Email (letter only)</button><button class="btn primary" id="sd-share">${I.send}Share PDF</button>`:`<button class="btn" id="sd-share">${I.send}Share…</button><button class="btn primary" id="sd-mail">${I.send}Email</button>`}`,true);
+  const get=mode=>({to:$('#sd-to',o).value.trim(),subject:$('#sd-subj',o).value.trim(),text:$('#sd-body',o).value,mode});
+  const mark=async sh=>{try{const x={...d,sentAt:new Date().toISOString(),sentTo:sh.to||'',sentBy:S.me.name||'',updatedAt:new Date().toISOString()};
+      if((d.type==='quotation'||isPF(d))&&(d.status||'draft')==='draft')x.status='sent';delete x.id;
+      if(can(d.type)&&(can('viewAll')||d.createdBy===S.me.id))await Store.put('docs',d.id,x)}catch(e){console.warn('sent mark',e)}};
+  const go_=async mode=>{const sh=get(mode);if(mode==='mail'&&sh.to&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(sh.to.split(/[,;]/)[0].trim())){toast('Check the email address.',true);return}
+    closeModal();await downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d),pdfRefs(d),sh);mark(sh)};
+  $('#sd-share',o).onclick=()=>go_('share');
+  $('#sd-mail',o).onclick=()=>{if(phone){const sh=get('mail');location.href=mailtoUrl(sh);mark(sh)}else go_('mail')};
+  $('#sd-copy',o).onclick=async()=>{try{await navigator.clipboard.writeText($('#sd-subj',o).value+'\n\n'+$('#sd-body',o).value);toast('Letter copied')}catch(e){toast('Could not copy — select the text and copy it.',true)}};
+}
 
 /* ----- editor ----- */
 let ED=null;
 function newDraft(type,rt){
-  const date=today();rt=type==='delivery'&&REPORT[rt]?rt:'';
+  const date=today();const pf=type==='invoice'&&rt==='proforma';rt=type==='delivery'&&REPORT[rt]?rt:'';
+  if(pf)return {...newDraft('invoice'),kind:'proforma',number:nextNumber('invoice',date,'proforma'),dueDate:addDays(date,7),advMode:'percent',advPct:50,advAmount:0,balanceOn:'completion',
+    terms:S.cfg.terms.proforma||DEFAULT_CFG.terms.proforma,status:'draft'};
   return {id:uid(),type,...(rt?{reportType:rt}:{}),number:nextNumber(type,date,rt||undefined),_auto:true,date,dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):'',validUntil:type==='quotation'?addDays(date,S.cfg.validDays):'',
     clientId:'',client:null,ref:'',subject:'',salesperson:'',deliveryAddress:'',items:[{name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''}],discount:0,taxRate:S.cfg.taxRate,
     notes:'',terms:S.cfg.terms[type]||'',status:type==='quotation'?'draft':'',createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',
@@ -858,7 +944,9 @@ VIEWS.edit=()=>{
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
     else{ED=newDraft(p.type,p.rt);if(p.tk){ED.ticketId=String(p.tk);ED._tk=1}if(p.attSite){ED.attSiteId=p.attSite;ED.attSessionId=p.attSession||'';ED.attSiteName=p.attSiteName||'';ED._att=1}const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
       if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
-        if(p.from)ED.sourceId=src.id; if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
+        if(p.from)ED.sourceId=src.id;
+        if(isPF(ED)&&src.type==='quotation'){const m=String(src.terms||'').match(/(\d{1,3})\s*%\s*(?:advance|down)/i);if(m&&+m[1]>0&&+m[1]<=100)ED.advPct=+m[1];if(src.siteId){ED.siteId=src.siteId;ED.siteName=src.siteName;ED.siteAddress=src.siteAddress}}
+        if(isInv(ED)&&isPF(src)){ED._fromPF=src.id;if(src.siteId){ED.siteId=src.siteId;ED.siteName=src.siteName;ED.siteAddress=src.siteAddress}} if(p.copy){ED.terms=src.terms;ED.attachments=clone(src.attachments||[])}}}
     ED._key=JSON.stringify(p);
   }
   const d=ED,isQ=d.type==='quotation',isDN=d.type==='delivery';
@@ -876,11 +964,11 @@ VIEWS.edit=()=>{
    <div class="grid g4 ed-top">
     <label class="field" style="grid-column:span 2"><span>Client</span><div class="row" style="flex-wrap:nowrap"><select id="e-client"><option value="">Choose a client…</option>${S.clients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===d.clientId?'selected':''}>${h(c.name)}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-nc" title="Add client">${I.plus}</button>`:''}</div></label>
     ${(()=>{const c=S.clients.find(x=>x.id===d.clientId);const ss=sitesOf(c);return c&&(ss.length||can('clients'))?`<label class="field" style="grid-column:span 2"><span>Site</span><div class="row" style="flex-wrap:nowrap"><select id="e-site"><option value="">${ss.length?'Choose a site…':'No sites yet'}</option>${ss.map(si=>`<option value="${h(si.id)}" ${si.id===d.siteId?'selected':''}>${h(si.name)}${si.address?' — '+h(si.address.split('\n')[0]):''}</option>`).join('')}</select>${can('clients')?`<button class="btn" id="e-ns" type="button" title="Add a site to this client">${I.plus}</button>`:''}</div></label>`:''})()}
-    ${!isDN&&d.clientId?(()=>{const c=S.clients.find(x=>x.id===d.clientId)||{};const v=d.clientTrn!=null?d.clientTrn:(c.taxId||(d.client&&d.client.taxId)||'');const miss=d.type==='invoice'&&!String(v).trim();
-      return `<label class="field trnf ${miss?'miss':''}" style="grid-column:span 2"><span>Customer ${h(S.cfg.taxIdLabel||'TRN')}${d.type==='invoice'?' <b class="req">required on tax invoices</b>':''}</span><input id="e-trn" inputmode="numeric" maxlength="20" value="${h(v)}" placeholder="15-digit TRN, e.g. 100XXXXXXXXXXX3">${miss?`<small class="trnwarn">⚠ This client has no TRN saved. Ask the customer and enter it here — it is saved to the client for next time.</small>`:''}</label>`})():''}
+    ${!isDN&&d.clientId?(()=>{const c=S.clients.find(x=>x.id===d.clientId)||{};const v=d.clientTrn!=null?d.clientTrn:(c.taxId||(d.client&&d.client.taxId)||'');const miss=isInv(d)&&!String(v).trim();
+      return `<label class="field trnf ${miss?'miss':''}" style="grid-column:span 2"><span>Customer ${h(S.cfg.taxIdLabel||'TRN')}${isInv(d)?' <b class="req">required on tax invoices</b>':''}</span><input id="e-trn" inputmode="numeric" maxlength="20" value="${h(v)}" placeholder="15-digit TRN, e.g. 100XXXXXXXXXXX3">${miss?`<small class="trnwarn">⚠ This client has no TRN saved. Ask the customer and enter it here — it is saved to the client for next time.</small>`:''}</label>`})():''}
     <label class="field"><span>Number</span><input id="e-number" value="${h(d.number)}"></label>
     <label class="field"><span>Date</span><input type="date" id="e-date" value="${h(d.date)}"></label>
-    ${d.type==='invoice'?`<label class="field"><span>Due date</span><input type="date" id="e-dueDate" value="${h(d.dueDate)}"></label>`:''}
+    ${d.type==='invoice'?`<label class="field"><span>${isPF(d)?'Advance due by':'Due date'}</span><input type="date" id="e-dueDate" value="${h(d.dueDate)}"></label>`:''}
     ${isQ?`<label class="field"><span>Valid until</span><input type="date" id="e-validUntil" value="${h(d.validUntil)}"></label>`:''}
     ${isDN?dnHead(d):qiHead(d,isQ,isDN)}
    </div>
@@ -901,7 +989,11 @@ VIEWS.edit=()=>{
     <div class="tr" style="align-items:center"><span class="muted">Discount</span><input type="number" step="any" id="e-discount" value="${h(d.discount)}" style="width:120px;text-align:right"></div>
     <div class="tr" style="align-items:center"><span class="muted">${h(S.cfg.taxLabel)} %</span><input type="number" step="any" id="e-taxRate" value="${h(d.taxRate)}" style="width:120px;text-align:right"></div>
     <div class="tr"><span class="muted">${h(S.cfg.taxLabel)}</span><span class="num" id="t-tax">${money(t.tax)}</span></div>
-    <div class="tr grand"><span>Total</span><span class="num" id="t-total">${cur(t.total)}</span></div></div>`}
+    <div class="tr grand"><span>Total</span><span class="num" id="t-total">${cur(t.total)}</span></div>
+    ${isPF(d)?(a=>`<div class="advbox"><div class="tr" style="align-items:center;gap:8px"><span class="muted">Advance</span><span class="row" style="gap:6px;flex-wrap:nowrap"><select id="e-advMode" style="width:auto"><option value="percent" ${a.byAmt?'':'selected'}>% of total</option><option value="amount" ${a.byAmt?'selected':''}>Fixed amount</option></select><input type="number" step="any" min="0" id="e-advVal" value="${h(a.byAmt?(d.advAmount||''):(d.advPct??''))}" style="width:110px;text-align:right"></span></div>
+      <div class="advq">${[25,30,40,50,100].map(x=>`<button type="button" class="chip" data-advp="${x}">${x}%</button>`).join('')}</div>
+      <div class="tr grand"><span>Advance payable</span><span class="num" id="t-adv">${cur(a.amt)}</span></div>
+      <div class="tr" style="align-items:center"><span class="muted">Balance on</span><span class="row" style="gap:6px;flex-wrap:nowrap"><input id="e-balanceOn" value="${h(d.balanceOn||'completion')}" style="width:130px"><span class="num" id="t-bal">${money(a.bal)}</span></span></div></div>`)(advanceOf(d)):''}</div>`}
   </div>
   <div class="card pad grid"><div class="row"><div class="hgrow"><h2>${isDN?h(rep(d).photos)+' photos':'Attachments'}</h2><div class="muted" style="font-size:.82rem">Photos print as extra pages after the document. Pick a size for each.${isDN?'':' PDF files (up to 700 KB each) are joined at the end.'}</div></div>
     <div class="row">${isDN&&(d.reportType||'delivery')!=='delivery'?`<button class="btn" id="att-before" type="button">${I.scan}Before the work</button><button class="btn" id="att-after" type="button">${I.scan}After the work</button>`:''}<button class="btn" id="att-cam" type="button">${I.scan}Take photo</button><button class="btn" id="att-add" type="button">${I.plus}Upload${isDN?' photo':' photo or PDF'}</button></div></div>
@@ -920,6 +1012,7 @@ function readEditor(){
   $$('.items [data-i]').forEach(row=>{const it=d.items[+row.dataset.i];$$('[data-f]',row).forEach(el=>{it[el.dataset.f]=el.type==='number'?(el.value===''?'':+el.value):el.value})});
   readAtts(d.attachments||[],'att');
   if($('#e-trn'))d.clientTrn=$('#e-trn').value.trim();
+  if($('#e-advMode')){d.advMode=$('#e-advMode').value;const v=+$('#e-advVal').value||0;if(d.advMode==='amount')d.advAmount=v;else d.advPct=v;d.balanceOn=$('#e-balanceOn').value.trim()||'completion'}
   if($('#o-site')){d.showSite=$('#o-site').checked;d.showWords=$('#o-words').checked;d.showBank=$('#o-bank').checked}
 }
 // One item in a full window: name, long description, qty, unit, rate / status.
@@ -1015,7 +1108,7 @@ async function addAttachments(camera,label){
   if(label)ED.attachments.sort((x,y)=>(x.caption===PHOTO_LABELS[1]?1:0)-(y.caption===PHOTO_LABELS[1]?1:0));
   render();
 }
-function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
+function updTotals(){readEditor();const t=totals(ED);if(!$('#t-sub'))return;if($('#t-adv')){const a=advanceOf(ED);$('#t-adv').textContent=cur(a.amt);$('#t-bal').textContent=money(a.bal)}$('#t-sub').textContent=money(t.sub);$('#t-tax').textContent=money(t.tax);$('#t-total').textContent=cur(t.total);ED.items.forEach((i,n)=>{const a=$(`[data-amt="${n}"]`);if(a)a.textContent=money((+i.qty||0)*(+i.price||0))})}
 // Search the products list (name, description, category, barcode) and pick one.
 function productPicker(cb,start=''){
   const o=modal('Find product',`<input type="search" class="search" id="pp-q" placeholder="Search name, model, description, barcode…" autocomplete="off" style="max-width:none;width:100%" value="${h(start)}"><div class="list card" id="pp-list" style="margin-top:10px;max-height:60vh;overflow:auto"></div>`,'',false,'ov2');
@@ -1037,7 +1130,7 @@ VIEWS_AFTER.edit=()=>{
   const cancel=()=>{const d=ED;ED=null;clearDraft();d._new?go(d.sourceId?'view':'docs',d.sourceId?{id:d.sourceId}:{tab:d.type}):go('view',{id:d.id})};
   $('#cx').onclick=cancel;$('#cx2').onclick=cancel;
   $('#e-number').addEventListener('input',()=>{ED._auto=false});
-  $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date,ED.reportType);$('#e-number').value=ED.number}});
+  $('#e-date').addEventListener('change',()=>{if(ED._new&&ED._auto){readEditor();ED.number=nextNumber(ED.type,ED.date,ED.reportType||ED.kind);$('#e-number').value=ED.number}});
   if(ED.type==='delivery'){
     const applyNear=(k,auto)=>{const m=(ED._near||[])[k];if(!m)return;readEditor();ED._picked=k;
       if(m.client){ED.clientId=m.client.id;ED.client=clientSnap(m.client);const si=m.siteId&&sitesOf(m.client).find(x=>x.id===m.siteId);if(si){ED.siteId=si.id;ED.siteName=si.name;ED.siteAddress=si.address||''}}
@@ -1083,29 +1176,38 @@ VIEWS_AFTER.edit=()=>{
   $$('[data-att-rep]').forEach(b=>b.onclick=async()=>{readEditor();if(await replacePhoto(ED.attachments[+b.dataset.attRep]))render()});
   $$('[data-att-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.attachments.splice(+b.dataset.attRm,1);render()});
   $$('[data-photo]').forEach(b=>b.onclick=async()=>{const f=await pickImage();if(!f)return;readEditor();toast('Uploading photo…');ED.items[+b.dataset.photo].photo=await storeImage(f,800);render()});
-  $$('.items input,.items textarea,#e-discount,#e-taxRate').forEach(el=>el.addEventListener('input',updTotals));
+  $$('.items input,.items textarea,#e-discount,#e-taxRate,#e-advVal').forEach(el=>el.addEventListener('input',updTotals));
+  $('#e-advMode')&&($('#e-advMode').onchange=()=>{readEditor();if(ED.advMode==='amount'&&!ED.advAmount)ED.advAmount=advanceOf({...ED,advMode:'percent'}).amt;render()});
+  $$('[data-advp]').forEach(b=>b.onclick=()=>{readEditor();ED.advMode='percent';ED.advPct=+b.dataset.advp;render()});
   $$('.items [data-f="name"]').forEach(el=>el.addEventListener('change',()=>{const p=S.products.find(x=>x.name===el.value);if(!p)return;readEditor();const it=ED.items[+el.closest('[data-i]').dataset.i];Object.assign(it,{desc:it.desc||p.desc||'',price:+p.price||it.price,unit:p.unit||it.unit,photo:it.photo||p.photo||'',pid:p.id});render()}));
   $('#scan-add').onclick=()=>openScanner(code=>{const p=S.products.find(x=>x.barcode===code||x.sku===code);if(p){addProduct(p);toast('Added '+p.name)}else{readEditor();ED.items.push({name:code,desc:'',qty:1,unit:'pcs',price:0});render();toast('Code '+code+' is not in your product list. Added as a new line.')}},{title:'Scan product'});
   const doSave=async()=>{readEditor();const d=clone(ED);
     if(!d.clientId){toast('Choose a client first.',true);return}
     const trn=String(d.clientTrn||'').replace(/\s+/g,'');
-    if(d.type==='invoice'&&!trn&&!await confirmBox('Customer TRN is missing','A tax invoice should show the customer\'s TRN. Save without it? You can add it later by editing the invoice.','Save without TRN')){const t=$('#e-trn');if(t){t.focus();t.scrollIntoView({block:'center'})}return}
+    if(isInv(d)&&!trn&&!await confirmBox('Customer TRN is missing','A tax invoice should show the customer\'s TRN. Save without it? You can add it later by editing the invoice.','Save without TRN')){const t=$('#e-trn');if(t){t.focus();t.scrollIntoView({block:'center'})}return}
     if(trn&&!/^\d{15}$/.test(trn)&&!await confirmBox('Check the TRN','UAE TRNs have 15 digits; this one has '+trn.replace(/\D/g,'').length+'. Save anyway?','Save anyway'))return;
     d.items=d.items.filter(i=>i.name||i.desc);if(!d.items.length&&!(d.type==='delivery'&&(d.reportType||'delivery')!=='delivery')){toast('Add at least one item.',true);return}
     const b1=$('#sv'),b2=$('#sv2');b1.disabled=b2.disabled=true;
     try{
-      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType,d.number);
+      if(d._new&&d._auto)d.number=await reserveNumber(d.type,d.date,d.reportType||d.kind,d.number);
       if(S.docs.some(x=>x.id!==d.id&&x.number===d.number)){toast('Number '+d.number+' is already used.',true);return}
+    if(isPF(d)){const a=advanceOf(d);if(!(a.amt>0)){toast('Enter the advance — a percentage or an amount.',true);return}}
       const c=S.clients.find(x=>x.id===d.clientId);if(c)d.client=clientSnap(c);
       if(d.clientTrn!=null){if(d.client)d.client.taxId=trn;
         if(c&&trn&&trn!==String(c.taxId||'')&&can('clients')){const x={...c,taxId:trn,updatedAt:new Date().toISOString()};delete x.id;Store.put('clients',c.id,x).then(()=>toast('TRN saved to '+c.name)).catch(()=>{})}}
       delete d.clientTrn;
       const wasNew=!!d._new;
-      delete d._new;delete d._key;delete d._auto;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai','_tk','_tkDone','_tkBusy'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
-      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();rememberPlace(d);if(wasNew)linkTicket(d);await syncProducts(d);go('view',{id:d.id})}
+      delete d._new;delete d._key;delete d._auto;const fromPF=d._fromPF;['_gpsBusy','_gpsErr','_near','_gpsTried','_picked','_more','_att','_attDone','_ai','_tk','_tkDone','_tkBusy','_fromPF'].forEach(k=>delete d[k]);d.updatedAt=new Date().toISOString();if(!ED||!ED._new)d.updatedBy=S.me.name||'';
+      if(await save('docs',d.id,d,'Saved '+d.number)){ED=null;clearDraft();if(wasNew&&fromPF)await linkAdvance(fromPF,d);rememberPlace(d);if(wasNew)linkTicket(d);await syncProducts(d);go('view',{id:d.id})}
     }finally{b1.disabled=b2.disabled=false}};
   $('#sv').onclick=doSave;$('#sv2').onclick=doSave;
 };
+// When a tax invoice is made from a proforma, advance payments recorded on account against that proforma are linked to it.
+async function linkAdvance(pfId,inv){
+  if(!can('payments'))return;const ps=S.payments.filter(p=>p.pfId===pfId&&!p.invoiceId);if(!ps.length)return;
+  try{for(const p of ps){const x={...p,invoiceId:inv.id,updatedAt:new Date().toISOString()};delete x.id;await Store.put('payments',p.id,x)}
+    toast('Advance of '+money(ps.reduce((s,p)=>s+(+p.amount||0),0))+' linked to '+inv.number)}catch(e){console.warn('advance link',e)}
+}
 // New items typed on a document are added to the product list only after asking; products added by
 // anyone other than an admin / manager wait for their approval before they show in the lists.
 const canApproveProducts=()=>S.me.role==='admin'||S.me.role==='manager';
@@ -1431,7 +1533,7 @@ VIEWS.payments=()=>{
 VIEWS_AFTER.payments=()=>{$('#np')&&($('#np').onclick=()=>paymentForm());$$('[data-p]').forEach(b=>b.onclick=()=>can('payments')&&paymentForm(S.payments.find(p=>p.id===b.dataset.p)))};
 function paymentForm(pre={}){
   const e={date:today(),method:'Bank transfer',...pre};
-  const invOpts=cid=>S.docs.filter(d=>d.type==='invoice'&&d.clientId===cid).map(d=>{const due=r2(totals(d).total-paidOn(d.id)+(e.id&&e.invoiceId===d.id?+e.amount:0));return due>0||d.id===e.invoiceId?`<option value="${d.id}" data-due="${due}" ${d.id===e.invoiceId?'selected':''}>${h(d.number)} · due ${money(due)}</option>`:''}).join('');
+  const invOpts=cid=>S.docs.filter(d=>isInv(d)&&d.clientId===cid).map(d=>{const due=r2(totals(d).total-paidOn(d.id)+(e.id&&e.invoiceId===d.id?+e.amount:0));return due>0||d.id===e.invoiceId?`<option value="${d.id}" data-due="${due}" ${d.id===e.invoiceId?'selected':''}>${h(d.number)} · due ${money(due)}</option>`:''}).join('');
   const o=modal(e.id?'Edit payment':'Record payment',`<div class="grid g2">
    <label class="field" style="grid-column:1/-1"><span>Client</span><select id="p-client"><option value="">Choose…</option>${S.clients.map(c=>`<option value="${c.id}" ${c.id===e.clientId?'selected':''}>${h(c.name)} · ${money(clientBalance(c.id))}</option>`).join('')}</select></label>
    <label class="field" style="grid-column:1/-1"><span>Against invoice</span><select id="p-inv"><option value="">On account (not linked to one invoice)</option>${e.clientId?invOpts(e.clientId):''}</select></label>
@@ -1480,7 +1582,7 @@ function renderReceipt(p){
   else alloc=`<table><thead><tr><th>Applied to</th><th class="r">Amount</th></tr></thead><tbody><tr><td><div class="it">Payment on account</div><div class="idesc">Not linked to a single invoice</div></td><td class="r m b">${money(amt)}</td></tr></tbody></table>`;
   // client balance straight after this payment (same-day payments counted in the order they were recorded)
   const stamp=x=>x.createdAt||x.updatedAt||'';
-  const accBal=r2((+cl.openingBalance||0)+S.docs.filter(d=>d.type==='invoice'&&d.clientId===p.clientId&&d.date<=p.date).reduce((s2,d)=>s2+totals(d).total,0)
+  const accBal=r2((+cl.openingBalance||0)+S.docs.filter(d=>isInv(d)&&d.clientId===p.clientId&&d.date<=p.date).reduce((s2,d)=>s2+totals(d).total,0)
     -S.payments.filter(x=>x.clientId===p.clientId&&(x.id===p.id||x.date<p.date||(x.date===p.date&&stamp(x)<stamp(p)))).reduce((s2,x)=>s2+(+x.amount||0),0)-(S.payments.some(x=>x.id===p.id)?0:amt));
   const det=[['Receipt date',fdate(p.date)],['Payment method',p.method||'—']];
   if(p.ref)det.push([/cheque|pdc/i.test(p.method||'')?'Cheque no.':'Reference',p.ref]);
@@ -1913,10 +2015,10 @@ VIEWS.settings=()=>{
    <label class="field"><span>Bank details (printed on quotations, invoices, statements)</span><textarea id="s-bank" placeholder="Bank name&#10;Account name&#10;IBAN&#10;SWIFT">${h(c.bank)}</textarea></label></div>
   <div class="card pad grid"><h2>Money & numbering</h2><div class="grid g3">${f('currency','Currency code')}${f('currencyName','Currency in words')}${f('minorName','Cents in words')}${f('taxLabel','Tax name')}${f('taxRate','Tax rate %',c.taxRate,'number')}${f('dueDays','Invoice due (days)',c.dueDays,'number')}${f('validDays','Quotation valid (days)',c.validDays,'number')}
    </div><div class="label" style="margin-top:4px">Numbering · prefix + date (DDMMYY) + 3-digit random number, never repeated, e.g. ${h(nextNumber('quotation',today()))}</div><div class="grid g3">
-   ${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(numPrefix(t))}"></label>`).join('')}
+   ${['quotation','invoice','proforma','delivery'].map(t=>`<label class="field"><span>${t==='proforma'?'Proforma':TYPE[t].t.replace('Tax ','')} prefix</span><input id="s-p-${t}" value="${h(numPrefix(t))}"></label>`).join('')}
 </div>
    <label class="check"><input type="checkbox" id="s-dnp" ${c.showPricesOnDN?'checked':''}>Show prices on delivery notes</label></div>
-  <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','delivery'].map(t=>`<label class="field"><span>${TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
+  <div class="card pad grid"><h2>Default terms</h2>${['quotation','invoice','proforma','delivery'].map(t=>`<label class="field"><span>${t==='proforma'?'Proforma invoice (advance)':TYPE[t].t}</span><textarea id="s-t-${t}" rows="3">${h(c.terms[t])}</textarea></label>`).join('')}</div>
   <div class="card pad grid"><h2>Look & signature</h2><div class="grid g2"><label class="field"><span>Accent colour</span><input type="color" id="s-brand" value="${h(c.brand)}" style="padding:2px;height:40px"></label><label class="field"><span>Dark colour</span><input type="color" id="s-charcoal" value="${h(c.charcoal)}" style="padding:2px;height:40px"></label>
    <label class="field"><span>Document style</span><select id="s-docStyle"><option value="clean" ${(c.docStyle||'clean')==='clean'?'selected':''}>Clean · black & white, minimal</option><option value="classic" ${c.docStyle==='classic'?'selected':''}>Classic · logo colours</option><option value="premium" ${c.docStyle==='premium'?'selected':''}>Premium · corporate, full colour</option></select></label>
    <label class="field"><span>Document font</span><select id="s-docFont">${[['gothic','Century Gothic style · clean, geometric'],['modern','Montserrat + Source Sans · professional'],['neutral','Inter · neutral, compact'],['plex','Archivo + IBM Plex · technical']].map(([k,l])=>`<option value="${k}" ${(c.docFont||'gothic')===k?'selected':''}>${l}</option>`).join('')}</select></label>
@@ -1946,8 +2048,8 @@ VIEWS_AFTER.settings=()=>{
   $('#s-save').onclick=async()=>{
     ['name','website','phone','email','dnEmail','taxIdLabel','taxId','address','bank','currency','currencyName','minorName','taxLabel','signName','brand','charcoal','photoSize','docStyle','docFont','tagline','gps'].forEach(k=>c[k]=$('#s-'+k).value.trim());
     ['taxRate','dueDays','validDays'].forEach(k=>c[k]=+$('#s-'+k).value||0);
-    c.prefix={};c.seqStart={};['quotation','invoice','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
-    c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,delivery:$('#s-t-delivery').value};
+    c.prefix={};c.seqStart={};['quotation','invoice','proforma','delivery'].forEach(t=>{c.prefix[t]=$('#s-p-'+t).value.trim().toUpperCase()||numPrefix(t);0});
+    c.terms={quotation:$('#s-t-quotation').value,invoice:$('#s-t-invoice').value,proforma:$('#s-t-proforma').value,delivery:$('#s-t-delivery').value};
     c.showPricesOnDN=$('#s-dnp').checked;if(!sp.isEmpty())c.signature=sp.toData();
     await save('config','company',c,'Settings saved');
   };
