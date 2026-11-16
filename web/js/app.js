@@ -80,7 +80,7 @@ const docTab=d=>d&&(isPF(d)?'proforma':d.type==='delivery'&&(d.reportType||'deli
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={pricing:[],prices:[],pricingCfg:{markup:40,round:0},plSel:[],logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={pend:[],pricing:[],prices:[],pricingCfg:{markup:40,round:0},plSel:[],logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
@@ -90,7 +90,7 @@ const canPricing=()=>S.me.role==='admin'||!!S.me.perms.pricing;
 const seesPrices=()=>canPricing()||!!S.me.perms.quotation||!!S.me.perms.invoice||S.me.role==='manager';
 
 /* ================= Firebase store ================= */
-const COL={pricing:'inv_pricing',prices:'inv_prices',ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={pending:'acctPending',pricing:'inv_pricing',prices:'inv_prices',ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -749,7 +749,7 @@ VIEWS.home=()=>{
     <button class="hl-card hl-green" data-go="payments"><span class="hl-l">Received this month</span><span class="hl-v">${money(monthRec)}</span><span class="hl-s">${(n=>`${n} payment${n===1?'':'s'}`)(S.payments.filter(p=>(p.date||'').startsWith(ym)).length)}</span></button>
     ${isAdmin()?(()=>{const A=accSummary();return `<button class="hl-card hl-orange hl-acc" data-go="accounts"><span class="hl-l">Current account balance</span><span class="hl-v">${money(A.bal)}<small>${h(S.cfg.currency)}</small></span>
       <span class="hl-s">Cash ${money(A.cash)} · Bank ${money(A.bank)}</span>
-      <span class="hl-g"><span>Total received</span><b>${money(A.inAll)}</b><span>Total spent</span><b>${money(A.outAll)}</b><span>This month in</span><b>${money(A.inMon)}</b><span>This month out</span><b>${money(A.outMon)}</b></span></button>`})()
+      <span class="hl-g"><span>Total received</span><b>${money(A.inAll)}</b><span>Total spent</span><b>${money(A.outAll)}</b><span>This month in</span><b>${money(A.inMon)}</b><span>This month out</span><b>${money(A.outMon)}</b><span class="hl-pend">To pay (${A.nPay})</span><b class="hl-pend">${money(A.toPay)}</b><span class="hl-pend">To receive (${A.nGet})</span><b class="hl-pend">${money(A.toGet)}</b></span></button>`})()
     :`<button class="hl-card hl-orange" data-go="deliveries"><span class="hl-l">Pending deliveries</span><span class="hl-v">${pend.length}</span><span class="hl-s">${pend.filter(d=>(d.reportType||'delivery')!=='delivery').length} service / call-out</span></button>`}
   </div>`:''}
 
@@ -1877,7 +1877,57 @@ function accBalance(upto){const o=S.acctOpen||{};const out={cash:0,bank:0,set:!!
 function accSummary(){const t=today(),m0=t.slice(0,8)+'01',o=S.acctOpen||{},start=o.date||'2000-01-01';const b=accBalance(t);
   const es=accEntries().filter(e=>e.date>=start&&e.date<=t);const sum=a=>r2(a.reduce((x,e)=>x+e.amount,0));
   const inn=es.filter(e=>e.type==='income'),out=es.filter(e=>e.type==='expense');
-  return {cash:b.cash,bank:b.bank,bal:r2(b.cash+b.bank),inAll:sum(inn),outAll:sum(out),inMon:sum(inn.filter(e=>e.date>=m0)),outMon:sum(out.filter(e=>e.date>=m0))}}
+  const P=pendSummary();
+  return {cash:b.cash,bank:b.bank,bal:r2(b.cash+b.bank),inAll:sum(inn),outAll:sum(out),inMon:sum(inn.filter(e=>e.date>=m0)),outMon:sum(out.filter(e=>e.date>=m0)),...P}}
+// Pending payments — the attendance app's list of payments still to make (suppliers, salaries…) or to receive.
+const pendRem=x=>Math.max(0,r2((+x.amount||0)-(+x.paid||0)));
+const pendOpen=()=>S.pend.filter(x=>x.status!=='done'&&pendRem(x)>0.005).sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
+function pendSummary(){const o=pendOpen();const pay=o.filter(x=>x.type!=='receive'),get=o.filter(x=>x.type==='receive');
+  return {toPay:r2(pay.reduce((a,x)=>a+pendRem(x),0)),nPay:pay.length,toGet:r2(get.reduce((a,x)=>a+pendRem(x),0)),nGet:get.length,overPay:pay.filter(x=>x.dueDate&&x.dueDate<today()).length}}
+function pendCard(){const o=pendOpen(),P=pendSummary(),b=accBalance(today()),bal=r2(b.cash+b.bank),t=today();
+  return `<div class="card pendcard"><div class="pad row" style="align-items:center;gap:8px;flex-wrap:wrap"><div class="grow"><h3>Pending payments</h3><div class="muted" style="font-size:.8rem">Bills and salaries still to pay, and money still to receive · same list as the attendance app</div></div>
+    <button class="btn sm" data-pnew="pay">${I.plus}To pay</button><button class="btn sm" data-pnew="receive">${I.plus}To receive</button></div>
+   <div class="pendsum"><div class="ps-pay"><span>To pay</span><b>${money(P.toPay)}</b><small>${P.nPay} pending${P.overPay?` · <b>${P.overPay} overdue</b>`:''}</small></div><div class="ps-get"><span>To receive</span><b>${money(P.toGet)}</b><small>${P.nGet} pending</small></div><div class="ps-proj"><span>Balance after pending</span><b>${money(r2(bal-P.toPay+P.toGet))}</b><small>now ${money(bal)}</small></div></div>
+   <div class="list">${o.length?o.map(x=>{const rcv=x.type==='receive',od=x.dueDate&&x.dueDate<t;return `<div class="li pendli"><span class="ico" style="background:${rcv?'var(--good-soft)':'var(--bad-soft)'};color:${rcv?'var(--good)':'var(--bad)'}">${rcv?'IN':'OUT'}</span>
+      <button class="pend-main" data-pedit="${h(x.id)}" type="button"><div class="t">${h(x.party||x.category||'—')}</div><div class="s" style="${od?'color:var(--bad)':''}">${h([rcv?'We receive':'We pay',x.category,x.dueDate?(od?'OVERDUE ':'due ')+fdate(x.dueDate):'no due date',+x.paid?'paid '+money(x.paid)+' of '+money(x.amount):'',x.note].filter(Boolean).join(' · '))}</div></button>
+      <span class="r row" style="gap:8px;flex-wrap:nowrap"><b class="num" style="color:${rcv?'var(--good)':'var(--bad)'}">${money(pendRem(x))}</b><button class="btn sm ${rcv?'':'danger'}" data-ppay="${h(x.id)}" type="button">${rcv?'Got it':'Pay'}</button></span></div>`}).join('')
+     :'<div class="empty" style="padding:16px"><b>Nothing pending</b>Add supplier bills, salaries still to pay or client payments you expect, with a due date.</div>'}</div></div>`}
+function pendForm(x,kind){const pay=(x?x.type:kind)!=='receive';const e={category:pay?'Supplier payment':'Client payment',method:'Bank transfer',...(x||{})};
+  const parties=[...new Set(S.acct.map(a=>a.party).concat(S.pend.map(a=>a.party)).filter(Boolean))].sort();
+  const o=modal(`${x?'Edit':'Add'} ${pay?'payment to make':'payment to receive'}`,`<div class="grid g2">
+    <label class="field" style="grid-column:1/-1"><span>${pay?'Pay to':'Receive from'}</span><input id="pe-party" list="pe-parties" value="${h(e.party||'')}"><datalist id="pe-parties">${parties.map(v=>`<option value="${h(v)}">`).join('')}</datalist></label>
+    <label class="field"><span>For (category)</span><input id="pe-cat" list="pe-cats" value="${h(e.category||'')}"><datalist id="pe-cats">${ACC_CAT[pay?'expense':'income'].map(v=>`<option value="${h(v)}">`).join('')}</datalist></label>
+    <label class="field"><span>Total amount (${h(S.cfg.currency)})</span><input id="pe-amt" type="number" step="any" min="0" inputmode="decimal" value="${h(e.amount??'')}"></label>
+    <label class="field"><span>Due date</span><input id="pe-due" type="date" value="${h(e.dueDate||'')}"></label>
+    <label class="field"><span>Method</span><select id="pe-m">${ACC_METHODS.map(m=>`<option ${m===e.method?'selected':''}>${m}</option>`).join('')}</select></label>
+    <label class="field" style="grid-column:1/-1"><span>Note</span><input id="pe-note" value="${h(e.note||'')}" placeholder="e.g. supplier invoice no."></label>
+    ${x&&+x.paid?`<div class="muted" style="grid-column:1/-1;font-size:.84rem">Already ${pay?'paid':'received'} ${money(x.paid)}</div>`:''}</div>`,
+    `${x?'<button class="btn danger" id="pe-del">Delete</button><span class="grow"></span>':''}<button class="btn" data-x>Cancel</button><button class="btn primary" id="pe-save">Save</button>`);
+  $('#pe-save',o).onclick=async()=>{const amt=r2(+$('#pe-amt',o).value||0),party=$('#pe-party',o).value.trim();
+    if(!party||!(amt>0)){toast('Enter who and how much.',true);return}if(x&&amt<(+x.paid||0)-0.005){toast('Already paid '+money(x.paid)+'.',true);return}
+    const d={type:pay?'pay':'receive',party,category:$('#pe-cat',o).value.trim(),amount:amt,dueDate:$('#pe-due',o).value||'',note:$('#pe-note',o).value.trim(),method:$('#pe-m',o).value};
+    try{if(x)await setDoc(doc(fdb,COL.pending,x.id),{...d,status:amt-(+x.paid||0)>0.005?'open':'done',editedBy:S.me.name||'',editedAt:serverTimestamp()},{merge:true});
+      else await setDoc(doc(collection(fdb,COL.pending)),{...d,status:'open',paid:0,history:[],createdBy:S.me.name||'',createdAt:serverTimestamp()});
+      closeModal();toast('Saved')}catch(err){toast('Could not save: '+(err.code||err.message),true)}};
+  $('#pe-del',o)&&($('#pe-del',o).onclick=async()=>{if(!await confirmBox('Delete pending payment?','Entries already recorded stay in the accounts.','Delete'))return;try{await Store.remove('pending',x.id);closeModal();toast('Deleted')}catch(err){toast('Could not delete: '+(err.code||err.message),true)}});
+}
+// Pay (or receive) all or part: adds the accounts entry and reduces or closes the pending item — as the attendance app does.
+function pendPay(x){const rcv=x.type==='receive',rem=pendRem(x);
+  const o=modal(`${rcv?'Receive from':'Pay'} ${x.party||''}`,`<div class="grid g2"><div class="muted" style="grid-column:1/-1;font-size:.84rem">Remaining ${money(rem)} of ${money(x.amount)}. A part payment keeps the rest pending.</div>
+    <label class="field"><span>Amount (${h(S.cfg.currency)})</span><input id="pp-amt" type="number" step="any" min="0" inputmode="decimal" value="${h(rem)}"></label>
+    <label class="field"><span>Date</span><input id="pp-date" type="date" value="${today()}"></label>
+    <label class="field"><span>Method</span><select id="pp-m">${ACC_METHODS.map(m=>`<option ${m===(x.method||'Bank transfer')?'selected':''}>${m}</option>`).join('')}</select></label>
+    <label class="field"><span>Reference / cheque no.</span><input id="pp-ref"></label></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="pp-go">${rcv?'Received':'Paid'}</button>`);
+  $('#pp-go',o).onclick=async()=>{const amt=r2(+$('#pp-amt',o).value||0),date=$('#pp-date',o).value||today();
+    if(!(amt>0)||amt>rem+0.005){toast('Enter an amount up to '+money(rem)+'.',true);return}const btn=$('#pp-go',o);btn.disabled=true;
+    try{const b=writeBatch(fdb);const eref=doc(collection(fdb,COL.acct));
+      b.set(eref,{type:rcv?'income':'expense',date,month:date.slice(0,7),amount:amt,category:x.category||(rcv?'Client payment':'Supplier payment'),party:x.party||'',method:$('#pp-m',o).value,reference:$('#pp-ref',o).value.trim(),bank:'',chequeDate:'',siteId:'',siteName:'',
+        note:[x.note,amt<rem-0.005?`part payment (${amt} of ${rem})`:''].filter(Boolean).join(' · '),pendingId:x.id,createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()});
+      const paid=r2((+x.paid||0)+amt);
+      b.update(doc(fdb,COL.pending,x.id),{paid,status:paid>=(+x.amount||0)-0.005?'done':'open',lastPaidOn:date,history:arrayUnion({date,amount:amt,entryId:eref.id,by:S.me.name||''})});
+      await b.commit();closeModal();toast((rcv?'Received ':'Paid ')+money(amt)+' — added to accounts')}catch(err){btn.disabled=false;toast('Could not save: '+(err.code||err.message),true)}};
+}
 const SRC_PILL={petty:'petty cash · attendance',driver:'driver payment · attendance'};
 VIEWS.accounts=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
@@ -1901,6 +1951,7 @@ VIEWS.accounts=()=>{
    ${(S.params.per)==='custom'?`<input type="date" id="ac-f" value="${from}" style="width:auto"><input type="date" id="ac-t" value="${to}" style="width:auto">`:''}
    <div class="seg">${[['','Cash & bank'],['cash','Cash'],['bank','Bank / cheque']].map(([k,l])=>`<button class="${mf===k?'on':''}" data-mf="${k}">${l}</button>`).join('')}</div>
    ${projList().length?`<select id="ac-pj" style="width:auto;max-width:220px"><option value="">All projects</option>${projList().map(x=>`<option value="${h(x.id)}" ${x.id===pj?'selected':''}>${h(projLabel(x))}</option>`).join('')}</select>`:''}</div>
+  ${pendCard()}
   <div class="kpis"><div class="card kpi"><span class="label">Income</span><span class="v" style="color:var(--good)">${money(inc)}</span><span class="muted" style="font-size:.76rem">Customer payments in invoicing: ${money(coll)}</span></div>
    <div class="card kpi"><span class="label">Expenses</span><span class="v" style="color:var(--bad)">${money(exp)}</span><span class="muted" style="font-size:.76rem">incl. petty cash &amp; drivers ${money(auto)}</span></div>
    <div class="card kpi"><span class="label">Net for period</span><span class="v" style="color:${inc-exp<0?'var(--bad)':'inherit'}">${money(inc-exp)}</span></div>
@@ -1928,6 +1979,9 @@ VIEWS_AFTER.accounts=()=>{
   $('#ac-cat').onchange=e=>set('cat',e.target.value);$('#ac-pj')&&($('#ac-pj').onchange=e=>set('pj',e.target.value));
   const q=$('#ac-q');q.oninput=()=>{S.params.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#ac-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
   $('#ac-imp').onclick=acctImport;
+  $$('[data-pnew]').forEach(b=>b.onclick=()=>pendForm(null,b.dataset.pnew));
+  $$('[data-pedit]').forEach(b=>b.onclick=()=>{const x=S.pend.find(y=>y.id===b.dataset.pedit);if(x)pendForm(x)});
+  $$('[data-ppay]').forEach(b=>b.onclick=()=>{const x=S.pend.find(y=>y.id===b.dataset.ppay);if(x)pendPay(x)});
   $('#ac-in').onclick=()=>accForm({type:'income'});$('#ac-ex').onclick=()=>accForm({type:'expense'});$('#ac-open').onclick=openingForm;
   $$('[data-ac]').forEach(b=>b.onclick=()=>{const id=b.dataset.ac;
     if(id.startsWith('petty_')){toast('Petty cash given to staff comes from the attendance app (Petty cash). Change it there.');return}
@@ -2527,7 +2581,7 @@ function startData(){
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(seesAllDN())Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){const ra=()=>{if(S.view==='accounts'||S.view==='home')soon()};
-    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
+    Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('pending',r=>{S.pend=r;ra()},null,true);Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts'||S.view==='home')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});

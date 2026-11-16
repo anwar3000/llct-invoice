@@ -984,3 +984,15 @@ body,.main{background:var(--page)}
 .pltable th .th-s{display:block;font-size:.62rem;letter-spacing:.02em;text-transform:none;font-weight:500;opacity:.85}
 .plcalc{grid-template-columns:repeat(5,1fr)}
 @media (max-width:760px){.plcalc{grid-template-columns:1fr 1fr}}
+/* accounts: pending payments */
+.pendsum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px 12px}
+.pendsum>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--card-line,#e5e7eb)}
+.pendsum span{font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#6b7280)}
+.pendsum b{font-family:var(--f-mono);font-size:1.15rem}.pendsum small{font-size:.76rem;color:var(--muted,#6b7280)}
+.pendsum .ps-pay b{color:var(--bad)}.pendsum .ps-get b{color:var(--good)}
+.pendli{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;cursor:default}
+.pend-main{background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;min-width:0}
+.hl-acc .hl-g .hl-pend{margin-top:0}
+@media (max-width:640px){.pendsum{grid-template-columns:1fr 1fr}.pendsum .ps-proj{grid-column:1/-1}.pendli{grid-template-columns:auto 1fr}.pendli>.r{grid-column:2;justify-content:space-between}}
+.pendsum small b{font-family:inherit;font-size:inherit;color:var(--bad)}
+@media (max-width:640px){.pendcard>.pad>.grow{flex-basis:100%}}
