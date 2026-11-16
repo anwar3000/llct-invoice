@@ -929,32 +929,51 @@ body,.main{background:var(--page)}
 .advq{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .advq .chip{cursor:pointer;border:1px solid var(--card-line,#ddd);background:var(--card,#fff)}
 /* price list */
-.pltable-wrap{overflow:hidden}
-.pltable{width:100%;border-collapse:collapse;font-size:.9rem}
-.pltable th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7280);padding:10px 12px;border-bottom:1px solid var(--card-line,#e5e7eb);font-weight:600}
-.pltable td{padding:10px 12px;border-top:1px solid var(--card-line,#eef0f3);vertical-align:top}
+.pltable-wrap{overflow-x:auto}
+.pltable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.88rem}
+.pltable.full{min-width:900px}.pltable.staff{min-width:640px}
+.pltable .w-cb{width:44px}.pltable .w-vnd{width:180px}.pltable .w-dt{width:116px}.pltable .w-num{width:106px}.pltable .w-vat{width:84px}
+.pl-vm{display:none;font-size:.76rem;color:var(--muted,#6b7280);margin-top:3px}
+@media (min-width:761px) and (max-width:1250px){.pltable .cv,.pltable .cvn{display:none}.pl-vm{display:block}.pltable.full,.pltable.staff{min-width:0;table-layout:auto}.pltable .w-dt{width:1%}.pltable td.dt,.pltable td.n{width:1%}}
+.pltable th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#6b7280);padding:11px 12px;border-bottom:1px solid var(--card-line,#e5e7eb);font-weight:650;white-space:nowrap;background:var(--card,#fff)}
+.pltable td{padding:11px 12px;border-top:1px solid var(--card-line,#eef0f3);vertical-align:top;overflow:hidden}
 .pltable th.r,.pltable td.r{text-align:right}
+.pltable td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:.86rem}
+.pltable td.sale{font-weight:700;color:var(--ink,#111)}
+.pltable td.incl{font-weight:600}
 .pltable tr[data-pl]{cursor:pointer}.pltable tr[data-pl]:hover td{background:color-mix(in srgb,var(--c-amber) 5%,transparent)}
-.pltable tr.on td{background:color-mix(in srgb,var(--c-amber) 9%,transparent)}
-.pltable tr.plcat td{background:var(--sunk,#f4f5f7);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:6px 12px}
-.pltable .mdl b{font-weight:650}.pltable .dsc{font-size:.8rem;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pltable td.sale{font-weight:700}.pltable .cb{width:34px}.pltable .cb input{width:18px;height:18px}
+.pltable tr.on td{background:color-mix(in srgb,var(--c-amber) 10%,transparent)}
+.pltable tr.plcat td{background:var(--sunk,#f4f5f7);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;color:var(--muted,#6b7280)}
+.pltable .cb input{width:18px;height:18px;margin:1px 0 0}
+.pl-t{font-weight:650;line-height:1.3;overflow-wrap:anywhere}
+.pl-n{line-height:1.3;margin-top:1px}
+.pl-d{font-size:.78rem;color:var(--muted,#6b7280);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pl-v{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-ref{font-size:.76rem;color:var(--muted,#6b7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-age{font-size:.72rem;color:var(--muted,#6b7280);margin-top:3px;white-space:nowrap}
+.pl-mk{font-size:.7rem;color:var(--muted,#6b7280);font-family:inherit}
 .pltable .pill{white-space:nowrap}
 .plcalc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--c-amber) 7%,transparent);border:1px dashed color-mix(in srgb,var(--c-amber) 50%,transparent)}
 .plcalc div{display:flex;flex-direction:column;gap:2px}.plcalc span{font-size:.72rem;color:var(--muted,#6b7280)}.plcalc b{font-size:1rem}
 .plsel{position:sticky;top:8px;z-index:5}
 @media (max-width:760px){
+  .pltable-wrap{overflow:visible}
+  .pltable,.pltable.full,.pltable.staff{min-width:0;table-layout:auto}
   .pltable thead{display:none}
+  .pltable td.cvn{display:none!important}.pltable td.cv{display:flex}.pl-vm{display:block}
   .pltable,.pltable tbody{display:block}
-  .pltable tr[data-pl]{display:grid;grid-template-columns:30px 1fr auto;gap:2px 8px;padding:10px 12px;border-top:1px solid var(--card-line,#eef0f3)}
-  .pltable tr.plcat{display:block}.pltable tr.plcat td{display:block}
-  .pltable tr[data-pl] td{border:0;padding:0;background:none!important}
+  .pltable tr.plcat,.pltable tr.plcat td{display:block}
+  .pltable tr[data-pl]{display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:4px 10px;padding:12px;border-top:1px solid var(--card-line,#eef0f3)}
+  .pltable tr[data-pl] td{border:0;padding:0;background:none!important;overflow:visible}
   .pltable td.cb{grid-row:1/span 4}
-  .pltable td.mdl{grid-column:2/4}
-  .pltable td.vnd,.pltable td.dt{grid-column:2/4;font-size:.82rem}
-  .pltable td.r{grid-column:2/3;text-align:left;font-size:.84rem}
-  .pltable td.r::before{content:attr(data-l) " ";color:var(--muted,#6b7280);font-weight:400;font-size:.74rem}
-  .pltable td.r>div{display:inline;margin-left:4px}
+  .pltable td.mdl,.pltable td.vnd,.pltable td.dt{grid-column:2/-1}
+  .pltable td.vnd{display:flex;gap:8px;align-items:baseline}.pl-v{flex:none}
+  .pltable td.dt{display:flex;gap:8px;align-items:center}.pl-age{margin:0}
+  .pltable td.r{text-align:left;display:flex;flex-direction:column;gap:1px;margin-top:4px}
+  .pltable td.r::before{content:attr(data-l);font-family:var(--f-body,inherit);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7280);font-weight:500}
+  .pltable.full td.r[data-l="Cost"]{grid-column:2}
+  .pltable.full tr[data-pl]{grid-template-columns:28px repeat(4,1fr)}
+  .pltable.full td.mdl,.pltable.full td.vnd,.pltable.full td.dt{grid-column:2/-1}
   .plcalc{grid-template-columns:1fr 1fr}
 }
 /* overview: current account balance card */

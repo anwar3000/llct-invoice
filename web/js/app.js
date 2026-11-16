@@ -1714,14 +1714,15 @@ VIEWS.pricelist=()=>{
    ${cats.length>1?`<select id="plcat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>`:''}
    ${nOld?`<label class="check" style="white-space:nowrap"><input type="checkbox" id="plold" ${old?'checked':''}>Older than 3 months (${nOld})</label>`:''}</div>
   ${sel.size?`<div class="notice row plsel" style="align-items:center"><span class="grow"><b>${sel.size}</b> selected</span>${can('quotation')?`<button class="btn sm primary" data-plq="quotation">New quotation</button>`:''}${can('invoice')?`<button class="btn sm" data-plq="invoice">New invoice</button>`:''}<button class="btn sm ghost" id="pl-clr">Clear</button></div>`:''}
-  <div class="card pltable-wrap">${list.length?`<table class="pltable ${full?'full':''}"><thead><tr><th style="width:34px"></th><th>Model / item</th>${full?'<th>Vendor · reference</th>':''}<th>Price date</th>${full?'<th class="r">Cost</th>':''}<th class="r">Sale price</th><th class="r">${h(S.cfg.taxLabel)}</th><th class="r">Incl. ${h(S.cfg.taxLabel)}</th></tr></thead><tbody>
-   ${list.map((x,k)=>{const c=plCalc(x);return `${(k===0||String(list[k-1].category||'Other')!==String(x.category||'Other'))?`<tr class="plcat"><td colspan="${full?8:6}">${h(x.category||'Other')}</td></tr>`:''}<tr data-pl="${h(x.id)}" class="${sel.has(x.id)?'on':''}">
+  <div class="card pltable-wrap">${list.length?`<table class="pltable ${full?'full':'staff'}">
+   <thead><tr><th class="w-cb"></th><th>Model / item</th>${full?'<th class="w-vnd cvn">Vendor</th>':''}<th class="w-dt">Price date</th>${full?'<th class="r w-num">Cost</th>':''}<th class="r w-num">Sale price</th><th class="r w-vat cv">${h(S.cfg.taxLabel)} ${h(+S.cfg.taxRate||0)}%</th><th class="r w-num">Incl. ${h(S.cfg.taxLabel)}</th></tr></thead><tbody>
+   ${list.map((x,k)=>{const c=plCalc(x);const ag=plAge(x);return `${(k===0||String(list[k-1].category||'Other')!==String(x.category||'Other'))?`<tr class="plcat"><td colspan="${full?8:6}">${h(x.category||'Other')}</td></tr>`:''}<tr data-pl="${h(x.id)}" class="${sel.has(x.id)?'on':''}">
      <td class="cb"><input type="checkbox" data-plc="${h(x.id)}" ${sel.has(x.id)?'checked':''} aria-label="Select"></td>
-     <td class="mdl"><b>${h(plTitle(x))}</b>${x.name&&x.model?`<div>${h(x.name)}</div>`:''}${x.desc?`<div class="muted dsc">${h(String(x.desc).split('\n')[0])}</div>`:''}</td>
-     ${full?`<td class="vnd">${h(x.vendor||'—')}${x.vendorRef?`<div class="muted num">${h(x.vendorRef)}</div>`:''}</td>`:''}
-     <td class="dt"><span class="pill ${plAgeCls(x)}">${h(plAgeTxt(x))}</span></td>
-     ${full?`<td class="r num" data-l="Cost">${money(x.cost)}<div class="muted" style="font-size:.72rem">+${h(plMarkup(x))}%</div></td>`:''}
-     <td class="r num sale" data-l="Sale">${money(c.sale)}</td><td class="r num" data-l="${h(S.cfg.taxLabel)}">${money(c.vat)}</td><td class="r num" data-l="Incl.">${money(c.incl)}</td></tr>`}).join('')}</tbody></table>`
+     <td class="mdl"><div class="pl-t">${h(plTitle(x))}</div>${x.name&&x.model?`<div class="pl-n">${h(x.name)}</div>`:''}${x.desc?`<div class="pl-d">${h(String(x.desc).split('\n')[0])}</div>`:''}${full&&(x.vendor||x.vendorRef)?`<div class="pl-vm">${h([x.vendor,x.vendorRef].filter(Boolean).join(' · '))}</div>`:''}</td>
+     ${full?`<td class="vnd cvn"><div class="pl-v">${h(x.vendor||'—')}</div>${x.vendorRef?`<div class="pl-ref" title="${h(x.vendorRef)}">${h(x.vendorRef)}</div>`:''}</td>`:''}
+     <td class="dt"><span class="pill ${plAgeCls(x)}">${x.priceDate?h(fdate(x.priceDate)):'no date'}</span>${x.priceDate&&ag>90?`<div class="pl-age">${Math.round(ag/30)} months old</div>`:''}</td>
+     ${full?`<td class="r n" data-l="Cost">${money(x.cost)}<div class="pl-mk">+${h(plMarkup(x))}%</div></td>`:''}
+     <td class="r n sale" data-l="Sale">${money(c.sale)}</td><td class="r n cv" data-l="${h(S.cfg.taxLabel)}">${money(c.vat)}</td><td class="r n incl" data-l="Incl.">${money(c.incl)}</td></tr>`}).join('')}</tbody></table>`
    :`<div class="empty"><b>${all.length?'Nothing matches':'The price list is empty'}</b>${all.length?'Try a different search.':full?'Add items one by one, or import an Excel / CSV file from your vendor price list.':'Ask the admin to add items.'}</div>`}</div>`;
 };
 VIEWS_AFTER.pricelist=()=>{
