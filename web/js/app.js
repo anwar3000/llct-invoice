@@ -1690,6 +1690,7 @@ function plCalc(x){
   const sale=x&&x.cost!=null&&x.cost!==''?plRound((+x.cost||0)*(1+plMarkup(x)/100),S.pricingCfg.round):r2(+(x&&x.sale)||0);
   const vat=r2(sale*vr/100);return {sale,vat,incl:r2(sale+vat),vr};
 }
+const plCostVat=x=>r2((+x.cost||0)*(1+(+S.cfg.taxRate||0)/100));
 const plAge=x=>x&&x.priceDate?Math.floor((Date.now()-new Date(x.priceDate+'T00:00:00'))/864e5):9999;
 const plAgeCls=x=>{const a=plAge(x);return a>180?'bad':a>90?'warn':'good'};
 const plAgeTxt=x=>x.priceDate?`${fdate(x.priceDate)}${plAge(x)>90?` · ${Math.round(plAge(x)/30)} months old`:''}`:'no date';
@@ -1715,14 +1716,14 @@ VIEWS.pricelist=()=>{
    ${nOld?`<label class="check" style="white-space:nowrap"><input type="checkbox" id="plold" ${old?'checked':''}>Older than 3 months (${nOld})</label>`:''}</div>
   ${sel.size?`<div class="notice row plsel" style="align-items:center"><span class="grow"><b>${sel.size}</b> selected</span>${can('quotation')?`<button class="btn sm primary" data-plq="quotation">New quotation</button>`:''}${can('invoice')?`<button class="btn sm" data-plq="invoice">New invoice</button>`:''}<button class="btn sm ghost" id="pl-clr">Clear</button></div>`:''}
   <div class="card pltable-wrap">${list.length?`<table class="pltable ${full?'full':'staff'}">
-   <thead><tr><th class="w-cb"></th><th>Model / item</th>${full?'<th class="w-vnd cvn">Vendor</th>':''}<th class="w-dt">Price date</th>${full?'<th class="r w-num">Cost</th>':''}<th class="r w-num">Sale price</th><th class="r w-vat cv">${h(S.cfg.taxLabel)} ${h(+S.cfg.taxRate||0)}%</th><th class="r w-num">Incl. ${h(S.cfg.taxLabel)}</th></tr></thead><tbody>
+   <thead><tr><th class="w-cb"></th><th>Model / item</th>${full?'<th class="w-vnd cvn">Vendor</th>':''}<th class="w-dt">Price date</th>${full?`<th class="r w-num">Cost <small class="th-s">excl. / incl. ${h(S.cfg.taxLabel)}</small></th>`:''}<th class="r w-num">Sale price</th><th class="r w-vat cv">${h(S.cfg.taxLabel)} ${h(+S.cfg.taxRate||0)}%</th><th class="r w-num">Incl. ${h(S.cfg.taxLabel)}</th></tr></thead><tbody>
    ${list.map((x,k)=>{const c=plCalc(x);const ag=plAge(x);return `${(k===0||String(list[k-1].category||'Other')!==String(x.category||'Other'))?`<tr class="plcat"><td colspan="${full?8:6}">${h(x.category||'Other')}</td></tr>`:''}<tr data-pl="${h(x.id)}" class="${sel.has(x.id)?'on':''}">
      <td class="cb"><input type="checkbox" data-plc="${h(x.id)}" ${sel.has(x.id)?'checked':''} aria-label="Select"></td>
      <td class="mdl"><div class="pl-t">${h(plTitle(x))}</div>${x.name&&x.model?`<div class="pl-n">${h(x.name)}</div>`:''}${x.desc?`<div class="pl-d">${h(String(x.desc).split('\n')[0])}</div>`:''}${full&&(x.vendor||x.vendorRef)?`<div class="pl-vm">${h([x.vendor,x.vendorRef].filter(Boolean).join(' · '))}</div>`:''}</td>
      ${full?`<td class="vnd cvn"><div class="pl-v">${h(x.vendor||'—')}</div>${x.vendorRef?`<div class="pl-ref" title="${h(x.vendorRef)}">${h(x.vendorRef)}</div>`:''}</td>`:''}
      <td class="dt"><span class="pill ${plAgeCls(x)}">${x.priceDate?h(fdate(x.priceDate)):'no date'}</span>${x.priceDate&&ag>90?`<div class="pl-age">${Math.round(ag/30)} months old</div>`:''}</td>
-     ${full?`<td class="r n" data-l="Cost">${money(x.cost)}<div class="pl-mk">+${h(plMarkup(x))}%</div></td>`:''}
-     <td class="r n sale" data-l="Sale">${money(c.sale)}</td><td class="r n cv" data-l="${h(S.cfg.taxLabel)}">${money(c.vat)}</td><td class="r n incl" data-l="Incl.">${money(c.incl)}</td></tr>`}).join('')}</tbody></table>`
+     ${full?`<td class="r n" data-l="Cost">${money(x.cost)}<div class="pl-mk">${money(plCostVat(x))} incl.</div></td>`:''}
+     <td class="r n sale" data-l="Sale">${money(c.sale)}${full?`<div class="pl-mk">+${h(plMarkup(x))}%</div>`:''}</td><td class="r n cv" data-l="${h(S.cfg.taxLabel)}">${money(c.vat)}</td><td class="r n incl" data-l="Incl.">${money(c.incl)}</td></tr>`}).join('')}</tbody></table>`
    :`<div class="empty"><b>${all.length?'Nothing matches':'The price list is empty'}</b>${all.length?'Try a different search.':full?'Add items one by one, or import an Excel / CSV file from your vendor price list.':'Ask the admin to add items.'}</div>`}</div>`;
 };
 VIEWS_AFTER.pricelist=()=>{
@@ -1754,7 +1755,7 @@ function plForm(x){
     <label class="field" style="grid-column:1/-1"><span>Description</span><textarea id="pl-desc" rows="3" placeholder="Specs, lens, IR range, warranty…">${h(e.desc||'')}</textarea></label>
     <label class="field"><span>Category</span><input id="pl-category" list="pl-cats" value="${h(e.category||'')}" placeholder="e.g. Cameras"><datalist id="pl-cats">${cats.map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
     <label class="field"><span>Unit</span><input id="pl-unit" value="${h(e.unit||'pcs')}"></label>
-    <label class="field"><span>Cost price (${h(S.cfg.currency)})</span><input id="pl-cost" type="number" step="any" min="0" inputmode="decimal" value="${h(e.cost??'')}"></label>
+    <label class="field"><span>Cost price excl. ${h(S.cfg.taxLabel)} (${h(S.cfg.currency)})</span><input id="pl-cost" type="number" step="any" min="0" inputmode="decimal" value="${h(e.cost??'')}"></label>
     <label class="field"><span>Markup %</span><input id="pl-markup" type="number" step="any" inputmode="decimal" value="${h(e.markup??'')}" placeholder="${h(S.pricingCfg.markup)} (default)"></label>
     <div class="plcalc" id="pl-calc" style="grid-column:1/-1"></div>
     <label class="field"><span>Price updated on</span><input id="pl-date" type="date" value="${h(e.priceDate||today())}"></label>
@@ -1765,7 +1766,7 @@ function plForm(x){
    </div>`,`${isNew?'':'<button class="btn danger" id="pl-del">Delete</button><span class="grow"></span>'}<button class="btn" data-x>Cancel</button><button class="btn primary" id="pl-save">Save</button>`,true);
   const read=()=>({...e,model:$('#pl-model',o).value.trim(),brand:$('#pl-brand',o).value.trim(),name:$('#pl-name',o).value.trim(),desc:$('#pl-desc',o).value.trim(),category:$('#pl-category',o).value.trim(),unit:$('#pl-unit',o).value.trim()||'pcs',
     cost:$('#pl-cost',o).value===''?'':r2(+$('#pl-cost',o).value),markup:$('#pl-markup',o).value===''?null:+$('#pl-markup',o).value,priceDate:$('#pl-date',o).value||today(),vendor:$('#pl-vendor',o).value.trim(),vendorRef:$('#pl-vref',o).value.trim(),note:$('#pl-note',o).value.trim()});
-  const calc=()=>{const y=read();const c=plCalc(y);$('#pl-calc',o).innerHTML=`<div><span>Sale price (+${h(plMarkup(y))}%)</span><b class="num">${money(c.sale)}</b></div><div><span>${h(S.cfg.taxLabel)} ${c.vr}%</span><b class="num">${money(c.vat)}</b></div><div><span>Incl. ${h(S.cfg.taxLabel)}</span><b class="num">${money(c.incl)}</b></div><div><span>Margin</span><b class="num">${money(c.sale-(+y.cost||0))}</b></div>`};
+  const calc=()=>{const y=read();const c=plCalc(y);$('#pl-calc',o).innerHTML=`<div><span>Cost incl. ${h(S.cfg.taxLabel)}</span><b class="num">${money(plCostVat(y))}</b></div><div><span>Sale price (+${h(plMarkup(y))}%)</span><b class="num">${money(c.sale)}</b></div><div><span>${h(S.cfg.taxLabel)} ${c.vr}%</span><b class="num">${money(c.vat)}</b></div><div><span>Incl. ${h(S.cfg.taxLabel)}</span><b class="num">${money(c.incl)}</b></div><div><span>Margin</span><b class="num">${money(c.sale-(+y.cost||0))}</b></div>`};
   ['#pl-cost','#pl-markup'].forEach(k=>$(k,o).oninput=calc);calc();
   $('#pl-save',o).onclick=async()=>{const y=read();
     if(!y.model&&!y.name){toast('Enter the model number or item name.',true);return}
@@ -1793,7 +1794,7 @@ const PL_COLS={model:/model|part|item\s*code|sku/i,brand:/brand|make|manufacture
 async function plImport(){
   const o=modal('Import price list',`<div class="grid"><div class="muted" style="font-size:.84rem">Excel (.xlsx / .xls) or CSV. First row = column headings: <b>Model, Brand, Item, Description, Category, Unit, Cost, Markup, Date, Vendor, Vendor ref</b>. Only Model (or Item) and Cost are needed. An existing model is updated with the new cost and the old price is kept in its history.</div>
     <div class="row"><input type="file" id="pi-file" accept=".csv,.xlsx,.xls,.xlsm,.ods,.txt"><button class="btn" id="pi-tpl" type="button">Download sample file</button></div>
-    <div class="row"><label class="field"><span>Price date for rows without one</span><input type="date" id="pi-date" value="${today()}"></label><label class="field"><span>Vendor for rows without one</span><input id="pi-ven" placeholder="optional"></label></div><div id="pi-prev"></div></div>`,
+    <div class="row"><label class="field"><span>Price date for rows without one</span><input type="date" id="pi-date" value="${today()}"></label><label class="field"><span>Vendor for rows without one</span><input id="pi-ven" placeholder="optional"></label></div><label class="check"><input type="checkbox" id="pi-incl">Costs in this file include ${h(S.cfg.taxLabel)} (take it off before saving)</label><div id="pi-prev"></div></div>`,
     `<button class="btn" data-x>Cancel</button><button class="btn primary" id="pi-go" disabled>Import</button>`,true);
   let rows=[];
   $('#pi-tpl',o).onclick=()=>saveFile(new TextEncoder().encode('Model,Brand,Item,Description,Category,Unit,Cost,Markup,Date,Vendor,Vendor ref\nDS-2CD1143G2-LIU,Hikvision,4MP IP dome camera,"2.8 mm fixed lens, 30 m IR, PoE",Cameras,pcs,150,,'+today()+',Vendor name,Q-1234\n'),'Price list sample.csv','text/csv');
@@ -1806,7 +1807,7 @@ async function plImport(){
       const upd=rows.filter(x=>S.pricing.some(p=>x.model&&String(p.model||'').toLowerCase()===x.model.toLowerCase())).length;
       $('#pi-prev',o).innerHTML=`<div class="notice"><b>${rows.length}</b> rows with a model and cost · ${rows.length-upd} new · ${upd} update existing models. Columns found: ${Object.keys(map).join(', ')}.</div>`;$('#pi-go',o).disabled=!rows.length}
     catch(err){$('#pi-prev',o).innerHTML=`<div class="notice">${h(err.message||err)}</div>`}};
-  $('#pi-go',o).onclick=async()=>{const b=$('#pi-go',o);b.disabled=true;const dd=$('#pi-date',o).value||today(),ven=$('#pi-ven',o).value.trim();let n=0;
+  $('#pi-go',o).onclick=async()=>{const b=$('#pi-go',o);b.disabled=true;const dd=$('#pi-date',o).value||today(),ven=$('#pi-ven',o).value.trim();const inc=$('#pi-incl',o).checked,vf=1+(+S.cfg.taxRate||0)/100;if(inc)rows=rows.map(r=>({...r,cost:r2(r.cost/vf)}));let n=0;
     try{for(const r of rows){const ex=S.pricing.find(p=>r.model&&String(p.model||'').toLowerCase()===r.model.toLowerCase()&&(!r.brand||!p.brand||String(p.brand).toLowerCase()===r.brand.toLowerCase()));
         const y={...(ex||{id:uid(),createdAt:new Date().toISOString(),createdBy:S.me.id}),...Object.fromEntries(Object.entries(r).filter(([k,v])=>v!==''&&v!=null)),priceDate:r.priceDate||dd,vendor:r.vendor||ven||(ex&&ex.vendor)||'',updatedAt:new Date().toISOString(),updatedBy:S.me.name||''};
         if(ex&&(+ex.cost!==+y.cost||ex.priceDate!==y.priceDate))y.history=[...(ex.history||[]),{cost:ex.cost,priceDate:ex.priceDate||'',vendor:ex.vendor||'',vendorRef:ex.vendorRef||''}].slice(-10);
@@ -1814,8 +1815,8 @@ async function plImport(){
       closeModal();toast(n+' price list items imported')}catch(err){b.disabled=false;toast('Stopped after '+n+': '+(err.code||err.message),true)}};
 }
 function plExport(){const q=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=[['Model','Brand','Item','Description','Category','Unit','Cost','Markup %','Sale price','VAT','Sale incl. VAT','Price date','Vendor','Vendor ref']]
-    .concat(S.pricing.map(x=>{const c=plCalc(x);return [x.model,x.brand,x.name,x.desc,x.category,x.unit,x.cost,plMarkup(x),c.sale,c.vat,c.incl,x.priceDate,x.vendor,x.vendorRef]}));
+  const rows=[['Model','Brand','Item','Description','Category','Unit','Cost excl. VAT','Cost incl. VAT','Markup %','Sale price','VAT','Sale incl. VAT','Price date','Vendor','Vendor ref']]
+    .concat(S.pricing.map(x=>{const c=plCalc(x);return [x.model,x.brand,x.name,x.desc,x.category,x.unit,x.cost,plCostVat(x),plMarkup(x),c.sale,c.vat,c.incl,x.priceDate,x.vendor,x.vendorRef]}));
   saveFile(new TextEncoder().encode('﻿'+rows.map(r=>r.map(q).join(',')).join('\n')),'Price list '+today()+'.csv','text/csv')}
 function plPicker(cb){
   const o=modal('Add from price list',`<input type="search" class="search" id="plp-q" placeholder="Search model, brand, description…" autocomplete="off" style="max-width:none;width:100%"><div class="list card" id="plp-list" style="margin-top:10px;max-height:60vh;overflow:auto"></div>`,'',false,'ov2');

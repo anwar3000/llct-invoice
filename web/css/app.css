@@ -932,7 +932,7 @@ body,.main{background:var(--page)}
 .pltable-wrap{overflow-x:auto}
 .pltable{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.88rem}
 .pltable.full{min-width:900px}.pltable.staff{min-width:640px}
-.pltable .w-cb{width:44px}.pltable .w-vnd{width:180px}.pltable .w-dt{width:116px}.pltable .w-num{width:106px}.pltable .w-vat{width:84px}
+.pltable .w-cb{width:44px}.pltable .w-vnd{width:180px}.pltable .w-dt{width:116px}.pltable .w-num{width:112px}.pltable .w-vat{width:84px}
 .pl-vm{display:none;font-size:.76rem;color:var(--muted,#6b7280);margin-top:3px}
 @media (min-width:761px) and (max-width:1250px){.pltable .cv,.pltable .cvn{display:none}.pl-vm{display:block}.pltable.full,.pltable.staff{min-width:0;table-layout:auto}.pltable .w-dt{width:1%}.pltable td.dt,.pltable td.n{width:1%}}
 .pltable th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#6b7280);padding:11px 12px;border-bottom:1px solid var(--card-line,#e5e7eb);font-weight:650;white-space:nowrap;background:var(--card,#fff)}
@@ -981,3 +981,6 @@ body,.main{background:var(--page)}
 .hl-acc .hl-g span{opacity:.9}.hl-acc .hl-g b{font-family:var(--f-mono);font-weight:600;text-align:right}
 @media (max-width:900px){.hl-acc{grid-column:1/-1}.hl-acc .hl-g{grid-template-columns:auto 1fr auto 1fr;gap:2px 10px}}
 @media (max-width:900px){.hl-acc{order:-1}.hilites:has(.hl-acc) .hl-green{grid-column:1/-1}}
+.pltable th .th-s{display:block;font-size:.62rem;letter-spacing:.02em;text-transform:none;font-weight:500;opacity:.85}
+.plcalc{grid-template-columns:repeat(5,1fr)}
+@media (max-width:760px){.plcalc{grid-template-columns:1fr 1fr}}
