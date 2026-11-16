@@ -1,0 +1,96 @@
+{
+ "id": "pricelist-hik-vds-20261117",
+ "pricing": [
+  {
+   "brand": "Hikvision",
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "Hikvision",
+   "vendorRef": "WhatsApp 16 Nov 2026",
+   "note": "Cost excl. VAT. Vendor contact +971 56 389 4887",
+   "model": "DS-2CD1043G2-LIU(2.8mm)",
+   "name": "4MP IP bullet camera – Smart Hybrid Light",
+   "category": "Cameras",
+   "cost": 163,
+   "desc": "4MP (2560×1440) fixed bullet network camera with 2.8 mm lens\nSmart Hybrid Light: IR and white light up to 30 m, built-in microphone\nH.265+, IP67 weatherproof, PoE powered"
+  },
+  {
+   "brand": "Hikvision",
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "Hikvision",
+   "vendorRef": "WhatsApp 16 Nov 2026",
+   "note": "Cost excl. VAT. Vendor contact +971 56 389 4887",
+   "model": "DS-2CD1143G2-LIU(2.8mm)",
+   "name": "4MP IP dome camera – Smart Hybrid Light",
+   "category": "Cameras",
+   "cost": 171,
+   "desc": "4MP (2560×1440) fixed dome network camera with 2.8 mm lens (98° view)\nSmart Hybrid Light: IR and white light up to 30 m, built-in microphone\nH.265+, IP67 and IK08 rated, PoE powered"
+  },
+  {
+   "brand": "Hikvision",
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "Hikvision",
+   "vendorRef": "WhatsApp 16 Nov 2026",
+   "note": "Cost excl. VAT. Vendor contact +971 56 389 4887",
+   "model": "DS-2CD1643G2-LIZU(2.8-12mm)",
+   "name": "4MP varifocal bullet camera – motorized lens",
+   "category": "Cameras",
+   "cost": 304,
+   "desc": "4MP (2560×1440) bullet network camera with 2.8–12 mm motorized varifocal lens\nSmart Dual Light (IR and warm white light), built-in microphone\nH.265+, IP67 weatherproof, PoE powered"
+  },
+  {
+   "brand": "Hikvision",
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "Hikvision",
+   "vendorRef": "WhatsApp 16 Nov 2026",
+   "note": "Cost excl. VAT. Vendor contact +971 56 389 4887",
+   "model": "DS-2CD1743G2-LIZU(2.8-12mm)",
+   "name": "4MP varifocal dome camera – motorized lens",
+   "category": "Cameras",
+   "cost": 304,
+   "desc": "4MP (2560×1440) dome network camera with 2.8–12 mm motorized varifocal lens\nSmart Dual Light (IR and warm white light), built-in microphone\nH.265+, IP67 and IK10 vandal-resistant, PoE powered"
+  },
+  {
+   "brand": "Hikvision",
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "Hikvision",
+   "vendorRef": "WhatsApp 16 Nov 2026",
+   "note": "Cost excl. VAT. Vendor contact +971 56 389 4887",
+   "model": "DS-9664NI-M8",
+   "name": "64-channel NVR – 8 SATA, RAID",
+   "category": "NVR",
+   "cost": 4333.4,
+   "desc": "64-channel network video recorder, up to 32MP per camera, 400 Mbps incoming bandwidth\n8 SATA bays (up to 16 TB each), RAID 0/1/5/6/10 with hot spare\n2 × HDMI (up to 8K) and 2 × VGA outputs, 2 × Gigabit network ports"
+  },
+  {
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "VDS",
+   "vendorRef": "Quote 17 Nov 2026",
+   "note": "Cost excl. VAT. Model number not given by vendor — add it when confirmed.",
+   "brand": "Hanwha",
+   "model": "",
+   "name": "Hanwha 4MP IR dome camera",
+   "category": "Cameras",
+   "cost": 678,
+   "desc": "4MP network dome camera with built-in IR for night vision\nHanwha Vision, PoE powered"
+  },
+  {
+   "unit": "pcs",
+   "priceDate": "2026-11-17",
+   "vendor": "VDS",
+   "vendorRef": "Quote 17 Nov 2026",
+   "note": "Cost excl. VAT. Model number not given by vendor — add it when confirmed.",
+   "brand": "Hanwha",
+   "model": "",
+   "name": "Hanwha 4MP varifocal bullet camera",
+   "category": "Cameras",
+   "cost": 1159,
+   "desc": "4MP network bullet camera with varifocal lens and built-in IR for night vision\nHanwha Vision, PoE powered"
+  }
+ ]
+}

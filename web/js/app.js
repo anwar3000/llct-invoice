@@ -1693,9 +1693,9 @@ function plCalc(x){
 const plAge=x=>x&&x.priceDate?Math.floor((Date.now()-new Date(x.priceDate+'T00:00:00'))/864e5):9999;
 const plAgeCls=x=>{const a=plAge(x);return a>180?'bad':a>90?'warn':'good'};
 const plAgeTxt=x=>x.priceDate?`${fdate(x.priceDate)}${plAge(x)>90?` · ${Math.round(plAge(x)/30)} months old`:''}`:'no date';
-const plTitle=x=>[x.brand,x.model].filter(Boolean).join(' ')||x.name||'';
+const plTitle=x=>x.model?[x.brand,x.model].filter(Boolean).join(' '):(x.name||x.brand||'');
 // how a price-list line goes onto a quotation / invoice: name, model line + description, selling price
-function plToItem(x){const model=[x.brand,x.model].filter(Boolean).join(' ');
+function plToItem(x){const model=x.model?[x.brand,x.model].filter(Boolean).join(' '):'';
   return {name:x.name||model,desc:[x.name&&model?'Model: '+model:'',x.desc||''].filter(Boolean).join('\n'),qty:1,unit:x.unit||'pcs',price:plCalc(x).sale,photo:'',plId:x.id}}
 const plText=x=>[x.model,x.brand,x.name,x.desc,x.category,canPricing()?x.vendor:'',canPricing()?x.vendorRef:''].filter(Boolean).join(' ').toLowerCase();
 const plPublic=x=>({model:x.model||'',brand:x.brand||'',name:x.name||'',desc:x.desc||'',category:x.category||'',unit:x.unit||'pcs',sale:plCalc(x).sale,priceDate:x.priceDate||'',updatedAt:x.updatedAt||new Date().toISOString()});
@@ -2217,7 +2217,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -2255,6 +2255,14 @@ async function runSeeds(){
       if(nl)setTimeout(()=>toast(`${nl} previous invoice${nl===1?'':'s'} and ${npay} payment${npay===1?'':'s'} added`),5200);
       for(const p of seed.products||[]){if(haveP.has(p.name.trim().toLowerCase()))continue;
         await setDoc(doc(fdb,COL.products,uid()),{...p,createdBy:S.me.id,createdAt:now,updatedAt:now});np++}
+      // price list items: same model (and brand) updates the cost and keeps the old price in its history
+      if((seed.pricing||[]).length){const ps=(await getDocsFromServer(collection(fdb,COL.pricing))).docs.map(d=>({...d.data(),id:d.id}));
+        const st=ps.find(x=>x.id==='_settings');if(st)S.pricingCfg={markup:40,round:0,...st};const lc=v=>String(v||'').trim().toLowerCase();let npl=0;
+        for(const r of seed.pricing){const ex=ps.find(x=>x.id!=='_settings'&&(r.model?lc(x.model)===lc(r.model)&&(!r.brand||!x.brand||lc(x.brand)===lc(r.brand)):!x.model&&lc(x.name)===lc(r.name)));
+          const y={...(ex||{id:uid(),createdAt:now,createdBy:S.me.id}),...r,priceDate:r.priceDate||today(),updatedAt:now,updatedBy:S.me.name||''};
+          if(ex&&(+ex.cost!==+y.cost||ex.priceDate!==y.priceDate))y.history=[...(ex.history||[]),{cost:ex.cost,priceDate:ex.priceDate||'',vendor:ex.vendor||'',vendorRef:ex.vendorRef||''}].slice(-10);
+          await plWrite(y);npl++}
+        if(npl)setTimeout(()=>toast(npl+' price list item'+(npl===1?'':'s')+' added'),5600)}
       const made=[];
       for(const d00 of seed.docs||[]){const date=today(),id=uid(),pf=S.me.profile||{};
         // "clientName": link the document to a client in the list (added by this seed or already there)
