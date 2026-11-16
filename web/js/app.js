@@ -747,7 +747,10 @@ VIEWS.home=()=>{
     <button class="hl-card hl-navy" data-go="clients"><span class="hl-l">Receivable</span><span class="hl-v">${money(out)}<small>${h(S.cfg.currency)}</small></span><span class="hl-s">${overdue.length?`<b>${overdue.length}</b> invoice${overdue.length===1?'':'s'} overdue`:'Nothing overdue'}</span></button>
     <button class="hl-card hl-blue" data-box="invoice"><span class="hl-l">Invoiced this month</span><span class="hl-v">${money(monthInv)}</span><span class="hl-s">${(n=>`${n} invoice${n===1?'':'s'}`)(inv.filter(d=>(d.date||'').startsWith(ym)).length)}</span></button>
     <button class="hl-card hl-green" data-go="payments"><span class="hl-l">Received this month</span><span class="hl-v">${money(monthRec)}</span><span class="hl-s">${(n=>`${n} payment${n===1?'':'s'}`)(S.payments.filter(p=>(p.date||'').startsWith(ym)).length)}</span></button>
-    <button class="hl-card hl-orange" data-go="deliveries"><span class="hl-l">Pending deliveries</span><span class="hl-v">${pend.length}</span><span class="hl-s">${pend.filter(d=>(d.reportType||'delivery')!=='delivery').length} service / call-out</span></button>
+    ${isAdmin()?(()=>{const A=accSummary();return `<button class="hl-card hl-orange hl-acc" data-go="accounts"><span class="hl-l">Current account balance</span><span class="hl-v">${money(A.bal)}<small>${h(S.cfg.currency)}</small></span>
+      <span class="hl-s">Cash ${money(A.cash)} · Bank ${money(A.bank)}</span>
+      <span class="hl-g"><span>Total received</span><b>${money(A.inAll)}</b><span>Total spent</span><b>${money(A.outAll)}</b><span>This month in</span><b>${money(A.inMon)}</b><span>This month out</span><b>${money(A.outMon)}</b></span></button>`})()
+    :`<button class="hl-card hl-orange" data-go="deliveries"><span class="hl-l">Pending deliveries</span><span class="hl-v">${pend.length}</span><span class="hl-s">${pend.filter(d=>(d.reportType||'delivery')!=='delivery').length} service / call-out</span></button>`}
   </div>`:''}
 
   ${(S.params.oq||'').trim()?'':`<div class="actgrid">${boxes.map(recentBox).join('')}</div>`}
@@ -1868,6 +1871,11 @@ function accBalance(upto){const o=S.acctOpen||{};const out={cash:0,bank:0,set:!!
   if(o.date&&o.date<=upto){out.cash=+o.cash||0;out.bank=+o.bank||0}const start=o.date||'2000-01-01';
   accEntries().forEach(e=>{if(e.date>=start&&e.date<=upto){out[isBankM(e.method)?'bank':'cash']+=e.type==='income'?e.amount:-e.amount}});
   out.cash=r2(out.cash);out.bank=r2(out.bank);return out}
+// Overview card: balance now (cash + bank), everything received / spent since the opening balance, and this month.
+function accSummary(){const t=today(),m0=t.slice(0,8)+'01',o=S.acctOpen||{},start=o.date||'2000-01-01';const b=accBalance(t);
+  const es=accEntries().filter(e=>e.date>=start&&e.date<=t);const sum=a=>r2(a.reduce((x,e)=>x+e.amount,0));
+  const inn=es.filter(e=>e.type==='income'),out=es.filter(e=>e.type==='expense');
+  return {cash:b.cash,bank:b.bank,bal:r2(b.cash+b.bank),inAll:sum(inn),outAll:sum(out),inMon:sum(inn.filter(e=>e.date>=m0)),outMon:sum(out.filter(e=>e.date>=m0))}}
 const SRC_PILL={petty:'petty cash · attendance',driver:'driver payment · attendance'};
 VIEWS.accounts=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
@@ -2508,9 +2516,9 @@ function startData(){
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(seesAllDN())Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
-  if(isAdmin()){const ra=()=>{if(S.view==='accounts')soon()};
+  if(isAdmin()){const ra=()=>{if(S.view==='accounts'||S.view==='home')soon()};
     Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
-    Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts')soon()},[where('type','==','credit')],true)}
+    Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts'||S.view==='home')soon()},[where('type','==','credit')],true)}
   if(isAdmin()){Store.sub('users',r=>{S.users=Object.fromEntries(r.map(u=>[u.id,u]));soon()});Store.sub('access',r=>{S.access=Object.fromEntries(r.map(a=>[a.id,a]));if(S.view==='staff')soon()})}
   Store.subDoc('access',S.me.id,a=>{if(isAdmin()||!a)return;const p=JSON.stringify(a.perms||{});if(a.enabled===false||p!==JSON.stringify(S.me.perms))location.reload()});
 }
