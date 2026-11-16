@@ -383,6 +383,11 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
       allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
     }
+    // Activity log: everyone records their own actions (create only, never edit); only admins can read them.
+    match /inv_activity/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+    }
     // Each user's own contact details, printed on documents they create.
     match /inv_profiles/{uid} {
       allow read: if invOn();

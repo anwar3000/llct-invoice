@@ -996,3 +996,15 @@ body,.main{background:var(--page)}
 @media (max-width:640px){.pendsum{grid-template-columns:1fr 1fr}.pendsum .ps-proj{grid-column:1/-1}.pendli{grid-template-columns:auto 1fr}.pendli>.r{grid-column:2;justify-content:space-between}}
 .pendsum small b{font-family:inherit;font-size:inherit;color:var(--bad)}
 @media (max-width:640px){.pendcard>.pad>.grow{flex-basis:100%}}
+/* top-right price list shortcut */
+.deskbar{display:flex;justify-content:flex-end;margin:-12px 0 -6px}
+.deskbar .btn{gap:6px}.deskbar svg,.topbar .pl-sc svg{width:16px;height:16px}
+.pl-sc{color:var(--c-amber)!important;border-color:color-mix(in srgb,var(--c-amber) 40%,var(--line))!important}
+@media (max-width:820px){.deskbar{display:none}}
+/* activity log */
+.lgtabs{align-self:flex-start}
+.al-row{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:flex-start;cursor:default}
+.al-area{font-weight:600;color:var(--muted,#6b7280)}
+.al-ch{margin:5px 0 2px;padding-left:16px;font-size:.8rem;color:var(--ink-2,#374151);display:flex;flex-direction:column;gap:1px}
+.al-ch li{overflow-wrap:anywhere}
+.al-dev{font-size:.72rem;color:var(--muted,#6b7280);margin-top:2px}

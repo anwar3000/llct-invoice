@@ -80,7 +80,7 @@ const docTab=d=>d&&(isPF(d)?'proforma':d.type==='delivery'&&(d.reportType||'deli
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={pend:[],pricing:[],prices:[],pricingCfg:{markup:40,round:0},plSel:[],logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={activity:[],pend:[],pricing:[],prices:[],pricingCfg:{markup:40,round:0},plSel:[],logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
@@ -90,7 +90,7 @@ const canPricing=()=>S.me.role==='admin'||!!S.me.perms.pricing;
 const seesPrices=()=>canPricing()||!!S.me.perms.quotation||!!S.me.perms.invoice||S.me.role==='manager';
 
 /* ================= Firebase store ================= */
-const COL={pending:'acctPending',pricing:'inv_pricing',prices:'inv_prices',ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={activity:'inv_activity',pending:'acctPending',pricing:'inv_pricing',prices:'inv_prices',ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -98,10 +98,56 @@ const Store={unsubs:[],
   },
   subDoc(col,id,cb){this.unsubs.push(onSnapshot(doc(fdb,COL[col],id),s=>cb(s.exists()?{...s.data(),id:s.id}:null),e=>console.warn(col,e)))},
   stop(){this.unsubs.forEach(u=>{try{u()}catch(e){}});this.unsubs=[]},
-  async put(col,id,data){const d=clone(data);delete d.id;await setDoc(doc(fdb,COL[col],id),d)},
-  async remove(col,id){await deleteDoc(doc(fdb,COL[col],id))},
+  async put(col,id,data){const d=clone(data);delete d.id;const prev=actPrev(col,id);await setDoc(doc(fdb,COL[col],id),d);actWrite(col,id,prev,d)},
+  async remove(col,id){const prev=actPrev(col,id);await deleteDoc(doc(fdb,COL[col],id));actWrite(col,id,prev,null)},
   async get(col,id){const s=await getDoc(doc(fdb,COL[col],id));return s.exists()?{...s.data(),id:s.id}:null}
 };
+/* ===== activity log: what each person does — created / changed / deleted (with the fields that changed),
+   opened, PDF, sent, paid… Written by everyone for themselves; only admins can read it (inv_activity). ===== */
+const ACT_SKIP=new Set(['logins','activity','numbers','images','counters','prices']);
+const ACT_IGN=new Set(['updatedAt','updatedBy','createdAt','createdBy','createdById','createdByName','editedAt','editedBy','history','seeds','month','ua','approvedAt','approvedBy','lastPaidOn','sentAt','sentBy']);
+const ACT_LBL={type:'Type',number:'Number',date:'Date',dueDate:'Due date',validUntil:'Valid until',ref:'Reference',subject:'Subject',salesperson:'Salesperson',notes:'Notes',terms:'Terms',discount:'Discount',taxRate:'VAT %',
+  status:'Status',clientId:'Client',siteName:'Site',deliveryAddress:'Site / address',contactName:'Contact',contactMobile:'Contact mobile',contactEmail:'Contact email',name:'Name',desc:'Description',qty:'Qty',
+  unit:'Unit',price:'Rate',amount:'Amount',method:'Method',category:'Category',party:'Party',note:'Note',cost:'Cost',markup:'Markup %',vendor:'Vendor',vendorRef:'Vendor ref',priceDate:'Price date',model:'Model',brand:'Brand',
+  advPct:'Advance %',advAmount:'Advance amount',taxId:'TRN',phone:'Phone',email:'Email',address:'Address',contact:'Contact person',creditDays:'Credit days',invoiceId:'Against invoice',receiptNo:'Receipt no.',
+  enabled:'Access on',role:'Role',technician:'Technician',timeIn:'Time in',timeOut:'Time out',complaint:'Complaint',workDone:'Work done',reportType:'Report type',kind:'Kind',paid:'Paid'};
+function actPrev(col,id){if(ACT_SKIP.has(col))return null;
+  const L={docs:S.docs,clients:S.clients,products:S.allProducts||S.products,payments:S.payments,pricing:S.pricing,acct:S.acct,pending:S.pend,sites:S.sites};
+  let x=L[col]?L[col].find(y=>y.id===id):col==='access'?S.access[id]:col==='config'&&id==='company'?S.cfg:null;return x?clone(x):null}
+function actLabel(col,id,d){d=d||{};const cn=d.client&&d.client.name||((S.clients.find(c=>c.id===d.clientId)||{}).name)||'';
+  switch(col){
+    case 'docs':return [d.type&&TYPE[d.type]?docTitle(d):'Document',d.number,[cn,docSite(d)!==cn?docSite(d):'',d.type&&d.type!=='delivery'?cur(totals(d).total):''].filter(Boolean).join(' · ')];
+    case 'clients':return ['Client','',d.name];
+    case 'products':return ['Product','',d.name];
+    case 'payments':return ['Payment',d.receiptNo||'',[cn,cur(d.amount),d.method].filter(Boolean).join(' · ')];
+    case 'pricing':return id==='_settings'?['Price list','','Markup '+d.markup+'%']:['Price list',d.model||'',[plTitle(d),d.cost!=null?'cost '+money(d.cost):''].filter(Boolean).join(' · ')];
+    case 'config':return ['Company settings','',id];
+    case 'access':return ['Staff access','',(S.users[id]||{}).name||d.name||id];
+    case 'profiles':return ['My details','',S.me.name||''];
+    case 'acct':return ['Accounts','',[d.type==='income'?'Income':'Expense',d.category,d.party,cur(d.amount)].filter(Boolean).join(' · ')];
+    case 'pending':return ['Pending payment','',[d.type==='receive'?'To receive':'To pay',d.party,cur(d.amount)].filter(Boolean).join(' · ')];
+    default:return [col,'',d.name||id]}}
+const actVal=v=>{if(v==null||v==='')return '—';if(typeof v==='boolean')return v?'yes':'no';let t=String(v);if(/^data:|^img:/.test(t))return '[image]';t=t.replace(/\s+/g,' ');return t.length>70?t.slice(0,67)+'…':t};
+function actFlat(o,p,out,dp){for(const [k,v] of Object.entries(o||{})){if(ACT_IGN.has(k)||k[0]==='_'||k==='id')continue;
+    const lbl=(p?p+' · ':'')+(ACT_LBL[k]||k);
+    if(k==='photo'||k==='signature'||k==='logo'||k==='stamp'){out[lbl]=v?'[image]':'—';continue}
+    if(Array.isArray(v)){if(k==='items'){v.forEach((it,i)=>actFlat(it,'Item '+(i+1),out,dp+1));out['Items']=v.length}
+      else if(k==='serials')out[lbl]=v.length+' serials'+(v.length?' ('+actVal(v.join(', '))+')':'');
+      else if(v.every(x=>x==null||typeof x!=='object'))out[lbl]=v.join(', ');else out[lbl]=v.length+' entries'}
+    else if(v&&typeof v==='object'){if(k==='client'||k==='gps')continue;if(dp<2)actFlat(v,lbl,out,dp+1)}
+    else out[lbl]=v}return out}
+function actDiff(a,b){const A=actFlat(a||{},'',{},0),B=actFlat(b||{},'',{},0),ch=[];
+  for(const k of new Set([...Object.keys(A),...Object.keys(B)])){const x=A[k],y=B[k];if(String(x??'')===String(y??''))continue;if((x==null||x==='')&&(y==null||y===''))continue;ch.push(`${k}: ${actVal(x)} → ${actVal(y)}`)}
+  return ch}
+function logAct(action,area,ref,title,changes,extra){try{const u=auth.currentUser;if(!u||!S.me||!S.me.id)return;
+  setDoc(doc(fdb,COL.activity,uid()),{uid:u.uid,name:S.me.name||'',role:S.me.role||'',at:new Date().toISOString(),date:today(),action,area:area||'',ref:String(ref||''),title:String(title||'').slice(0,240),
+    changes:(changes||[]).slice(0,30).map(c=>String(c).slice(0,240)),more:Math.max(0,(changes||[]).length-30),app:isNative()?'Android app':'Web',device:deviceId(),view:S.view||'',...(extra||{})}).catch(e=>console.warn('activity',e))}catch(e){}}
+function actWrite(col,id,prev,next){if(ACT_SKIP.has(col))return;
+  const d=next||prev||{};const [area,ref,title]=actLabel(col,id,{...(prev||{}),...(next||{})});
+  if(!next)return logAct('Deleted',area,ref,title,prev?actDiff(prev,{}).slice(0,12):[]);
+  if(!prev)return logAct('Created',area,ref,title,actDiff({},next).filter(c=>!/ → —$/.test(c)).slice(0,20));
+  const ch=actDiff(prev,next);if(!ch.length)return;logAct('Changed',area,ref,title,ch)}
+const _actSeen={};const actOnce=(k,ms)=>{const t=Date.now();if(_actSeen[k]&&t-_actSeen[k]<ms)return false;_actSeen[k]=t;return true};
 async function save(col,id,data,msg){
   try{await Store.put(col,id,data);if(msg)toast(msg);return true}
   catch(e){toast(/permission/i.test(e.code||e.message||'')?'You don\'t have permission to save this. Ask the admin.':'Save failed: '+(e.message||e.code),true);return false}
@@ -624,7 +670,7 @@ function navItems(){
   if(can('clients'))cu.push(['products','Products',I.box,'violet']);
   if(seesPrices())cu.push(['pricelist','Price list',I.tag,'amber']);
   if(cu.length)n.push(['grp','Customers'],...cu);
-  if(isAdmin())n.push(['grp','Admin'],['accounts','Accounts',I.book,'amber'],['logins','Login log',I.clock,'cyan'],['staff','Staff & access',I.shield,'rose'],['settings','Company & template',I.gear,'slate']);
+  if(isAdmin())n.push(['grp','Admin'],['accounts','Accounts',I.book,'amber'],['logins','Activity log',I.clock,'cyan'],['staff','Staff & access',I.shield,'rose'],['settings','Company & template',I.gear,'slate']);
   return n;
 }
 // Colour class of a document's icon: quotation blue, invoice green, service / call-out violet, delivery orange.
@@ -644,8 +690,8 @@ function render(){
     <div class="who"><div style="margin-bottom:10px">${themeSwitch()}</div>
       <div class="whocard"><span class="av">${h(initials(S.me.name))}</span><span style="min-width:0"><b>${h(S.me.name)}</b><small>${isAdmin()?'Admin':'Staff'}</small></span></div>
       <div class="whoacts"><button class="btn ghost sm" data-myinfo>My details</button><button class="btn ghost sm" data-logout>Sign out</button></div></div></aside>
-    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span><button class="btn sm" data-ai aria-label="AI assistant">✨ AI</button><button class="btn sm" data-menu>${I.menu}</button></div>
-    <main class="main"><div class="wrap">${v}</div></main></div>
+    <div style="min-width:0"><div class="topbar"><div class="brand"><div class="mark">${logo}</div><div><b>${h(S.cfg.name)}</b></div></div><span class="grow"></span>${seesPrices()?`<button class="btn sm pl-sc" data-go="pricelist" aria-label="Price list">${I.tag}</button>`:''}<button class="btn sm" data-ai aria-label="AI assistant">✨ AI</button><button class="btn sm" data-menu>${I.menu}</button></div>
+    <main class="main"><div class="wrap">${seesPrices()&&cur!=='pricelist'&&cur!=='edit'?`<div class="deskbar"><button class="btn sm pl-sc" data-go="pricelist">${I.tag}Price list</button></div>`:''}${v}</div></main></div>
     <nav class="tabbar">${tabbar(cur)}</nav>${cur==='edit'||cur==='deliver'?'':`<button class="aifab" data-ai title="AI assistant" aria-label="AI assistant">✨ <span>Ask AI</span></button>`}</div>`;
   bindCommon(app);
   if(VIEWS_AFTER[cur])VIEWS_AFTER[cur]();
@@ -838,10 +884,11 @@ VIEWS_AFTER.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:docTab(d)}));
   if(!d)return;
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
-  $('#pdf')&&($('#pdf').onclick=()=>downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
-    .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d)));
+  $('#pdf')&&($('#pdf').onclick=()=>(logAct('PDF downloaded',docTitle(d),d.number,actLabel('docs',d.id,d)[2]),downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
+    .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d))));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
   $('#send')&&($('#send').onclick=()=>sendDoc(d));
+  if(actOnce('open'+d.id,6e5))logAct('Opened',docTitle(d),d.number,actLabel('docs',d.id,d)[2]);
   $$('[data-rcpt]').forEach(b=>b.onclick=()=>downloadReceipt(S.payments.find(x=>x.id===b.dataset.rcpt)));
   $('#ed')&&($('#ed').onclick=()=>d.legacy?legacyForm(d):go('edit',{id:d.id}));
   $('#dlv')&&($('#dlv').onclick=()=>go('deliver',{id:d.id}));
@@ -898,9 +945,9 @@ function sendDoc(d){
       if((d.type==='quotation'||isPF(d))&&(d.status||'draft')==='draft')x.status='sent';delete x.id;
       if(can(d.type)&&(can('viewAll')||d.createdBy===S.me.id))await Store.put('docs',d.id,x)}catch(e){console.warn('sent mark',e)}};
   const go_=async mode=>{const sh=get(mode);if(mode==='mail'&&sh.to&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(sh.to.split(/[,;]/)[0].trim())){toast('Check the email address.',true);return}
-    closeModal();await downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d),pdfRefs(d),sh);mark(sh)};
+    closeModal();logAct(mode==='mail'?'Emailed':'Shared',docTitle(d),d.number,actLabel('docs',d.id,d)[2],['To: '+(sh.to||'—'),'Subject: '+sh.subject]);await downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d),pdfRefs(d),sh);mark(sh)};
   $('#sd-share',o).onclick=()=>go_('share');
-  $('#sd-mail',o).onclick=()=>{if(phone){const sh=get('mail');location.href=mailtoUrl(sh);mark(sh)}else go_('mail')};
+  $('#sd-mail',o).onclick=()=>{if(phone){const sh=get('mail');logAct('Emailed (letter only)',docTitle(d),d.number,actLabel('docs',d.id,d)[2],['To: '+(sh.to||'—'),'Subject: '+sh.subject]);location.href=mailtoUrl(sh);mark(sh)}else go_('mail')};
   $('#sd-copy',o).onclick=async()=>{try{await navigator.clipboard.writeText($('#sd-subj',o).value+'\n\n'+$('#sd-body',o).value);toast('Letter copied')}catch(e){toast('Could not copy — select the text and copy it.',true)}};
 }
 
@@ -1506,7 +1553,7 @@ function groupSites(parentId){
       }
       ops.unshift(b=>b.set(doc(fdb,COL.clients,parent.id),{places,openingBalance:r2(ob),openingDate:od||parent.openingDate||today(),updatedAt:now},{merge:true}));
       for(let i=0;i<ops.length;i+=400){const b=writeBatch(fdb);ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
-      closeModal();toast(`${kids.length} site${kids.length===1?'':'s'} added to ${parent.name}`);go('client',{id:parent.id});
+      logAct('Changed','Client','',parent.name,kids.map(k=>'Moved in as a site: '+k.name));closeModal();toast(`${kids.length} site${kids.length===1?'':'s'} added to ${parent.name}`);go('client',{id:parent.id});
     }catch(x){toast('Could not move: '+(x.message||x.code),true)}};
 }
 function clientForm(c,after){
@@ -1579,7 +1626,7 @@ async function downloadReceipt(p){
   if(!p)return;
   if(!p.receiptNo){p={...p,receiptNo:await reserveNumber('receipt',p.date)};
     if(can('payments')&&p.id){const x={...p};delete x.id;await save('payments',p.id,x)}}
-  const cl=S.clients.find(c=>c.id===p.clientId)||{};
+  const cl=S.clients.find(c=>c.id===p.clientId)||{};logAct('Receipt downloaded','Payment',p.receiptNo,[cl.name,cur(p.amount)].filter(Boolean).join(' · '));
   downloadPdf(renderReceipt(p),`Receipt ${p.receiptNo} ${cl.name||''}.pdf`.replace(/[\\/:*?"<>|]/g,'').trim());
 }
 function renderReceipt(p){
@@ -1817,7 +1864,7 @@ async function plImport(){
 function plExport(){const q=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const rows=[['Model','Brand','Item','Description','Category','Unit','Cost excl. VAT','Cost incl. VAT','Markup %','Sale price','VAT','Sale incl. VAT','Price date','Vendor','Vendor ref']]
     .concat(S.pricing.map(x=>{const c=plCalc(x);return [x.model,x.brand,x.name,x.desc,x.category,x.unit,x.cost,plCostVat(x),plMarkup(x),c.sale,c.vat,c.incl,x.priceDate,x.vendor,x.vendorRef]}));
-  saveFile(new TextEncoder().encode('﻿'+rows.map(r=>r.map(q).join(',')).join('\n')),'Price list '+today()+'.csv','text/csv')}
+  saveFile(new TextEncoder().encode('﻿'+rows.map(r=>r.map(q).join(',')).join('\n')),'Price list '+today()+'.csv','text/csv');logAct('Exported','Price list','',S.pricing.length+' items')}
 function plPicker(cb){
   const o=modal('Add from price list',`<input type="search" class="search" id="plp-q" placeholder="Search model, brand, description…" autocomplete="off" style="max-width:none;width:100%"><div class="list card" id="plp-list" style="margin-top:10px;max-height:60vh;overflow:auto"></div>`,'',false,'ov2');
   const draw=()=>{const q=$('#plp-q',o).value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -1908,7 +1955,7 @@ function pendForm(x,kind){const pay=(x?x.type:kind)!=='receive';const e={categor
     const d={type:pay?'pay':'receive',party,category:$('#pe-cat',o).value.trim(),amount:amt,dueDate:$('#pe-due',o).value||'',note:$('#pe-note',o).value.trim(),method:$('#pe-m',o).value};
     try{if(x)await setDoc(doc(fdb,COL.pending,x.id),{...d,status:amt-(+x.paid||0)>0.005?'open':'done',editedBy:S.me.name||'',editedAt:serverTimestamp()},{merge:true});
       else await setDoc(doc(collection(fdb,COL.pending)),{...d,status:'open',paid:0,history:[],createdBy:S.me.name||'',createdAt:serverTimestamp()});
-      closeModal();toast('Saved')}catch(err){toast('Could not save: '+(err.code||err.message),true)}};
+      logAct(x?'Changed':'Created','Pending payment','',actLabel('pending','',d)[2],x?actDiff(x,{...x,...d}):[]);closeModal();toast('Saved')}catch(err){toast('Could not save: '+(err.code||err.message),true)}};
   $('#pe-del',o)&&($('#pe-del',o).onclick=async()=>{if(!await confirmBox('Delete pending payment?','Entries already recorded stay in the accounts.','Delete'))return;try{await Store.remove('pending',x.id);closeModal();toast('Deleted')}catch(err){toast('Could not delete: '+(err.code||err.message),true)}});
 }
 // Pay (or receive) all or part: adds the accounts entry and reduces or closes the pending item — as the attendance app does.
@@ -1926,7 +1973,7 @@ function pendPay(x){const rcv=x.type==='receive',rem=pendRem(x);
         note:[x.note,amt<rem-0.005?`part payment (${amt} of ${rem})`:''].filter(Boolean).join(' · '),pendingId:x.id,createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()});
       const paid=r2((+x.paid||0)+amt);
       b.update(doc(fdb,COL.pending,x.id),{paid,status:paid>=(+x.amount||0)-0.005?'done':'open',lastPaidOn:date,history:arrayUnion({date,amount:amt,entryId:eref.id,by:S.me.name||''})});
-      await b.commit();closeModal();toast((rcv?'Received ':'Paid ')+money(amt)+' — added to accounts')}catch(err){btn.disabled=false;toast('Could not save: '+(err.code||err.message),true)}};
+      await b.commit();logAct(rcv?'Received':'Paid','Pending payment','',[x.party,cur(amt)].filter(Boolean).join(' · '),[`Remaining before: ${money(rem)}`,`Method: ${$('#pp-m',o).value}`,`Date: ${date}`]);closeModal();toast((rcv?'Received ':'Paid ')+money(amt)+' — added to accounts')}catch(err){btn.disabled=false;toast('Could not save: '+(err.code||err.message),true)}};
 }
 const SRC_PILL={petty:'petty cash · attendance',driver:'driver payment · attendance'};
 VIEWS.accounts=()=>{
@@ -2052,10 +2099,10 @@ function accForm(pre={}){
       ...(e.id?{editedBy:S.me.name||'',editedAt:serverTimestamp()}:{createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()})};
     const ref=e.id?doc(fdb,COL.acct,e.id):doc(collection(fdb,COL.acct));const btn=$('#af-save',o);btn.disabled=true;
     try{const b=writeBatch(fdb);b.set(ref,body,{merge:true});if(file)b.set(doc(fdb,COL.acctFiles,ref.id),file);
-      if(party)b.set(doc(fdb,COL.acctSettings,'parties'),{[PARTY_KEY(e.type)]:arrayUnion(party)},{merge:true});await b.commit();toast(e.id?'Saved':(isInc?'Income':'Expense')+' added');closeModal()}
+      if(party)b.set(doc(fdb,COL.acctSettings,'parties'),{[PARTY_KEY(e.type)]:arrayUnion(party)},{merge:true});await b.commit();{const L=actLabel('acct','',{...e,...body});logAct(e.id?'Changed':'Created','Accounts','',L[2],e.id?actDiff(e,{...e,...body}):actDiff({},body).filter(c=>!/ → —$/.test(c)))}toast(e.id?'Saved':(isInc?'Income':'Expense')+' added');closeModal()}
     catch(x){btn.disabled=false;toast(/permission/i.test(x.code||x.message||'')?'Not allowed — publish the latest Firestore rules.':'Save failed: '+(x.message||x.code),true)}};
   $('#af-del',o)&&($('#af-del',o).onclick=async()=>{if(!await confirmBox('Delete this entry?',(isInc?'Income':'Expense')+' of '+cur(e.amount)+' will be removed from the accounts in both apps.'))return;
-    try{const b=writeBatch(fdb);b.delete(doc(fdb,COL.acct,e.id));if(e.hasFile)b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
+    try{const b=writeBatch(fdb);b.delete(doc(fdb,COL.acct,e.id));if(e.hasFile)b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();logAct('Deleted','Accounts','',actLabel('acct','',e)[2],actDiff(e,{}).slice(0,10));toast('Deleted');closeModal()}catch(x){toast('Could not delete: '+(x.message||x.code),true)}});
 }
 // Entries saved by the earlier invoicing Accounts (inv_ledger, e.g. from an older app install) are moved
 // into the shared accounts (acctEntries) with the same id, so nothing is counted twice.
@@ -2139,7 +2186,7 @@ function acctImport(){
     try{for(let i=0;i<list.length;i+=400){const b=writeBatch(fdb);list.slice(i,i+400).forEach(e=>{const {row,err,dup,...d}=e;
         b.set(doc(collection(fdb,COL.acct)),{...d,chequeDate:'',month:d.date.slice(0,7),importedFrom:'file',createdBy:S.me.name||'',createdById:S.me.id,createdAt:serverTimestamp()})});
         btn.textContent=`Importing ${Math.min(i+400,list.length)} of ${list.length}…`;await b.commit()}
-      closeModal();toast(`${list.length} account entr${list.length===1?'y':'ies'} imported`);S.params.per='all';render()}
+      logAct('Imported','Accounts','',`${list.length} entries from a file`,list.slice(0,25).map(e=>[e.date,e.type,e.category,e.party,money(e.amount)].filter(Boolean).join(' · ')));closeModal();toast(`${list.length} account entr${list.length===1?'y':'ies'} imported`);S.params.per='all';render()}
     catch(x){btn.disabled=false;btn.textContent='Import';toast('Import failed: '+(x.message||x.code),true)}};
 }
 function openingForm(){const op=S.acctOpen||{};
@@ -2150,7 +2197,7 @@ function openingForm(){const op=S.acctOpen||{};
     <label class="field" style="grid-column:1/-1"><span>Note</span><input id="ob-n" value="${h(op.note||'')}"></label></div>`,
     `<span class="grow"></span><button class="btn" data-x>Cancel</button><button class="btn primary" id="ob-s">Save</button>`);
   $('#ob-s',o).onclick=async()=>{const d=$('#ob-d',o).value;if(!d){toast('Choose the date.',true);return}
-    try{await setDoc(doc(fdb,COL.acctSettings,'opening'),{date:d,cash:r2(parseAmt($('#ob-c',o).value)),bank:r2(parseAmt($('#ob-b',o).value)),note:$('#ob-n',o).value.trim(),updatedBy:S.me.name||'',updatedAt:serverTimestamp()});toast('Opening balance saved');closeModal()}
+    try{await setDoc(doc(fdb,COL.acctSettings,'opening'),{date:d,cash:r2(parseAmt($('#ob-c',o).value)),bank:r2(parseAmt($('#ob-b',o).value)),note:$('#ob-n',o).value.trim(),updatedBy:S.me.name||'',updatedAt:serverTimestamp()});logAct('Changed','Accounts','','Opening balance',['Date: '+d,'Cash: '+$('#ob-c',o).value,'Bank: '+$('#ob-b',o).value]);toast('Opening balance saved');closeModal()}
     catch(x){toast('Could not save: '+(x.message||x.code),true)}};
 }
 
@@ -2187,7 +2234,42 @@ VIEWS.logins=()=>{
     :`<div class="empty"><b>No sign-ins in this period</b>Each sign-in, app open and sign-out is recorded here from now on.</div>`}</div>
   <div class="muted" style="font-size:.78rem">Kept for 120 days on screen. Location is added only when that phone or browser has already allowed location for this app. Wrong-password attempts are not recorded, because nothing can be saved before a login succeeds.</div>`;
 };
-VIEWS_AFTER.logins=()=>{
+// Activity log: Activity (everything people do) and Sign-ins (the login log), admins only.
+const ACT_PILL={Created:'good',Changed:'brand',Deleted:'bad',Paid:'good',Received:'good',Imported:'warn',Emailed:'brand',Shared:'brand'};
+const _signinsView=VIEWS.logins;
+VIEWS.logins=()=>{
+  if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
+  const lt=S.params.lt||'act';
+  const tabs=`<div class="seg lgtabs"><button class="${lt==='act'?'on':''}" data-lt="act">Activity</button><button class="${lt==='in'?'on':''}" data-lt="in">Sign-ins</button></div>`;
+  if(lt!=='act')return _signinsView().replace('Login log</h1>','Activity log</h1>').replace('<div class="row"><div class="seg">',tabs+'<div class="row"><div class="seg">');
+  const per=S.params.lp||'7',who=S.params.lu||'',ar=S.params.la||'',q=(S.params.lq||'').toLowerCase().split(/\s+/).filter(Boolean);
+  const from=per==='today'?today():addDays(today(),-(+per-1));
+  const all=S.activity.filter(x=>x.date>=from);
+  const txt=x=>[x.name,x.action,x.area,x.ref,x.title,...(x.changes||[])].join(' ').toLowerCase();
+  const list=all.filter(x=>(!who||x.uid===who)&&(!ar||x.area===ar)&&q.every(w=>txt(x).includes(w))).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const people=[...new Map(S.activity.map(x=>[x.uid,x.name])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  const areas=[...new Set(S.activity.map(x=>x.area).filter(Boolean))].sort();
+  const byP={};all.forEach(x=>{byP[x.uid]=byP[x.uid]||{n:x.name,c:0,last:''};byP[x.uid].c++;if(x.at>byP[x.uid].last)byP[x.uid].last=x.at});
+  let lastDate='';const shown=list.slice(0,400);
+  return `<div class="head"><div><h1>Activity log</h1><div class="sub">Everything people do in invoicing — what was created, changed or deleted, documents opened, PDFs, emails and payments. Admins only.</div></div>
+   <div class="row"><button class="btn" id="la-csv">${I.pdf}Export</button></div></div>
+  ${tabs}
+  <div class="row"><div class="seg">${[['today','Today'],['7','7 days'],['30','30 days'],['120','120 days']].map(([k,l])=>`<button class="${per===k?'on':''}" data-lp="${k}">${l}</button>`).join('')}</div>
+   <select id="la-u" style="width:auto"><option value="">Everyone</option>${people.map(([id,n])=>`<option value="${h(id)}" ${id===who?'selected':''}>${h(n||id)}</option>`).join('')}</select>
+   <select id="la-a" style="width:auto"><option value="">All areas</option>${areas.map(a=>`<option ${a===ar?'selected':''}>${h(a)}</option>`).join('')}</select>
+   <input class="search" id="la-q" placeholder="Search number, client, field, value…" value="${h(S.params.lq||'')}"></div>
+  ${Object.keys(byP).length?`<div class="card pad"><h3 style="margin-bottom:8px">Who did what (${per==='today'?'today':per+' days'})</h3><div class="lgseen">${Object.entries(byP).sort((a,b)=>b[1].c-a[1].c).map(([id,v])=>`<button data-lu="${h(id)}"><b>${h(v.n||'—')}</b><span>${v.c} action${v.c===1?'':'s'}</span><span class="muted">last ${fdate(v.last)} · ${ftime(v.last)}</span></button>`).join('')}</div></div>`:''}
+  <div class="card list actlog">${shown.length?shown.map(x=>{const hd=x.date!==lastDate?`<div class="pcat">${fdate(x.date)}</div>`:'';lastDate=x.date;const pc=ACT_PILL[x.action]||ACT_PILL[String(x.action).split(' ')[0]]||'';
+    return hd+`<div class="li al-row"><span class="ico q num" style="font-size:.72rem">${ftime(x.at)}</span>
+      <span style="min-width:0"><div class="t">${h(x.name||'—')} <span class="pill ${pc}">${h(x.action)}</span> <span class="al-area">${h(x.area||'')}</span>${x.ref?` <span class="num">${h(x.ref)}</span>`:''}</div>
+      ${x.title?`<div class="s">${h(x.title)}</div>`:''}
+      ${(x.changes||[]).length?`<ul class="al-ch">${x.changes.map(c=>`<li>${h(c)}</li>`).join('')}${x.more?`<li class="muted">+${x.more} more</li>`:''}</ul>`:''}
+      <div class="al-dev">${h([x.app,x.view?'on '+x.view:''].filter(Boolean).join(' · '))}</div></span><span></span></div>`}).join('')
+    :`<div class="empty"><b>No activity in this period</b>From now on, every change people make here is recorded with what changed.</div>`}</div>
+  ${list.length>400?`<div class="muted" style="font-size:.8rem">Showing the latest 400 of ${list.length}. Narrow by person, area or search, or export.</div>`:''}
+  <div class="muted" style="font-size:.78rem">Kept for 120 days on screen. Logged from the invoicing app (web and Android); changes made in the attendance app are not included.</div>`;
+};
+const _signinsAfter=()=>{
   $$('[data-lp]').forEach(b=>b.onclick=()=>{S.params.lp=b.dataset.lp;render()});
   $$('[data-lu]').forEach(b=>b.onclick=()=>{S.params.lu=b.dataset.lu;render()});
   $('#lg-u')&&($('#lg-u').onchange=e=>{S.params.lu=e.target.value;render()});
@@ -2195,6 +2277,18 @@ VIEWS_AFTER.logins=()=>{
   $('#lg-csv')&&($('#lg-csv').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
     const rows=[['Date','Time','Name','Event','App','Device model','OS','Browser','Screen','GPS','Reason','Device ID']].concat(S.logins.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))).map(x=>[x.date,ftime(x.at),x.name,(LG_EV[x.event]||[x.event])[0],x.app,x.model,x.os,x.browser,x.screen,hasGPS(x.gps)?fmtGPS(x.gps):'',x.reason,x.device]));
     saveFile(new TextEncoder().encode('\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')),'LLCT login log '+today()+'.csv','text/csv','Save login log').catch(()=>{})});
+};
+VIEWS_AFTER.logins=()=>{
+  $$('[data-lt]').forEach(b=>b.onclick=()=>{S.params.lt=b.dataset.lt;render()});
+  if((S.params.lt||'act')!=='act')return _signinsAfter();
+  $$('[data-lp]').forEach(b=>b.onclick=()=>{S.params.lp=b.dataset.lp;render()});
+  $$('[data-lu]').forEach(b=>b.onclick=()=>{S.params.lu=b.dataset.lu;render()});
+  $('#la-u')&&($('#la-u').onchange=e=>{S.params.lu=e.target.value;render()});
+  $('#la-a')&&($('#la-a').onchange=e=>{S.params.la=e.target.value;render()});
+  const lq=$('#la-q');if(lq)lq.oninput=()=>{S.params.lq=lq.value;clearTimeout(lq._t);lq._t=setTimeout(()=>{render();const n=$('#la-q');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
+  $('#la-csv')&&($('#la-csv').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const rows=[['Date','Time','Name','Action','Area','Number / ref','Details','Changes','App']].concat(S.activity.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))).map(x=>[x.date,ftime(x.at),x.name,x.action,x.area,x.ref,x.title,(x.changes||[]).join(' | '),x.app]));
+    saveFile(new TextEncoder().encode('\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')),'LLCT activity log '+today()+'.csv','text/csv','Save activity log').catch(()=>{})});
 };
 VIEWS.staff=()=>{
   if(!isAdmin())return '<div class="empty"><b>Admins only</b></div>';
@@ -2580,6 +2674,7 @@ function startData(){
   if(can('viewAll'))Store.sub('docs',r=>{parts.all=r;merge()});
   else{Store.sub('docs',r=>{parts.mine=r;merge()},[where('createdBy','==',S.me.id)]);if(seesAllDN())Store.sub('docs',r=>{parts.dl=r;merge()},[where('type','==','delivery')])}
   if(isAdmin())Store.sub('logins',r=>{S.logins=r;if(S.view==='logins'||S.view==='staff')soon()},[where('date','>=',addDays(today(),-120))],true);
+  if(isAdmin())Store.sub('activity',r=>{S.activity=r;if(S.view==='logins')soon()},[where('date','>=',addDays(today(),-120))],true);
   if(isAdmin()){const ra=()=>{if(S.view==='accounts'||S.view==='home')soon()};
     Store.sub('acct',r=>{S.acct=r;ra()});Store.sub('pending',r=>{S.pend=r;ra()},null,true);Store.sub('ledger',r=>{if(r.length)moveOldLedger(r)},null,true);Store.sub('driverPay',r=>{S.drv=r;ra()},null,true);Store.subDoc('acctSettings','opening',o=>{S.acctOpen=o||{};ra()});Store.subDoc('acctSettings','parties',o=>{S.acctParties=o||{}});
     Store.sub('petty',r=>{S.petty=r;if(S.view==='accounts'||S.view==='home')soon()},[where('type','==','credit')],true)}
