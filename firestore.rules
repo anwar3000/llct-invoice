@@ -175,6 +175,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ------------------------------------------------------ missed sign-outs
+    // Management flags a check-in that was never signed out (yellow / red); the employee writes an
+    // explanation; management accepts it (valid day) or marks the day absent (red flag, salary).
+    match /missedOuts/{id} {
+      allow read: if isManagement() || owns();
+      allow create, delete: if isManagement();
+      allow update: if isManagement() || (owns() && resource.data.status == 'asked'
+                      && request.resource.data.status == 'explained'
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'explanation', 'explainedAt']));
+    }
+
     // ------------------------------------------------------ geofence alerts
     // Raised by the employee's phone when they leave the site while still checked in.
     match /alerts/{id} {
@@ -350,10 +361,12 @@ service cloud.firestore {
     }
     // Anyone using invoicing can add a new product (items typed on documents are saved
     // automatically); only "clients & products" permission can change or delete them.
+    // New products from staff wait for an admin / manager (status 'pending'); they approve, edit or reject them.
     match /inv_products/{id} {
       allow read: if invOn();
-      allow create: if invOn() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if invHas('clients');
+      allow create: if invOn() && request.resource.data.createdBy == request.auth.uid
+                    && (request.resource.data.get('status', '') == 'pending' || isManagement() || invHas('clients'));
+      allow update, delete: if invHas('clients') || isManagement();
     }
     // Running document numbers (QTN…, INV…, DLN…). A counter can only move up, never back.
     match /inv_counters/{type} {
@@ -390,6 +403,15 @@ service cloud.firestore {
       allow read: if invHas('payments') || invHas('reports') || invHas('invoice');
       allow create, update: if invHas('payments');
       allow delete: if isAdmin() || (invHas('payments') && invHas('delete'));
+    }
+    // Price list. inv_pricing holds cost, markup and vendor references: admin and staff given 'pricing' only.
+    // inv_prices is the same list with the selling price only, for everyone who makes quotations or invoices.
+    match /inv_pricing/{id} {
+      allow read, write: if invHas('pricing');
+    }
+    match /inv_prices/{id} {
+      allow read: if invHas('pricing') || invHas('quotation') || invHas('invoice');
+      allow write: if invHas('pricing');
     }
     match /inv_docs/{id} {
       allow read: if invHas('viewAll')

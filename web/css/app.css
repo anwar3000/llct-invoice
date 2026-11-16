@@ -928,3 +928,32 @@ body,.main{background:var(--page)}
 .advbox select,.advbox input{min-height:36px}
 .advq{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .advq .chip{cursor:pointer;border:1px solid var(--card-line,#ddd);background:var(--card,#fff)}
+/* price list */
+.pltable-wrap{overflow:hidden}
+.pltable{width:100%;border-collapse:collapse;font-size:.9rem}
+.pltable th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7280);padding:10px 12px;border-bottom:1px solid var(--card-line,#e5e7eb);font-weight:600}
+.pltable td{padding:10px 12px;border-top:1px solid var(--card-line,#eef0f3);vertical-align:top}
+.pltable th.r,.pltable td.r{text-align:right}
+.pltable tr[data-pl]{cursor:pointer}.pltable tr[data-pl]:hover td{background:color-mix(in srgb,var(--c-amber) 5%,transparent)}
+.pltable tr.on td{background:color-mix(in srgb,var(--c-amber) 9%,transparent)}
+.pltable tr.plcat td{background:var(--sunk,#f4f5f7);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:6px 12px}
+.pltable .mdl b{font-weight:650}.pltable .dsc{font-size:.8rem;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pltable td.sale{font-weight:700}.pltable .cb{width:34px}.pltable .cb input{width:18px;height:18px}
+.pltable .pill{white-space:nowrap}
+.plcalc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--c-amber) 7%,transparent);border:1px dashed color-mix(in srgb,var(--c-amber) 50%,transparent)}
+.plcalc div{display:flex;flex-direction:column;gap:2px}.plcalc span{font-size:.72rem;color:var(--muted,#6b7280)}.plcalc b{font-size:1rem}
+.plsel{position:sticky;top:8px;z-index:5}
+@media (max-width:760px){
+  .pltable thead{display:none}
+  .pltable,.pltable tbody{display:block}
+  .pltable tr[data-pl]{display:grid;grid-template-columns:30px 1fr auto;gap:2px 8px;padding:10px 12px;border-top:1px solid var(--card-line,#eef0f3)}
+  .pltable tr.plcat{display:block}.pltable tr.plcat td{display:block}
+  .pltable tr[data-pl] td{border:0;padding:0;background:none!important}
+  .pltable td.cb{grid-row:1/span 4}
+  .pltable td.mdl{grid-column:2/4}
+  .pltable td.vnd,.pltable td.dt{grid-column:2/4;font-size:.82rem}
+  .pltable td.r{grid-column:2/3;text-align:left;font-size:.84rem}
+  .pltable td.r::before{content:attr(data-l) " ";color:var(--muted,#6b7280);font-weight:400;font-size:.74rem}
+  .pltable td.r>div{display:inline;margin-left:4px}
+  .plcalc{grid-template-columns:1fr 1fr}
+}

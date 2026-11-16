@@ -52,7 +52,8 @@ const DEFAULT_CFG={dnEmail:'service@llct.net / mekha@llct.net',name:'LEADERS LIN
 const PERMS=[
   ['quotation','Create & edit quotations'],['invoice','Create & edit invoices'],['delivery','Create delivery notes'],
   ['deliver','Complete deliveries (scan & sign)'],['payments','Record payments'],['clients','Manage clients & products'],
-  ['reports','View accounts & statements'],['viewAll','See documents made by others'],['delete','Delete documents']];
+  ['reports','View accounts & statements'],['viewAll','See documents made by others'],['delete','Delete documents'],
+  ['pricing','Price list: cost, markup & vendor (full access)']];
 const EMP_DEFAULT={delivery:true,deliver:true};
 // One delivery-note form, three names. Numbering shares one running sequence.
 const REPORT={
@@ -79,13 +80,17 @@ const docTab=d=>d&&(isPF(d)?'proforma':d.type==='delivery'&&(d.reportType||'deli
 const stClass=x=>/install|attend/i.test(x)?'ins':/partial|follow|temporary/i.test(x)?'part':/pending/i.test(x)?'pend':'del';
 const TYPE={quotation:{t:'Quotation',p:'Quotations',a:'QT',c:'q'},invoice:{t:'Tax Invoice',p:'Invoices',a:'INV',c:'i'},delivery:{t:'Delivery Note',p:'Delivery notes',a:'DN',c:'d'}};
 
-const S={logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
+const S={pricing:[],prices:[],pricingCfg:{markup:40,round:0},plSel:[],logins:[],acct:[],drv:[],acctOpen:{},acctParties:{},petty:[],sites:[],projects:{},counters:{},cfg:clone(DEFAULT_CFG),clients:[],products:[],docs:[],payments:[],users:{},access:{},
   me:{id:null,role:'loading',perms:{}},view:'home',params:{}};
 const can=p=>S.me.role==='admin'||S.me.role==='manager'&&p!=='__admin'||!!S.me.perms[p];
 const isAdmin=()=>S.me.role==='admin';
+// Price list: admin and staff ticked for 'pricing' see cost, markup and vendor; anyone who makes
+// quotations or invoices sees the selling price only (a separate copy, inv_prices).
+const canPricing=()=>S.me.role==='admin'||!!S.me.perms.pricing;
+const seesPrices=()=>canPricing()||!!S.me.perms.quotation||!!S.me.perms.invoice||S.me.role==='manager';
 
 /* ================= Firebase store ================= */
-const COL={ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
+const COL={pricing:'inv_pricing',prices:'inv_prices',ledger:'inv_ledger',logins:'inv_logins',acct:'acctEntries',acctFiles:'acctFiles',acctSettings:'acctSettings',driverPay:'driverPayments',petty:'petty',profiles:'inv_profiles',numbers:'inv_numbers',sites:'sites',projects:'projects',counters:'inv_counters',config:'inv_config',access:'inv_access',clients:'inv_clients',products:'inv_products',docs:'inv_docs',payments:'inv_payments',images:'inv_images',users:'users'};
 const Store={unsubs:[],
   sub(col,cb,clauses,quiet){
     const ref=collection(fdb,COL[col]);const q=clauses&&clauses.length?query(ref,...clauses):ref;
@@ -274,6 +279,7 @@ const visibleDocs=()=>S.docs.filter(d=>can('viewAll')||d.createdBy===S.me.id||(d
 /* ================= icons ================= */
 const I={
  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg>',
+ tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12V4a1 1 0 011-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/></svg>',
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>',
  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
@@ -616,6 +622,7 @@ function navItems(){
   if(can('clients')||can('reports'))cu.push(['clients','Clients & SOA',I.users,'teal']);
   if(can('payments')||can('reports'))cu.push(['payments','Payments',I.cash,'green']);
   if(can('clients'))cu.push(['products','Products',I.box,'violet']);
+  if(seesPrices())cu.push(['pricelist','Price list',I.tag,'amber']);
   if(cu.length)n.push(['grp','Customers'],...cu);
   if(isAdmin())n.push(['grp','Admin'],['accounts','Accounts',I.book,'amber'],['logins','Login log',I.clock,'cyan'],['staff','Staff & access',I.shield,'rose'],['settings','Company & template',I.gear,'slate']);
   return n;
@@ -943,6 +950,7 @@ VIEWS.edit=()=>{
   if(!ED||ED._key!==JSON.stringify(p)){
     if(p.id){ED=clone(S.docs.find(x=>x.id===p.id)||newDraft('invoice'))}
     else{ED=newDraft(p.type,p.rt);if(p.tk){ED.ticketId=String(p.tk);ED._tk=1}if(p.attSite){ED.attSiteId=p.attSite;ED.attSessionId=p.attSession||'';ED.attSiteName=p.attSiteName||'';ED._att=1}const srcId=p.from||p.copy;const src=srcId&&S.docs.find(x=>x.id===srcId);
+      if(Array.isArray(p.pl)&&p.pl.length){const its=p.pl.map(id=>plItems().find(x=>x.id===id)).filter(Boolean).map(plToItem);if(its.length)ED.items=its}
       if(src){Object.assign(ED,{clientId:src.clientId,client:src.client,ref:src.ref,subject:src.subject,salesperson:src.salesperson,items:clone(src.items||[]).map(i=>({...i,serials:p.type==='quotation'?[]:(i.serials||[])})),discount:src.discount,taxRate:src.taxRate,notes:src.notes});
         if(p.from)ED.sourceId=src.id;
         if(isPF(ED)&&src.type==='quotation'){const m=String(src.terms||'').match(/(\d{1,3})\s*%\s*(?:advance|down)/i);if(m&&+m[1]>0&&+m[1]<=100)ED.advPct=+m[1];if(src.siteId){ED.siteId=src.siteId;ED.siteName=src.siteName;ED.siteAddress=src.siteAddress}}
@@ -984,7 +992,7 @@ VIEWS.edit=()=>{
      ${isDN?`<label class="field f-s"><span>Status</span><select data-f="status">${rep(d).st.map(x=>`<option ${(i.status||rep(d).st[0])===x?'selected':''}>${h(x)}</option>`).join('')}</select></label>`:''}
      ${isDN?'':`<label class="field f-p"><span>Rate</span><input type="number" step="any" min="0" data-f="price" value="${h(i.price)}"></label><div class="amt"><span class="label">Amount</span><br><span data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</span></div>`}
      <div class="ibtns"><button class="xbtn ex" type="button" data-full="${n}" aria-label="Open item in full window" title="Open in full window">${I.expand}</button><button class="xbtn" type="button" data-rm="${n}" aria-label="Remove item" title="Remove item">✕</button></div></div>`).join('')}</div>
-   <div class="row" style="gap:8px;flex-wrap:wrap">${S.products.length?`<button class="btn primary" id="add-prod">${I.search}Add from products</button>`:''}<button class="btn" id="add-item">${I.plus}Add item</button></div>
+   <div class="row" style="gap:8px;flex-wrap:wrap">${!isDN&&plItems().length?`<button class="btn" id="add-pl">${I.tag}Add from price list</button>`:''}${S.products.length?`<button class="btn primary" id="add-prod">${I.search}Add from products</button>`:''}<button class="btn" id="add-item">${I.plus}Add item</button></div>
    ${isDN?'':`<div class="totals"><div class="tr"><span class="muted">Subtotal</span><span class="num" id="t-sub">${money(t.sub)}</span></div>
     <div class="tr" style="align-items:center"><span class="muted">Discount</span><input type="number" step="any" id="e-discount" value="${h(d.discount)}" style="width:120px;text-align:right"></div>
     <div class="tr" style="align-items:center"><span class="muted">${h(S.cfg.taxLabel)} %</span><input type="number" step="any" id="e-taxRate" value="${h(d.taxRate)}" style="width:120px;text-align:right"></div>
@@ -1168,6 +1176,7 @@ VIEWS_AFTER.edit=()=>{
   // tapping an empty item name opens the product list (close it to type the item by hand)
   $$('.items [data-i]').forEach(row=>{const inp=$('[data-f="name"]',row);if(!inp)return;inp.addEventListener('click',()=>{if(inp.value.trim()||row._pp)return;row._pp=1;readEditor();const n=+row.dataset.i;productPicker(p=>{if(!p){setTimeout(()=>inp.focus(),30);return}readEditor();fillItem(ED.items[n],p);render()},'')})});
   const ap=$('#add-prod');if(ap)ap.onclick=()=>productPicker(p=>{if(p)addProduct(p)});
+  const apl=$('#add-pl');if(apl)apl.onclick=()=>plPicker(x=>{if(!x)return;readEditor();const it=plToItem(x);const blank=ED.items.findIndex(i=>!i.name);if(blank>=0)ED.items[blank]=it;else ED.items.push(it);render()});
   // description boxes grow with the text, so long descriptions are easy to read and edit
   $$('.items textarea.grow-ta').forEach(ta=>{const fit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,420)+'px'};ta.addEventListener('input',fit);fit()});
   $$('[data-unphoto]').forEach(b=>b.onclick=()=>{readEditor();ED.items[+b.dataset.unphoto].photo='';render()});
@@ -1226,7 +1235,7 @@ function askNewProducts(names){
 async function syncProducts(d){
   const seen=new Set();const fresh=[];
   for(const i of d.items||[]){
-    const name=String(i.name||'').trim();const key=name.toLowerCase();if(!name||seen.has(key))continue;seen.add(key);
+    if(i.plId)continue;const name=String(i.name||'').trim();const key=name.toLowerCase();if(!name||seen.has(key))continue;seen.add(key);
     const p=(S.allProducts||S.products).find(x=>String(x.name||'').trim().toLowerCase()===key);
     if(!p){fresh.push(i);continue}
     try{
@@ -1668,6 +1677,150 @@ VIEWS_AFTER.products=()=>{$('#npd').onclick=()=>productForm();
   $$('[data-pe]').forEach(b=>b.onclick=()=>productForm(pp(b.dataset.pe)));
   $$('[data-pr]').forEach(b=>b.onclick=async()=>{const p=pp(b.dataset.pr);if(!p||!await confirmBox('Reject product?',p.name+' will not be added to the product list. Documents that use it keep it.'))return;await Store.remove('products',p.id);toast('Rejected')});$('#imp').onclick=()=>importForm('products');$('#pcat')&&($('#pcat').onchange=e=>{S.params.cat=e.target.value;render()});$$('[data-pd]').forEach(b=>b.onclick=()=>productForm(S.products.find(p=>p.id===b.dataset.pd)));
   const pq=$('#pq');pq.oninput=()=>{S.params.q=pq.value;clearTimeout(pq._t);pq._t=setTimeout(()=>{render();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)}};
+/* ----- price list ----- */
+const plItems=()=>canPricing()?S.pricing:S.prices;
+const plRound=(v,r)=>{r=+r||0;return r?Math.ceil(v/r-1e-9)*r:r2(v)};
+const plMarkup=x=>x&&x.markup!=null&&x.markup!==''?+x.markup:+S.pricingCfg.markup;
+// cost → selling price (markup, optional rounding up) → VAT → price including VAT
+function plCalc(x){
+  const vr=+S.cfg.taxRate||0;
+  const sale=x&&x.cost!=null&&x.cost!==''?plRound((+x.cost||0)*(1+plMarkup(x)/100),S.pricingCfg.round):r2(+(x&&x.sale)||0);
+  const vat=r2(sale*vr/100);return {sale,vat,incl:r2(sale+vat),vr};
+}
+const plAge=x=>x&&x.priceDate?Math.floor((Date.now()-new Date(x.priceDate+'T00:00:00'))/864e5):9999;
+const plAgeCls=x=>{const a=plAge(x);return a>180?'bad':a>90?'warn':'good'};
+const plAgeTxt=x=>x.priceDate?`${fdate(x.priceDate)}${plAge(x)>90?` · ${Math.round(plAge(x)/30)} months old`:''}`:'no date';
+const plTitle=x=>[x.brand,x.model].filter(Boolean).join(' ')||x.name||'';
+// how a price-list line goes onto a quotation / invoice: name, model line + description, selling price
+function plToItem(x){const model=[x.brand,x.model].filter(Boolean).join(' ');
+  return {name:x.name||model,desc:[x.name&&model?'Model: '+model:'',x.desc||''].filter(Boolean).join('\n'),qty:1,unit:x.unit||'pcs',price:plCalc(x).sale,photo:'',plId:x.id}}
+const plText=x=>[x.model,x.brand,x.name,x.desc,x.category,canPricing()?x.vendor:'',canPricing()?x.vendorRef:''].filter(Boolean).join(' ').toLowerCase();
+const plPublic=x=>({model:x.model||'',brand:x.brand||'',name:x.name||'',desc:x.desc||'',category:x.category||'',unit:x.unit||'pcs',sale:plCalc(x).sale,priceDate:x.priceDate||'',updatedAt:x.updatedAt||new Date().toISOString()});
+async function plWrite(x){const {id,...rest}=x;await Store.put('pricing',id,rest);await Store.put('prices',id,plPublic(x))}
+
+VIEWS.pricelist=()=>{
+  const full=canPricing();const all=plItems();const q=(S.params.q||'').toLowerCase().split(/\s+/).filter(Boolean),cat=S.params.cat||'',old=!!S.params.old;
+  const cats=[...new Set(all.map(x=>x.category||'Other'))].sort();
+  const list=all.filter(x=>(!cat||(x.category||'Other')===cat)&&(!old||plAge(x)>90)&&q.every(w=>plText(x).includes(w)))
+    .sort((a,b)=>String(a.category||'Other').localeCompare(String(b.category||'Other'))||plTitle(a).localeCompare(plTitle(b)));
+  S.plSel=(S.plSel||[]).filter(id=>all.some(x=>x.id===id));const sel=new Set(S.plSel);const nOld=all.filter(x=>plAge(x)>90).length;
+  const vr=+S.cfg.taxRate||0;
+  return `<div class="head"><div><h1>Price list</h1><div class="sub">${all.length} item${all.length===1?'':'s'}${full?` · sale price = cost + ${h(S.pricingCfg.markup)}%${+S.pricingCfg.round?` (rounded up to ${h(S.pricingCfg.round)})`:''} · ${h(S.cfg.taxLabel)} ${vr}%`:` · selling prices · ${h(S.cfg.taxLabel)} ${vr}%`}</div></div>
+   <div class="row">${full?`<button class="btn" id="pl-set">Markup</button><button class="btn" id="pl-imp">Import</button><button class="btn" id="pl-exp">Export</button><button class="btn primary" id="pl-new">${I.plus}Add item</button>`:''}</div></div>
+  <div class="row"><input class="search" id="plq" placeholder="Search model, brand, description${full?', vendor, reference':''}…" value="${h(S.params.q||'')}">
+   ${cats.length>1?`<select id="plcat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${c===cat?'selected':''}>${h(c)}</option>`).join('')}</select>`:''}
+   ${nOld?`<label class="check" style="white-space:nowrap"><input type="checkbox" id="plold" ${old?'checked':''}>Older than 3 months (${nOld})</label>`:''}</div>
+  ${sel.size?`<div class="notice row plsel" style="align-items:center"><span class="grow"><b>${sel.size}</b> selected</span>${can('quotation')?`<button class="btn sm primary" data-plq="quotation">New quotation</button>`:''}${can('invoice')?`<button class="btn sm" data-plq="invoice">New invoice</button>`:''}<button class="btn sm ghost" id="pl-clr">Clear</button></div>`:''}
+  <div class="card pltable-wrap">${list.length?`<table class="pltable ${full?'full':''}"><thead><tr><th style="width:34px"></th><th>Model / item</th>${full?'<th>Vendor · reference</th>':''}<th>Price date</th>${full?'<th class="r">Cost</th>':''}<th class="r">Sale price</th><th class="r">${h(S.cfg.taxLabel)}</th><th class="r">Incl. ${h(S.cfg.taxLabel)}</th></tr></thead><tbody>
+   ${list.map((x,k)=>{const c=plCalc(x);return `${(k===0||String(list[k-1].category||'Other')!==String(x.category||'Other'))?`<tr class="plcat"><td colspan="${full?8:6}">${h(x.category||'Other')}</td></tr>`:''}<tr data-pl="${h(x.id)}" class="${sel.has(x.id)?'on':''}">
+     <td class="cb"><input type="checkbox" data-plc="${h(x.id)}" ${sel.has(x.id)?'checked':''} aria-label="Select"></td>
+     <td class="mdl"><b>${h(plTitle(x))}</b>${x.name&&x.model?`<div>${h(x.name)}</div>`:''}${x.desc?`<div class="muted dsc">${h(String(x.desc).split('\n')[0])}</div>`:''}</td>
+     ${full?`<td class="vnd">${h(x.vendor||'—')}${x.vendorRef?`<div class="muted num">${h(x.vendorRef)}</div>`:''}</td>`:''}
+     <td class="dt"><span class="pill ${plAgeCls(x)}">${h(plAgeTxt(x))}</span></td>
+     ${full?`<td class="r num" data-l="Cost">${money(x.cost)}<div class="muted" style="font-size:.72rem">+${h(plMarkup(x))}%</div></td>`:''}
+     <td class="r num sale" data-l="Sale">${money(c.sale)}</td><td class="r num" data-l="${h(S.cfg.taxLabel)}">${money(c.vat)}</td><td class="r num" data-l="Incl.">${money(c.incl)}</td></tr>`}).join('')}</tbody></table>`
+   :`<div class="empty"><b>${all.length?'Nothing matches':'The price list is empty'}</b>${all.length?'Try a different search.':full?'Add items one by one, or import an Excel / CSV file from your vendor price list.':'Ask the admin to add items.'}</div>`}</div>`;
+};
+VIEWS_AFTER.pricelist=()=>{
+  const full=canPricing();const find=id=>plItems().find(x=>x.id===id);
+  const plq=$('#plq');plq.oninput=()=>{S.params.q=plq.value;clearTimeout(plq._t);plq._t=setTimeout(()=>{render();const n=$('#plq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
+  $('#plcat')&&($('#plcat').onchange=e=>{S.params.cat=e.target.value;render()});
+  $('#plold')&&($('#plold').onchange=e=>{S.params.old=e.target.checked?1:0;render()});
+  $$('[data-plc]').forEach(c=>{c.onclick=e=>e.stopPropagation();c.onchange=()=>{const id=c.dataset.plc;S.plSel=c.checked?[...new Set([...S.plSel,id])]:S.plSel.filter(x=>x!==id);render()}});
+  $$('tr[data-pl]').forEach(r=>r.onclick=()=>{const x=find(r.dataset.pl);if(!x)return;full?plForm(x):plInfo(x)});
+  $$('[data-plq]').forEach(b=>b.onclick=()=>{const ids=[...S.plSel];S.plSel=[];go('edit',{type:b.dataset.plq,pl:ids})});
+  $('#pl-clr')&&($('#pl-clr').onclick=()=>{S.plSel=[];render()});
+  if(!full)return;
+  $('#pl-new').onclick=()=>plForm();$('#pl-set').onclick=plSettings;$('#pl-imp').onclick=plImport;$('#pl-exp').onclick=plExport;
+};
+function plInfo(x){const c=plCalc(x);
+  const o=modal(plTitle(x),`<div class="grid">${x.name?`<div><b>${h(x.name)}</b></div>`:''}${x.desc?`<div class="muted" style="white-space:pre-line">${h(x.desc)}</div>`:''}
+   <div class="kv"><span class="muted">Sale price</span><b class="num">${cur(c.sale)}</b></div><div class="kv"><span class="muted">${h(S.cfg.taxLabel)} ${c.vr}%</span><span class="num">${money(c.vat)}</span></div><div class="kv"><span class="muted">Including ${h(S.cfg.taxLabel)}</span><span class="num">${money(c.incl)}</span></div>
+   <div class="kv"><span class="muted">Price date</span><span class="pill ${plAgeCls(x)}">${h(plAgeTxt(x))}</span></div></div>`,
+   `<button class="btn" data-x>Close</button><span class="grow"></span>${can('quotation')?`<button class="btn primary" id="pi-q">New quotation</button>`:''}`);
+  $('#pi-q',o)&&($('#pi-q',o).onclick=()=>{closeModal();go('edit',{type:'quotation',pl:[x.id]})});
+}
+function plForm(x){
+  const e={unit:'pcs',priceDate:today(),...(x||{})};const isNew=!x;
+  const cats=[...new Set(S.pricing.map(p=>p.category).filter(Boolean))].sort();const vendors=[...new Set(S.pricing.map(p=>p.vendor).filter(Boolean))].sort();
+  const o=modal(isNew?'New price list item':'Edit '+plTitle(e),`<div class="grid g2">
+    <label class="field"><span>Model number</span><input id="pl-model" value="${h(e.model||'')}" placeholder="e.g. DS-2CD1143G2-LIU"></label>
+    <label class="field"><span>Brand</span><input id="pl-brand" value="${h(e.brand||'')}" placeholder="e.g. Hikvision"></label>
+    <label class="field" style="grid-column:1/-1"><span>Item name (as on the quotation)</span><input id="pl-name" value="${h(e.name||'')}" placeholder="e.g. 4MP IP dome camera"></label>
+    <label class="field" style="grid-column:1/-1"><span>Description</span><textarea id="pl-desc" rows="3" placeholder="Specs, lens, IR range, warranty…">${h(e.desc||'')}</textarea></label>
+    <label class="field"><span>Category</span><input id="pl-category" list="pl-cats" value="${h(e.category||'')}" placeholder="e.g. Cameras"><datalist id="pl-cats">${cats.map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
+    <label class="field"><span>Unit</span><input id="pl-unit" value="${h(e.unit||'pcs')}"></label>
+    <label class="field"><span>Cost price (${h(S.cfg.currency)})</span><input id="pl-cost" type="number" step="any" min="0" inputmode="decimal" value="${h(e.cost??'')}"></label>
+    <label class="field"><span>Markup %</span><input id="pl-markup" type="number" step="any" inputmode="decimal" value="${h(e.markup??'')}" placeholder="${h(S.pricingCfg.markup)} (default)"></label>
+    <div class="plcalc" id="pl-calc" style="grid-column:1/-1"></div>
+    <label class="field"><span>Price updated on</span><input id="pl-date" type="date" value="${h(e.priceDate||today())}"></label>
+    <label class="field"><span>Vendor</span><input id="pl-vendor" list="pl-vens" value="${h(e.vendor||'')}"><datalist id="pl-vens">${vendors.map(c=>`<option value="${h(c)}">`).join('')}</datalist></label>
+    <label class="field"><span>Vendor reference</span><input id="pl-vref" value="${h(e.vendorRef||'')}" placeholder="Vendor quote / invoice no."></label>
+    <label class="field"><span>Internal note</span><input id="pl-note" value="${h(e.note||'')}" placeholder="Not shown to staff or on documents"></label>
+    ${(e.history||[]).length?`<div style="grid-column:1/-1"><div class="label" style="margin-bottom:4px">Earlier prices</div>${e.history.slice().reverse().map(hh=>`<div class="kv" style="font-size:.84rem"><span class="muted">${fdate(hh.priceDate)} · ${h(hh.vendor||'—')}${hh.vendorRef?' · '+h(hh.vendorRef):''}</span><span class="num">${money(hh.cost)}</span></div>`).join('')}</div>`:''}
+   </div>`,`${isNew?'':'<button class="btn danger" id="pl-del">Delete</button><span class="grow"></span>'}<button class="btn" data-x>Cancel</button><button class="btn primary" id="pl-save">Save</button>`,true);
+  const read=()=>({...e,model:$('#pl-model',o).value.trim(),brand:$('#pl-brand',o).value.trim(),name:$('#pl-name',o).value.trim(),desc:$('#pl-desc',o).value.trim(),category:$('#pl-category',o).value.trim(),unit:$('#pl-unit',o).value.trim()||'pcs',
+    cost:$('#pl-cost',o).value===''?'':r2(+$('#pl-cost',o).value),markup:$('#pl-markup',o).value===''?null:+$('#pl-markup',o).value,priceDate:$('#pl-date',o).value||today(),vendor:$('#pl-vendor',o).value.trim(),vendorRef:$('#pl-vref',o).value.trim(),note:$('#pl-note',o).value.trim()});
+  const calc=()=>{const y=read();const c=plCalc(y);$('#pl-calc',o).innerHTML=`<div><span>Sale price (+${h(plMarkup(y))}%)</span><b class="num">${money(c.sale)}</b></div><div><span>${h(S.cfg.taxLabel)} ${c.vr}%</span><b class="num">${money(c.vat)}</b></div><div><span>Incl. ${h(S.cfg.taxLabel)}</span><b class="num">${money(c.incl)}</b></div><div><span>Margin</span><b class="num">${money(c.sale-(+y.cost||0))}</b></div>`};
+  ['#pl-cost','#pl-markup'].forEach(k=>$(k,o).oninput=calc);calc();
+  $('#pl-save',o).onclick=async()=>{const y=read();
+    if(!y.model&&!y.name){toast('Enter the model number or item name.',true);return}
+    if(y.cost===''||!(+y.cost>0)){toast('Enter the cost price.',true);return}
+    const dup=S.pricing.find(p=>p.id!==e.id&&y.model&&String(p.model||'').toLowerCase()===y.model.toLowerCase()&&String(p.brand||'').toLowerCase()===y.brand.toLowerCase());
+    if(dup&&!await confirmBox('Model already in the list',`${plTitle(dup)} is already saved (cost ${money(dup.cost)}, ${fdate(dup.priceDate)}). Save another line anyway?`,'Save anyway'))return;
+    if(!isNew&&(+x.cost!==+y.cost||x.vendor!==y.vendor||x.priceDate!==y.priceDate)&&x.cost!=null)y.history=[...(x.history||[]),{cost:x.cost,priceDate:x.priceDate||'',vendor:x.vendor||'',vendorRef:x.vendorRef||''}].slice(-10);
+    if(isNew){y.id=uid();y.createdAt=new Date().toISOString();y.createdBy=S.me.id}
+    y.updatedAt=new Date().toISOString();y.updatedBy=S.me.name||'';
+    const b=$('#pl-save',o);b.disabled=true;try{await plWrite(y);closeModal();toast('Saved '+plTitle(y))}catch(err){b.disabled=false;toast('Could not save: '+(err.code||err.message),true)}};
+  $('#pl-del',o)&&($('#pl-del',o).onclick=async()=>{if(!await confirmBox('Delete '+plTitle(e)+'?','It is removed from the price list. Quotations that already use it keep their prices.'))return;
+    try{await Store.remove('pricing',e.id);await Store.remove('prices',e.id);closeModal();toast('Deleted')}catch(err){toast('Could not delete: '+(err.code||err.message),true)}});
+}
+function plSettings(){const c=S.pricingCfg;
+  const o=modal('Markup',`<div class="grid g2"><label class="field"><span>Default markup %</span><input id="ps-m" type="number" step="any" value="${h(c.markup)}"></label>
+    <label class="field"><span>Round sale price up to</span><select id="ps-r">${[[0,'No rounding'],[0.5,'0.50'],[1,'1'],[5,'5'],[10,'10']].map(([v,l])=>`<option value="${v}" ${+c.round===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <div class="muted" style="grid-column:1/-1;font-size:.84rem">Items without their own markup use the default. ${h(S.cfg.taxLabel)} (${h(S.cfg.taxRate)}%) comes from Company & template.</div></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="ps-save">Save & update prices</button>`);
+  $('#ps-save',o).onclick=async()=>{const m=+$('#ps-m',o).value;if(!(m>=0)){toast('Enter the markup %.',true);return}const b=$('#ps-save',o);b.disabled=true;
+    try{S.pricingCfg={...c,markup:m,round:+$('#ps-r',o).value};await Store.put('pricing','_settings',{markup:m,round:S.pricingCfg.round,updatedAt:new Date().toISOString(),updatedBy:S.me.name||''});
+      for(const x of S.pricing)await Store.put('prices',x.id,plPublic(x));closeModal();toast('Markup saved — '+S.pricing.length+' selling prices updated');render()}
+    catch(err){b.disabled=false;toast('Could not save: '+(err.code||err.message),true)}};
+}
+const PL_COLS={model:/model|part|item\s*code|sku/i,brand:/brand|make|manufacturer/i,name:/^(item|name|product|item name|product name)$/i,desc:/desc|spec|detail/i,category:/categ|group|type/i,unit:/^unit|uom/i,cost:/cost|buy|purchase|dealer|net price|^price$|rate/i,markup:/markup|margin/i,priceDate:/date/i,vendor:/vendor|supplier/i,vendorRef:/ref|quote|invoice/i};
+async function plImport(){
+  const o=modal('Import price list',`<div class="grid"><div class="muted" style="font-size:.84rem">Excel (.xlsx / .xls) or CSV. First row = column headings: <b>Model, Brand, Item, Description, Category, Unit, Cost, Markup, Date, Vendor, Vendor ref</b>. Only Model (or Item) and Cost are needed. An existing model is updated with the new cost and the old price is kept in its history.</div>
+    <div class="row"><input type="file" id="pi-file" accept=".csv,.xlsx,.xls,.xlsm,.ods,.txt"><button class="btn" id="pi-tpl" type="button">Download sample file</button></div>
+    <div class="row"><label class="field"><span>Price date for rows without one</span><input type="date" id="pi-date" value="${today()}"></label><label class="field"><span>Vendor for rows without one</span><input id="pi-ven" placeholder="optional"></label></div><div id="pi-prev"></div></div>`,
+    `<button class="btn" data-x>Cancel</button><button class="btn primary" id="pi-go" disabled>Import</button>`,true);
+  let rows=[];
+  $('#pi-tpl',o).onclick=()=>saveFile(new TextEncoder().encode('Model,Brand,Item,Description,Category,Unit,Cost,Markup,Date,Vendor,Vendor ref\nDS-2CD1143G2-LIU,Hikvision,4MP IP dome camera,"2.8 mm fixed lens, 30 m IR, PoE",Cameras,pcs,150,,'+today()+',Vendor name,Q-1234\n'),'Price list sample.csv','text/csv');
+  $('#pi-file',o).onchange=async ev=>{const f=ev.target.files[0];if(!f)return;
+    try{const t=await readSheetFile(f);const hdr=(t[0]||[]).map(v=>String(v).trim());const map={};
+      Object.entries(PL_COLS).forEach(([k,re])=>{const i=hdr.findIndex((x,j)=>re.test(x)&&!Object.values(map).includes(j));if(i>=0)map[k]=i});
+      if(map.cost==null||(map.model==null&&map.name==null)){$('#pi-prev',o).innerHTML='<div class="notice">Could not find the <b>Model</b> and <b>Cost</b> columns in the first row.</div>';return}
+      const num=v=>+String(v).replace(/[^0-9.\-]/g,'');
+      rows=t.slice(1).map(r=>{const g=k=>map[k]==null?'':String(r[map[k]]??'').trim();return {model:g('model'),brand:g('brand'),name:g('name'),desc:g('desc'),category:g('category'),unit:g('unit')||'pcs',cost:r2(num(g('cost'))),markup:g('markup')===''?null:num(g('markup')),priceDate:anyDate(map.priceDate==null?'':r[map.priceDate])||'',vendor:g('vendor'),vendorRef:g('vendorRef')}}).filter(x=>(x.model||x.name)&&x.cost>0);
+      const upd=rows.filter(x=>S.pricing.some(p=>x.model&&String(p.model||'').toLowerCase()===x.model.toLowerCase())).length;
+      $('#pi-prev',o).innerHTML=`<div class="notice"><b>${rows.length}</b> rows with a model and cost · ${rows.length-upd} new · ${upd} update existing models. Columns found: ${Object.keys(map).join(', ')}.</div>`;$('#pi-go',o).disabled=!rows.length}
+    catch(err){$('#pi-prev',o).innerHTML=`<div class="notice">${h(err.message||err)}</div>`}};
+  $('#pi-go',o).onclick=async()=>{const b=$('#pi-go',o);b.disabled=true;const dd=$('#pi-date',o).value||today(),ven=$('#pi-ven',o).value.trim();let n=0;
+    try{for(const r of rows){const ex=S.pricing.find(p=>r.model&&String(p.model||'').toLowerCase()===r.model.toLowerCase()&&(!r.brand||!p.brand||String(p.brand).toLowerCase()===r.brand.toLowerCase()));
+        const y={...(ex||{id:uid(),createdAt:new Date().toISOString(),createdBy:S.me.id}),...Object.fromEntries(Object.entries(r).filter(([k,v])=>v!==''&&v!=null)),priceDate:r.priceDate||dd,vendor:r.vendor||ven||(ex&&ex.vendor)||'',updatedAt:new Date().toISOString(),updatedBy:S.me.name||''};
+        if(ex&&(+ex.cost!==+y.cost||ex.priceDate!==y.priceDate))y.history=[...(ex.history||[]),{cost:ex.cost,priceDate:ex.priceDate||'',vendor:ex.vendor||'',vendorRef:ex.vendorRef||''}].slice(-10);
+        await plWrite(y);n++;if(n%20===0)b.textContent='Importing '+n+'/'+rows.length+'…'}
+      closeModal();toast(n+' price list items imported')}catch(err){b.disabled=false;toast('Stopped after '+n+': '+(err.code||err.message),true)}};
+}
+function plExport(){const q=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[['Model','Brand','Item','Description','Category','Unit','Cost','Markup %','Sale price','VAT','Sale incl. VAT','Price date','Vendor','Vendor ref']]
+    .concat(S.pricing.map(x=>{const c=plCalc(x);return [x.model,x.brand,x.name,x.desc,x.category,x.unit,x.cost,plMarkup(x),c.sale,c.vat,c.incl,x.priceDate,x.vendor,x.vendorRef]}));
+  saveFile(new TextEncoder().encode('﻿'+rows.map(r=>r.map(q).join(',')).join('\n')),'Price list '+today()+'.csv','text/csv')}
+function plPicker(cb){
+  const o=modal('Add from price list',`<input type="search" class="search" id="plp-q" placeholder="Search model, brand, description…" autocomplete="off" style="max-width:none;width:100%"><div class="list card" id="plp-list" style="margin-top:10px;max-height:60vh;overflow:auto"></div>`,'',false,'ov2');
+  const draw=()=>{const q=$('#plp-q',o).value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const list=plItems().filter(x=>q.every(w=>plText(x).includes(w))).sort((a,b)=>plTitle(a).localeCompare(plTitle(b))).slice(0,150);
+    $('#plp-list',o).innerHTML=list.map(x=>`<button class="li" data-plp="${h(x.id)}"><span class="ico pf">${I.tag}</span><span style="min-width:0"><div class="t">${h(plTitle(x))}</div><div class="s">${h([x.name,(x.desc||'').split('\n')[0]].filter(Boolean).join(' · '))}</div></span><span class="r"><div class="num">${money(plCalc(x).sale)}</div><span class="pill ${plAgeCls(x)}" style="font-size:.68rem">${h(x.priceDate?fdate(x.priceDate):'no date')}</span></span></button>`).join('')||'<div class="empty" style="padding:16px"><b>Nothing found</b></div>';
+    $$('[data-plp]',o).forEach(b=>b.onclick=()=>{o.remove();cb(plItems().find(x=>x.id===b.dataset.plp))})};
+  $('#plp-q',o).oninput=draw;draw();setTimeout(()=>$('#plp-q',o).focus(),60);
+}
 function productForm(p){
   const e={unit:'pcs',...(p||{})};
   const o=modal(p?'Edit product':'New product',`<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><button class="photo" id="pd-ph" style="width:96px;height:96px;flex:none" type="button">${e.photo?img(e.photo):'+ Photo'}</button>
@@ -2347,6 +2500,8 @@ function startData(){
   Store.sub('clients',r=>{S.clients=r;soon();if(S.view==='edit'&&ED&&ED._tk&&!ED._tkDone)applyTicket()});
   // Products waiting for admin / manager approval are kept out of the lists and pickers until approved.
   Store.sub('products',r=>{S.allProducts=r;S.products=r.filter(p=>p.status!=='pending');S.pendingProducts=r.filter(p=>p.status==='pending');soon()});
+  if(canPricing()){Store.sub('pricing',r=>{S.pricingCfg={markup:40,round:0,...(r.find(x=>x.id==='_settings')||{})};S.pricing=r.filter(x=>x.id!=='_settings');if(S.view==='pricelist')soon()},null,true)}
+  else if(seesPrices())Store.sub('prices',r=>{S.prices=r;if(S.view==='pricelist')soon()},null,true);
   if(isAdmin())setTimeout(runSeeds,1500);
   if(can('payments')||can('reports')||can('invoice'))Store.sub('payments',r=>{S.payments=r;soon()});
   const parts={};const merge=()=>{const m={};Object.values(parts).forEach(a=>a.forEach(d=>m[d.id]=d));S.docs=Object.values(m);soon()};
