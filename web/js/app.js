@@ -732,7 +732,8 @@ const VIEWS={},VIEWS_AFTER={};
 // The document's site: the chosen site, or (older delivery notes) the first line of the site / address.
 const docSite=d=>(d.siteName||(d.type==='delivery'&&d.deliveryAddress?String(d.deliveryAddress).split('\n')[0]:'')||'').trim();
 const siteLine=d=>{const st=docSite(d);return st&&st!==(d.client&&d.client.name)?`<div class="s site">${I.pin}${h(st)}</div>`:''};
-const docFile=d=>`${d.number} ${(d.client&&d.client.name)||''}${docSite(d)&&docSite(d)!==(d.client&&d.client.name)?' - '+docSite(d):''}.pdf`.replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();
+// PDF file name: document type, number, customer and site.
+const docFile=d=>{const cn=((d.client&&d.client.name)||'').trim(),st=docSite(d);return `${docTitle(d)} ${d.number}${cn?' - '+cn:''}${st&&st!==cn?' - '+st:''}`.replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim().slice(0,150)+'.pdf'};
 const docText=d=>[d.number,d.client&&d.client.name,docSite(d),d.deliveryAddress,d.ref,d.subject,d.createdByName,d.technician,docTitle(d),
   ...(d.items||[]).flatMap(i=>[i.name,i.desc,...(i.serials||[])])].filter(Boolean).join(' ').toLowerCase();
 const docMatch=(d,q)=>q.split(/\s+/).filter(Boolean).every(w=>docText(d).includes(w));
@@ -883,6 +884,8 @@ VIEWS.view=()=>{
 VIEWS_AFTER.view=()=>{
   const d=S.docs.find(x=>x.id===S.params.id);$('#bk')&&($('#bk').onclick=()=>history.length&&S.params.back?go(S.params.back,S.params.backp||{}):go(d&&d.type==='delivery'&&!can('viewAll')?'deliveries':'docs',{tab:docTab(d)}));
   if(!d)return;
+  // Browser print / "Save as PDF" names the file after the page title: use the same name as the PDF button.
+  {const t0=document.title;window.onbeforeprint=()=>{if(S.view==='view'&&S.params.id===d.id)document.title=docFile(d).replace(/\.pdf$/,'')};window.onafterprint=()=>{document.title=t0}}
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
   $('#pdf')&&($('#pdf').onclick=()=>(logAct('PDF downloaded',docTitle(d),d.number,actLabel('docs',d.id,d)[2]),downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
     .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d))));
