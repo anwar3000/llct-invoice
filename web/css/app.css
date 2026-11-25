@@ -1008,3 +1008,14 @@ body,.main{background:var(--page)}
 .al-ch{margin:5px 0 2px;padding-left:16px;font-size:.8rem;color:var(--ink-2,#374151);display:flex;flex-direction:column;gap:1px}
 .al-ch li{overflow-wrap:anywhere}
 .al-dev{font-size:.72rem;color:var(--muted,#6b7280);margin-top:2px}
+/* documents: select & export PDFs */
+.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;position:sticky;top:8px;z-index:6;border-color:color-mix(in srgb,var(--c-blue) 35%,var(--line))}
+.selbar .check{font-weight:600;white-space:nowrap}.selbar .check input,.selrow>input{width:19px;height:19px;accent-color:var(--c-blue);margin:0}
+.selmode .selrow{display:grid;grid-template-columns:46px 1fr;align-items:center;cursor:pointer;border-top:1px solid var(--line)}
+.selmode .selrow:first-child{border-top:0}
+.selmode .selrow>input{justify-self:center}
+.selmode .selrow>.li{border:0;padding-left:4px;cursor:pointer}
+.selmode .selrow.on{background:color-mix(in srgb,var(--c-blue) 7%,transparent)}
+#dsel.on{background:var(--c-blue);color:#fff;border-color:var(--c-blue)}
+.xpbar{height:8px;border-radius:8px;background:var(--sunk,#eef0f3);overflow:hidden}.xpbar span{display:block;height:100%;width:0;background:var(--c-blue);transition:width .3s}
+@media (max-width:640px){.selbar .grow{flex-basis:auto}.selbar #dx-zip{flex:1}}

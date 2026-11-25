@@ -571,6 +571,11 @@ const mailtoUrl=sh=>'mailto:'+encodeURIComponent(sh.to||'').replace(/%40/g,'@').
 async function downloadPdf(html,filename,merge=[],share=null){
   if(!window.html2pdf){toast('PDF tool is still loading. Try again in a moment.',true);return}
   toast('Preparing PDF…');
+  try{const bytes=await buildPdf(html,filename,merge);await saveFile(bytes,filename,'application/pdf',share?'Send '+filename:'Send or save PDF',share)}
+  catch(e){if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Could not create the PDF: '+(e.message||e),true)}
+}
+// Builds one document's PDF and returns its bytes (used by Download PDF, Send and the bulk export).
+async function buildPdf(html,filename,merge=[]){
   const st=document.createElement('div');st.className='pdf-stage';st.innerHTML=`<div class="pdfdoc">${html}</div>`;document.body.appendChild(st);
   try{
     await Promise.all($$('img[data-ref^="img:"]',st).map(async i=>{i.src=(await loadImg(i.dataset.ref.slice(4)))||BLANK}));
@@ -595,9 +600,41 @@ async function downloadPdf(html,filename,merge=[],share=null){
           const src=await PDFLib.PDFDocument.load(dataToBytes(data),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}catch(e){bad++}}
         bytes=await out.save();if(bad)toast(bad+' attached PDF could not be joined (it may be protected).',true)}
     }
-    await saveFile(bytes,filename,'application/pdf',share?'Send '+filename:'Send or save PDF',share);
-  }catch(e){if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Could not create the PDF: '+(e.message||e),true)}
-  finally{st.remove()}
+    return bytes;
+  }finally{st.remove()}
+}
+const docPdfName=d=>docFile(d).replace(/[\\/:*?"<>|]/g,'').trim();
+const docPdfBytes=d=>buildPdf(renderSheet(d)+renderAnnex(d),docPdfName(d),pdfRefs(d));
+
+// Bulk export: the selected documents' PDFs, one by one, into a ZIP (or joined into one PDF).
+let _zipLib=null;
+const loadZip=()=>_zipLib||(_zipLib=new Promise((ok,no)=>{if(window.JSZip)return ok(window.JSZip);const sc=document.createElement('script');
+  sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=()=>window.JSZip?ok(window.JSZip):no(new Error('ZIP tool did not load'));sc.onerror=()=>{_zipLib=null;no(new Error('ZIP tool could not be downloaded — check the internet connection'))};document.head.appendChild(sc)}));
+async function exportPdfs(docs,mode,label){
+  if(!docs.length)return;if(!window.html2pdf){toast('PDF tool is still loading. Try again in a moment.',true);return}
+  if(mode==='one'&&!window.PDFLib){toast('The PDF joiner did not load. Use the ZIP export.',true);return}
+  let stop=false;const o=modal('Exporting PDFs',`<div class="grid"><div id="xp-msg">Preparing…</div><div class="xpbar"><span id="xp-bar"></span></div><div class="muted" style="font-size:.8rem">Keep this screen open. Each document takes a few seconds.</div><div id="xp-err" class="muted" style="font-size:.8rem;color:var(--bad)"></div></div>`,
+    `<button class="btn" id="xp-stop">Stop</button>`);
+  $('#xp-stop',o).onclick=()=>{stop=true;$('#xp-stop',o).disabled=true;$('#xp-msg',o).textContent='Stopping after this document…'};
+  const done=[],bad=[];let zip=null,joined=null;
+  try{if(mode==='zip')zip=new (await loadZip())();else joined=await PDFLib.PDFDocument.create();
+    const used={};
+    for(let i=0;i<docs.length&&!stop;i++){const d=docs[i];
+      $('#xp-msg',o).innerHTML=`Making <b>${i+1}</b> of <b>${docs.length}</b> · <span class="num">${h(d.number)}</span> ${h(d.client&&d.client.name||'')}`;$('#xp-bar',o).style.width=(i/docs.length*100)+'%';
+      try{const bytes=await docPdfBytes(d);
+        if(zip){let nm=docPdfName(d);const k=nm.toLowerCase();if(used[k]){used[k]++;nm=nm.replace(/\.pdf$/i,` (${used[k]}).pdf`)}else used[k]=1;zip.file(nm,bytes)}
+        else{const src=await PDFLib.PDFDocument.load(bytes);(await joined.copyPages(src,src.getPageIndices())).forEach(pg=>joined.addPage(pg))}
+        done.push(d)}
+      catch(e){bad.push(d.number);$('#xp-err',o).textContent='Could not make: '+bad.join(', ')}}
+    if(!done.length){closeModal();toast('No PDFs were made.',true);return}
+    $('#xp-msg',o).textContent=zip?'Packing the ZIP file…':'Joining into one PDF…';$('#xp-bar',o).style.width='100%';
+    const base=`${label} ${today()} (${done.length})`.replace(/[\\/:*?"<>|]/g,'');
+    const out=zip?await zip.generateAsync({type:'uint8array',compression:'STORE'}):await joined.save();
+    closeModal();
+    logAct(zip?'Exported PDFs (ZIP)':'Exported PDFs (one file)',label,'',`${done.length} document${done.length===1?'':'s'}`,done.slice(0,30).map(d=>d.number+(d.client&&d.client.name?' · '+d.client.name:'')));
+    await saveFile(out,base+(zip?'.zip':'.pdf'),zip?'application/zip':'application/pdf','Save '+label);
+    if(bad.length)toast(`${bad.length} could not be made: ${bad.join(', ')}`,true);else if(stop)toast(`Stopped — ${done.length} of ${docs.length} exported`);
+  }catch(e){closeModal();if(/abort|cancel|declin/i.test((e&&(e.name||e.message))||''))toast('Cancelled');else toast('Export failed: '+(e.message||e),true)}
 }
 // Running header / footer drawn straight onto each PDF page (Classic & Clean styles)
 function decoratePages(pdf,meta,MT,MB){
@@ -815,18 +852,38 @@ const DOC_TABS={
   delivery:{p:'Delivery notes',one:'delivery note',f:d=>d.type==='delivery'&&(d.reportType||'delivery')==='delivery',ok:()=>seesAllDN()||can('viewAll')}};
 const newDoc=t=>t==='service'?go('edit',{type:'delivery',rt:'service'}):t==='proforma'?go('edit',{type:'invoice',rt:'proforma'}):go('edit',{type:t});
 const canNew=t=>t==='service'||t==='delivery'?can('delivery'):t==='proforma'?can('invoice'):can(t);
+const DOC_PER=[['all','All time'],['tm','This month'],['lm','Last month'],['3m','Last 3 months'],['ty','This year'],['ly','Last year']];
+function perRange(k){const t=today(),y=+t.slice(0,4),m=+t.slice(5,7),ym=(Y,M)=>{while(M<1){M+=12;Y--}return `${Y}-${String(M).padStart(2,'0')}`},end=(Y,M)=>{const d=new Date(Date.UTC(Y,M,0));return d.toISOString().slice(0,10)};
+  if(k==='tm')return [ym(y,m)+'-01',t];if(k==='lm'){const s=ym(y,m-1);return [s+'-01',end(+s.slice(0,4),+s.slice(5,7))]}
+  if(k==='3m')return [ym(y,m-2)+'-01',t];if(k==='ty')return [y+'-01-01',t];if(k==='ly')return [(y-1)+'-01-01',(y-1)+'-12-31'];return ['','9999']}
+S.dsel=S.dsel||[];
 VIEWS.docs=()=>{
   const tabs=Object.keys(DOC_TABS).filter(t=>DOC_TABS[t].ok()||visibleDocs().some(DOC_TABS[t].f));
   const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
-  const list=visibleDocs().filter(T.f).filter(d=>!q||docMatch(d,q)).sort(newestFirst);
+  const [pf,pt]=perRange(S.params.per||'all');
+  const list=visibleDocs().filter(T.f).filter(d=>!q||docMatch(d,q)).filter(d=>(d.date||'')>=pf&&(d.date||'')<=pt).sort(newestFirst);
+  const selMode=!!S.params.sel;S.dsel=(S.dsel||[]).filter(id=>list.some(d=>d.id===id));const sel=new Set(S.dsel);const allOn=list.length&&list.every(d=>sel.has(d.id));
   const money_=tab==='quotation'||tab==='invoice'||tab==='proforma';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
   return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
-   ${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div>
-  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span><input class="search" id="dq" placeholder="Search number, client, site, LPO, item, serial no, person…" value="${h(S.params.q||'')}"></div>
-  <div class="card list">${list.length?list.map(docRow).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q?'Try a different search.':'Use the New button above to make one.'}</div>`}</div>`;
+   <div class="row">${list.length?`<button class="btn ${selMode?'on':''}" id="dsel">${I.pdf}${selMode?'Done':'Select & export PDFs'}</button>`:''}${canNew(tab)&&!selMode?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div></div>
+  <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span>
+   <select id="dper" style="width:auto" aria-label="Period">${DOC_PER.map(([k,l])=>`<option value="${k}" ${(S.params.per||'all')===k?'selected':''}>${l}</option>`).join('')}</select>
+   <input class="search" id="dq" placeholder="Search number, client, site, LPO, item, serial no, person…" value="${h(S.params.q||'')}"></div>
+  ${selMode?`<div class="selbar card"><label class="check"><input type="checkbox" id="dsall" ${allOn?'checked':''}>Select all ${list.length}</label><span class="grow muted"><b>${sel.size}</b> selected</span>
+    <button class="btn sm" id="dx-one" ${sel.size?'':'disabled'}>One PDF</button><button class="btn sm primary" id="dx-zip" ${sel.size?'':'disabled'}>${I.pdf}Export ${sel.size||''} PDF${sel.size===1?'':'s'} (ZIP)</button></div>`:''}
+  <div class="card list ${selMode?'selmode':''}">${list.length?list.map(d=>selMode?`<label class="selrow ${sel.has(d.id)?'on':''}"><input type="checkbox" data-dsel="${h(d.id)}" ${sel.has(d.id)?'checked':''}>${docRow(d).replace('<button class="li" data-open=','<div class="li" data-noop=').replace(/<\/button>$/,'</div>')}</label>`:docRow(d)).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q||S.params.per&&S.params.per!=='all'?'Try a different search or period.':'Use the New button above to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
-  $$('[data-tab]').forEach(b=>b.onclick=()=>go('docs',{tab:b.dataset.tab}));
+  $$('[data-tab]').forEach(b=>b.onclick=()=>{S.dsel=[];go('docs',{tab:b.dataset.tab,...(S.params.sel?{sel:1}:{}),...(S.params.per?{per:S.params.per}:{})})});
+  $('#dper')&&($('#dper').onchange=e=>{S.params.per=e.target.value;render()});
+  $('#dsel')&&($('#dsel').onclick=()=>{S.params.sel=S.params.sel?0:1;if(!S.params.sel)S.dsel=[];render()});
+  const vis=()=>$$('[data-dsel]').map(c=>c.dataset.dsel);
+  $('#dsall')&&($('#dsall').onchange=e=>{S.dsel=e.target.checked?vis():[];render()});
+  $$('[data-dsel]').forEach(c=>c.onchange=()=>{const id=c.dataset.dsel;S.dsel=c.checked?[...new Set([...S.dsel,id])]:S.dsel.filter(x=>x!==id);render()});
+  const picked=()=>{const set=new Set(S.dsel);return visibleDocs().filter(d=>set.has(d.id)).sort(newestFirst)};
+  const lbl=()=>(DOC_TABS[S.params.tab]||DOC_TABS[$('.seg [data-tab].on').dataset.tab]).p;
+  $('#dx-zip')&&($('#dx-zip').onclick=()=>exportPdfs(picked(),'zip',lbl()));
+  $('#dx-one')&&($('#dx-one').onclick=()=>exportPdfs(picked(),'one',lbl()));
   const nd=$('#nd');if(nd)nd.onclick=()=>newDoc(DOC_TABS[S.params.tab]?S.params.tab:$('.seg [data-tab].on').dataset.tab);
   const dq=$('#dq');dq.oninput=()=>{S.params.q=dq.value;clearTimeout(dq._t);dq._t=setTimeout(()=>{const p=dq.selectionStart;render();const n=$('#dq');n.focus();n.setSelectionRange(p,p)},250)};
 };
@@ -887,8 +944,7 @@ VIEWS_AFTER.view=()=>{
   // Browser print / "Save as PDF" names the file after the page title: use the same name as the PDF button.
   {const t0=document.title;window.onbeforeprint=()=>{if(S.view==='view'&&S.params.id===d.id)document.title=docFile(d).replace(/\.pdf$/,'')};window.onafterprint=()=>{document.title=t0}}
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();go('view',{id:a.dataset.open})});
-  $('#pdf')&&($('#pdf').onclick=()=>(logAct('PDF downloaded',docTitle(d),d.number,actLabel('docs',d.id,d)[2]),downloadPdf(renderSheet(d)+renderAnnex(d),docFile(d)+``
-    .replace(/[\\/:*?"<>|]/g,'').trim(),pdfRefs(d))));
+  $('#pdf')&&($('#pdf').onclick=()=>(logAct('PDF downloaded',docTitle(d),d.number,actLabel('docs',d.id,d)[2]),downloadPdf(renderSheet(d)+renderAnnex(d),docPdfName(d),pdfRefs(d))));
   $$('[data-openatt]').forEach(b=>b.onclick=()=>openAttachment(d.attachments[+b.dataset.openatt]));
   $('#send')&&($('#send').onclick=()=>sendDoc(d));
   if(actOnce('open'+d.id,6e5))logAct('Opened',docTitle(d),d.number,actLabel('docs',d.id,d)[2]);
