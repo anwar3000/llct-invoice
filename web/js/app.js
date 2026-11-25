@@ -366,8 +366,11 @@ function modal(title,body,foot,wide,id='ov'){
     setTimeout(()=>{fit();t.scrollIntoView({block:'center',behavior:'smooth'})},280)});})();
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('.themesw [data-theme]');if(b){e.preventDefault();e.stopPropagation();setTheme(b.dataset.theme)}},true);
 function closeModal(){const o=$('#ov');if(o)o.remove()}
-function confirmBox(title,text,okLabel='Delete'){return new Promise(res=>{const o=modal(title,`<p style="margin:0">${h(text)}</p>`,`<button class="btn" data-x>Cancel</button><button class="btn primary" id="ok">${h(okLabel)}</button>`);
-  $('#ok',o).onclick=()=>{closeModal();res(true)};o.addEventListener('click',e=>{if(e.target.closest('[data-x]')||e.target===o)res(false)})})}
+/* Asks before going on. Opens on top of any open form (the form stays as it is if you cancel). */
+function confirmBox(title,text,okLabel='Delete'){return new Promise(res=>{const o=modal(title,`<p style="margin:0">${h(text)}</p>`,`<button class="btn" data-x>Cancel</button><button class="btn primary" id="ok">${h(okLabel)}</button>`,false,'cf');
+  $('#ok',o).onclick=()=>{o.remove();res(true)};o.addEventListener('click',e=>{if(e.target.closest('[data-x]')||e.target===o)res(false)})})}
+/* Removing a line / photo / file inside a form: ask first. */
+const askRemove=(what)=>confirmBox('Remove '+what+'?','Remove '+what+'? You can add it again before saving.','Remove');
 function go(view,params={}){S.view=view;S.params=params;closeModal();render();window.scrollTo(0,0);navPush()}
 /* ----- navigation that survives reloads, app switching and the back button ----- */
 const navHash=(v,p)=>{const k=Object.keys(p||{}).filter(x=>!['q'].includes(x)&&p[x]!==''&&p[x]!=null);const o={};k.forEach(x=>o[x]=p[x]);return '#/'+v+(k.length?'?'+encodeURIComponent(JSON.stringify(o)):'')};
@@ -1168,7 +1171,7 @@ function serialEditor(n){
    <div class="serials" id="sn-list"></div>`,`<button class="btn" id="sn-clear" type="button">Clear all</button><button class="btn" id="sn-qty" type="button">Set qty = count</button><span class="grow"></span><button class="btn primary" data-x>Done</button>`);
   const draw=()=>{$('#sn-count',o).textContent=`${it.serials.length} of ${it.qty||0} recorded`;
     $('#sn-list',o).innerHTML=it.serials.map((x,k)=>`<span class="chip">${h(x)}<button type="button" data-k="${k}" aria-label="Remove ${h(x)}">×</button></span>`).join('')||'<span class="muted">No serial numbers yet.</span>';
-    $$('[data-k]',o).forEach(b=>b.onclick=()=>{it.serials.splice(+b.dataset.k,1);draw()})};
+    $$('[data-k]',o).forEach(b=>b.onclick=async()=>{if(!await askRemove('serial '+(it.serials[+b.dataset.k]||'')))return;it.serials.splice(+b.dataset.k,1);draw()})};
   const add=raw=>{const codes=String(raw||'').split(/[\n\r,;\t]+/).map(x=>x.trim()).filter(Boolean);let added=0;const dup=[];
     for(const code of codes){if(ED.items.some(x=>(x.serials||[]).includes(code))){dup.push(code);continue}it.serials.push(code);added++}
     if(dup.length)toast((dup.length===1?dup[0]+' is':dup.length+' serial numbers are')+' already on this document.',true);draw();return added>0};
@@ -1276,7 +1279,7 @@ VIEWS_AFTER.edit=()=>{
   $('#e-client').onchange=e=>{readEditor();if(ED.clientId!==e.target.value){ED.siteId='';ED.siteName='';ED.siteAddress='';ED.clientTrn=null}ED.clientId=e.target.value;const c=S.clients.find(x=>x.id===ED.clientId);ED.client=c?clientSnap(c):null;if(c&&ED.type==='invoice'&&c.creditDays)ED.dueDate=addDays(ED.date,+c.creditDays);if(c&&ED.type==='delivery'&&!ED.deliveryAddress)ED.deliveryAddress=c.address||'';render()};
   $('#e-nc')&&($('#e-nc').onclick=()=>{readEditor();clientForm(null,c=>{ED.clientId=c.id;ED.client=clientSnap(c);render()})});
   $('#add-item').onclick=()=>{readEditor();ED.items.push({name:'',desc:'',qty:1,unit:'pcs',price:0,photo:''});render();const rows=$$('.items [data-i]');$('[data-f="name"]',rows[rows.length-1]).focus()};
-  $$('[data-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
+  $$('[data-rm]').forEach(b=>b.onclick=async()=>{readEditor();const nm=(ED.items[+b.dataset.rm]||{}).name;if(!await askRemove(nm?'“'+nm+'”':'this item'))return;ED.items.splice(+b.dataset.rm,1);if(!ED.items.length)ED.items.push({name:'',qty:1,unit:'pcs',price:0});render()});
   $$('[data-serials]').forEach(b=>b.onclick=()=>serialEditor(+b.dataset.serials));
   $$('[data-full]').forEach(b=>b.onclick=()=>itemFull(+b.dataset.full));
   $$('[data-now]').forEach(b=>b.onclick=()=>{const el=$('#'+b.dataset.now);const n=new Date();el.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');el.dispatchEvent(new Event('change',{bubbles:true}))});
@@ -1292,7 +1295,7 @@ VIEWS_AFTER.edit=()=>{
   $('#att-add').onclick=()=>addAttachments(false);$('#att-cam').onclick=()=>addAttachments(true);
   $('#att-before')&&($('#att-before').onclick=()=>addAttachments(true,PHOTO_LABELS[0]));$('#att-after')&&($('#att-after').onclick=()=>addAttachments(true,PHOTO_LABELS[1]));
   $$('[data-att-rep]').forEach(b=>b.onclick=async()=>{readEditor();if(await replacePhoto(ED.attachments[+b.dataset.attRep]))render()});
-  $$('[data-att-rm]').forEach(b=>b.onclick=()=>{readEditor();ED.attachments.splice(+b.dataset.attRm,1);render()});
+  $$('[data-att-rm]').forEach(b=>b.onclick=async()=>{readEditor();if(!await askRemove('this attachment'))return;ED.attachments.splice(+b.dataset.attRm,1);render()});
   $$('[data-photo]').forEach(b=>b.onclick=async()=>{const f=await pickImage();if(!f)return;readEditor();toast('Uploading photo…');ED.items[+b.dataset.photo].photo=await storeImage(f,800);render()});
   $$('.items input,.items textarea,#e-discount,#e-taxRate,#e-advVal').forEach(el=>el.addEventListener('input',updTotals));
   $('#e-advMode')&&($('#e-advMode').onchange=()=>{readEditor();if(ED.advMode==='amount'&&!ED.advAmount)ED.advAmount=advanceOf({...ED,advMode:'percent'}).amt;render()});
@@ -1397,7 +1400,7 @@ VIEWS_AFTER.deliver=()=>{
   $('#bk').onclick=()=>{DV=null;go('view',{id:d.id})};
   $$('[data-sn]').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add(+inp.dataset.sn,inp.value)}}));
   $$('[data-cam]').forEach(b=>b.onclick=()=>{const n=+b.dataset.cam;openScanner(code=>add(n,code),{title:'Scan serials · '+DV.items[n].name,multi:true})});
-  $$('[data-del]').forEach(b=>b.onclick=()=>{const [n,k]=b.dataset.del.split(':').map(Number);keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items[n].serials.splice(k,1);render();if(sig)pad.load(sig)});
+  $$('[data-del]').forEach(b=>b.onclick=async()=>{const [n,k]=b.dataset.del.split(':').map(Number);if(!await askRemove('serial '+(DV.items[n].serials[k]||'')))return;keep();const sig=!pad.isEmpty()?pad.toData():null;DV.items[n].serials.splice(k,1);render();if(sig)pad.load(sig)});
   $('#sig-clr').onclick=()=>pad.clear();
   if(!DV.gps&&!DV._gpsTried){DV._gpsTried=true;getGPS().then(g=>{if(!DV||DV.id!==d.id)return;const el=$('#dv-gps');if(hasGPS(g)){DV.gps=g;if(el)el.textContent='Location '+fmtGPS(g)+' ±'+g.acc+' m'}else if(el)el.textContent=g&&g.error==='denied'?'Location blocked. Allow location access to record where this was signed.':'Location not available.'})}
   $$('[data-st]').forEach(sel=>sel.onchange=()=>{DV.items[+sel.dataset.st].status=sel.value});
@@ -1406,7 +1409,7 @@ VIEWS_AFTER.deliver=()=>{
   const podAdd=async camera=>{const files=await pickFiles({camera});if(!files.length)return;const added=await uploadFiles(files,{proof:true});if(added.length&&DV)keepSig(()=>DV.photos.push(...added))};
   $('#pod-cam').onclick=()=>podAdd(true);$('#pod-up').onclick=()=>podAdd(false);
   $$('[data-pod-rep]').forEach(b=>b.onclick=async()=>{readAtts(DV.photos,'pod');const a=DV.photos[+b.dataset.podRep];if(await replacePhoto(a))keepSig(()=>{})});
-  $$('[data-pod-rm]').forEach(b=>b.onclick=()=>keepSig(()=>DV.photos.splice(+b.dataset.podRm,1)));
+  $$('[data-pod-rm]').forEach(b=>b.onclick=async()=>{if(!await askRemove('this photo'))return;keepSig(()=>DV.photos.splice(+b.dataset.podRm,1))});
   $('#save-draft').onclick=async()=>{keep();readAtts(DV.photos,'pod');if(await save('docs',d.id,{...d,items:DV.items,attachments:DV.photos,updatedAt:new Date().toISOString()},'Saved'))go('view',{id:d.id})};
   $('#confirm').onclick=async()=>{keep();
     if(!DV.receiver.trim()){toast('Enter the receiver\'s name.',true);return}
@@ -1506,7 +1509,7 @@ function legacyBulk(c){
      <td><input data-lf="amount" inputmode="decimal" value="${h(r.amount)}" style="text-align:right" aria-label="Amount"></td>
      <td><input data-lf="paid" inputmode="decimal" value="${h(r.paid)}" style="text-align:right" placeholder="0" aria-label="Already paid"></td>
      <td><button class="xbtn" type="button" data-lrm="${k}" aria-label="Remove row">✕</button></td></tr>`).join('');
-    $$('[data-lrm]',o).forEach(b=>b.onclick=()=>{read();rows.splice(+b.dataset.lrm,1);if(!rows.length)rows.push({no:'',date:'',due:'',ref:'',amount:'',paid:''});draw()});
+    $$('[data-lrm]',o).forEach(b=>b.onclick=async()=>{read();if(!await askRemove('this line'))return;rows.splice(+b.dataset.lrm,1);if(!rows.length)rows.push({no:'',date:'',due:'',ref:'',amount:'',paid:''});draw()});
     $$('[data-lf]',o).forEach(el=>{el.oninput=sum;el.onpaste=e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(!/[\t\n]/.test(t))return;e.preventDefault();read();
       const lines=t.split(/\r?\n/).map(l=>(l.includes('\t')?l.split('\t'):l.split(/;|,(?!\d{3}\b)/)).map(x=>x.trim())).filter(c=>c.some(Boolean));
       const add=lines.filter(c=>c[0]&&!/^inv|^no|^number/i.test(c[0])||parseAmt(c[2])).map(cl=>({no:cl[0]||'',date:parseDate(cl[1]),due:'',ref:cl[4]||'',amount:cl[2]?String(parseAmt(cl[2])):'',paid:cl[3]?String(parseAmt(cl[3])):''}));
@@ -1547,7 +1550,7 @@ function legacyForm(d){
     const u={...d,number:no,ref:$('#lf-ref',o).value.trim(),subject:$('#lf-subj',o).value.trim(),date,dueDate:$('#lf-due',o).value||date,amount:amt,vat:parseAmt($('#lf-vat',o).value),notes:$('#lf-note',o).value.trim(),updatedAt:new Date().toISOString()};delete u.id;
     if(await save('docs',d.id,u,'Saved'))closeModal()};
   $('#lf-pay',o)&&($('#lf-pay',o).onclick=()=>paymentForm({clientId:d.clientId,invoiceId:d.id}));
-  $('#lf-del',o)&&($('#lf-del',o).onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
+  $('#lf-del',o)&&($('#lf-del',o).onclick=async()=>{if(!await confirmBox('Delete '+d.number+'?','Payments recorded against it stay on the client account.'))return;try{await Store.remove('docs',d.id);toast('Deleted');closeModal()}catch(e){toast('Could not delete: '+(e.message||e.code),true)}});
 }
 // One site of a client: name, address, contact, phone, GPS (current location or typed "lat, lng").
 function siteForm(si,done){
@@ -1631,7 +1634,7 @@ function clientForm(c,after){
   let places=sitesOf(e);
   const drawPl=()=>{$('#c-places',o).innerHTML=places.length?places.map((pl,k)=>`<div class="siterow"><span class="ico q">${I.pin}</span><span style="min-width:0"><b>${h(pl.name||'Site')}</b><div class="muted" style="font-size:.78rem;white-space:pre-line">${h([pl.address,[pl.contact,pl.phone].filter(Boolean).join(' · ')].filter(Boolean).join('\n'))}</div>${hasGPS(pl)?`<div class="num" style="font-size:.74rem;color:var(--good)">GPS ${fmtGPS(pl)}</div>`:'<div style="font-size:.74rem" class="muted">No GPS yet</div>'}</span>
       <span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm" type="button" data-pled="${k}">Edit</button><button class="btn ghost sm" type="button" data-plrm="${k}" aria-label="Remove site">✕</button></span></div>`).join(''):'<div class="muted" style="font-size:.84rem">No sites yet. Add the head office and each branch or project location.</div>';
-    $$('[data-plrm]',o).forEach(b=>b.onclick=()=>{places.splice(+b.dataset.plrm,1);drawPl()});
+    $$('[data-plrm]',o).forEach(b=>b.onclick=async()=>{if(!await askRemove('this site / place'))return;places.splice(+b.dataset.plrm,1);drawPl()});
     $$('[data-pled]',o).forEach(b=>b.onclick=()=>siteForm(places[+b.dataset.pled],si=>{places[+b.dataset.pled]=si;drawPl()}))};drawPl();
   $('#c-addsite',o).onclick=()=>siteForm(null,si=>{places.push(si);drawPl()});
   $('#c-save',o).onclick=async()=>{const d={...e,places:places.map(pl=>({...pl,id:pl.id&&!/^s\d+$/.test(pl.id)?pl.id:uid()}))};['name','contact','phone','email','taxId','address','openingDate'].forEach(k=>d[k]=$('#c-'+k,o).value.trim());d.creditDays=+$('#c-creditDays',o).value||0;d.openingBalance=+$('#c-openingBalance',o).value||0;
@@ -2148,7 +2151,7 @@ function accForm(pre={}){
       else{let d=await compress(f,1600,.82);if(d.length*.75>700*1024)d=await compress(f,1200,.7);if(d.length*.75>700*1024)d=await compress(f,900,.6);file={name:f.name.replace(/\.[^.]+$/,'')+'.jpg',mime:'image/jpeg',base64:d.split(',')[1]}}
       $('#af-rcv',o).textContent='✓ '+file.name}catch(x){file=null;toast(x.message||'Could not read the file',true)}};
   $('#af-view',o)&&($('#af-view',o).onclick=()=>showAcctFile(e));
-  $('#af-rm',o)&&($('#af-rm',o).onclick=async()=>{try{const b=writeBatch(fdb);b.update(doc(fdb,COL.acct,e.id),{hasFile:false,fileName:'',fileMime:''});b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();e.hasFile=false;$('#af-rm',o).remove();$('#af-view',o)&&$('#af-view',o).remove();$('#af-rcv',o).textContent='Removed'}catch(x){toast('Could not remove: '+(x.message||x.code),true)}});
+  $('#af-rm',o)&&($('#af-rm',o).onclick=async()=>{if(!await confirmBox('Remove receipt?','The attached receipt copy will be deleted.','Remove'))return;try{const b=writeBatch(fdb);b.update(doc(fdb,COL.acct,e.id),{hasFile:false,fileName:'',fileMime:''});b.delete(doc(fdb,COL.acctFiles,e.id));await b.commit();e.hasFile=false;$('#af-rm',o).remove();$('#af-view',o)&&$('#af-view',o).remove();$('#af-rcv',o).textContent='Removed'}catch(x){toast('Could not remove: '+(x.message||x.code),true)}});
   $('#af-save',o).onclick=async()=>{const date=$('#af-date',o).value,amount=r2(parseAmt($('#af-amt',o).value)),category=$('#af-cat',o).value.trim(),method=$('#af-meth',o).value,chq=method==='Cheque';
     if(!date||!(amount>0)||!category){toast('Date, amount and category are required.',true);return}
     const siteId=$('#af-site',o).value,site=S.sites.find(x=>x.id===siteId),projectId=$('#af-proj',o).value,proj=S.projects[projectId];const party=$('#af-party',o).value.trim();
