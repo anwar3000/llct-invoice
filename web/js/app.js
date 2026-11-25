@@ -2683,10 +2683,17 @@ function loginScreen(){
     <label class="field"><span>Login ID or email</span><input id="lf-id" autocomplete="username" autocapitalize="none" required></label>
     <label class="field"><span>Password</span><input id="lf-pw" type="password" autocomplete="current-password" required></label>
     <div id="lf-err" class="pill bad" hidden style="text-transform:none;padding:8px 10px;border-radius:8px"></div>
-    <button class="btn primary" id="lf-go">Sign in</button></form></div>`;
-  $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#lf-go'),er=$('#lf-err');b.disabled=true;er.hidden=true;
-    try{try{sessionStorage.setItem('ll_fresh','1')}catch(_){}await signInWithEmailAndPassword(auth,loginToEmail($('#lf-id').value),$('#lf-pw').value)}
+    <button class="btn primary" id="lf-go">Sign in</button>
+    ${SavedLogin.ok()?'<button class="btn" type="button" id="lf-saved">🔑 Sign in with saved login</button>':''}</form></div>`;
+  try{const last=localStorage.getItem('lastLogin');if(last){$('#lf-id').value=last;$('#lf-pw').focus()}}catch(_){}
+  const go=async(id,pw)=>{const b=$('#lf-go'),er=$('#lf-err');b.disabled=true;er.hidden=true;
+    try{try{sessionStorage.setItem('ll_fresh','1')}catch(_){}await signInWithEmailAndPassword(auth,loginToEmail(id),pw);
+      try{localStorage.setItem('lastLogin',id.trim())}catch(_){}SavedLogin.store(id,pw)}
     catch(x){er.hidden=false;er.textContent=/invalid|wrong|not-found|credential/i.test(x.code||'')?'Login ID or password is wrong.':/network/i.test(x.code||'')?'No internet connection.':'Could not sign in ('+(x.code||x.message)+').';b.disabled=false}};
+  $('#lf').onsubmit=e=>{e.preventDefault();go($('#lf-id').value,$('#lf-pw').value)};
+  const sb=$('#lf-saved');if(sb)sb.onclick=async()=>{const c=await SavedLogin.get(false);if(c)go(c.id,c.password);else $('#lf-id').focus()};
+  // Opened fresh (e.g. from the attendance app's report button): sign straight in when the browser allows it.
+  const f=$('#lf');SavedLogin.get(true).then(c=>{if(c&&$('#lf')===f)go(c.id,c.password)});
 }
 function messageScreen(title,text,retry){
   $('#app').innerHTML=`<div class="loading"><div class="card pad" style="max-width:420px;text-align:center;display:flex;flex-direction:column;gap:10px"><h2>${h(title)}</h2><p class="muted" style="margin:0">${text}</p>
@@ -2716,7 +2723,12 @@ function logSession(){let fresh=false;try{fresh=sessionStorage.getItem('ll_fresh
   // re-opened with a saved login: record at most once per 30 minutes per device
   try{const k='ll_open_'+S.me.id,t=+localStorage.getItem(k)||0;if(Date.now()-t<30*6e4)return;localStorage.setItem(k,String(Date.now()))}catch(e){}
   return logEvent('open')}
-async function logOut(){await Promise.race([logEvent('logout'),new Promise(r=>setTimeout(r,1500))]);signOut(auth)}
+async function logOut(){await Promise.race([logEvent('logout'),new Promise(r=>setTimeout(r,1500))]);await SavedLogin.signedOut();signOut(auth)}
+/* Remembered login (Chrome / Edge password manager): one click to sign in again after signing out. */
+const SavedLogin={ok:()=>'PasswordCredential' in window&&!!navigator.credentials,
+  async store(id,pw){try{if(this.ok()&&id&&pw)await navigator.credentials.store(new window.PasswordCredential({id:id.trim(),password:pw,name:id.trim()}))}catch(_){}},
+  async get(silent){try{if(!this.ok())return null;const c=await navigator.credentials.get({password:true,mediation:silent?'silent':'optional'});return c&&c.password?c:null}catch(_){return null}},
+  async signedOut(){try{await navigator.credentials?.preventSilentAccess?.()}catch(_){}}};
 
 function startData(){
   Store.subDoc('config','company',c=>{S.cfg={...clone(DEFAULT_CFG),...(c||{}),prefix:{...DEFAULT_CFG.prefix,...(c&&c.prefix||{})},seqStart:{...DEFAULT_CFG.seqStart,...(c&&c.seqStart||{})},terms:{...DEFAULT_CFG.terms,...(c&&c.terms||{})}};delete S.cfg.id;soon()});
