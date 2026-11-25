@@ -1019,3 +1019,10 @@ body,.main{background:var(--page)}
 #dsel.on{background:var(--c-blue);color:#fff;border-color:var(--c-blue)}
 .xpbar{height:8px;border-radius:8px;background:var(--sunk,#eef0f3);overflow:hidden}.xpbar span{display:block;height:100%;width:0;background:var(--c-blue);transition:width .3s}
 @media (max-width:640px){.selbar .grow{flex-basis:auto}.selbar #dx-zip{flex:1}}
+/* tick boxes always on document lists */
+.selmode .selrow{grid-template-columns:44px 1fr;cursor:default}
+.selmode .selrow>.li{cursor:pointer;padding-left:2px}
+.selcb{display:flex;align-items:center;justify-content:center;align-self:stretch;cursor:pointer}
+.selcb input{width:19px;height:19px;accent-color:var(--c-blue);margin:0;cursor:pointer}
+.selbar{position:sticky;top:8px;z-index:6;padding:8px 14px}
+.selbar .btn[disabled]{opacity:.45}

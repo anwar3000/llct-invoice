@@ -862,21 +862,21 @@ VIEWS.docs=()=>{
   const tab=DOC_TABS[S.params.tab]?S.params.tab:(tabs[0]||'invoice');const T=DOC_TABS[tab];const q=(S.params.q||'').toLowerCase();
   const [pf,pt]=perRange(S.params.per||'all');
   const list=visibleDocs().filter(T.f).filter(d=>!q||docMatch(d,q)).filter(d=>(d.date||'')>=pf&&(d.date||'')<=pt).sort(newestFirst);
-  const selMode=!!S.params.sel;S.dsel=(S.dsel||[]).filter(id=>list.some(d=>d.id===id));const sel=new Set(S.dsel);const allOn=list.length&&list.every(d=>sel.has(d.id));
+  const selMode=list.length>0;S.dsel=(S.dsel||[]).filter(id=>list.some(d=>d.id===id));const sel=new Set(S.dsel);const allOn=list.length&&list.every(d=>sel.has(d.id));
   const money_=tab==='quotation'||tab==='invoice'||tab==='proforma';const total=money_?list.reduce((s,d)=>s+totals(d).total,0):0;
   return `<div class="head"><div><h1>${T.p}</h1><div class="sub">${list.length} ${list.length===1?T.one:T.p.toLowerCase()}${money_?` · ${cur(total)}`:''} · latest first</div></div>
-   <div class="row">${list.length?`<button class="btn ${selMode?'on':''}" id="dsel">${I.pdf}${selMode?'Done':'Select & export PDFs'}</button>`:''}${canNew(tab)&&!selMode?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div></div>
+   <div class="row">${canNew(tab)?`<button class="btn primary" id="nd">${I.plus}New ${T.one}</button>`:''}</div></div>
   <div class="row"><div class="seg">${tabs.map(t=>`<button class="${t===tab?'on':''}" data-tab="${t}">${DOC_TABS[t].p}</button>`).join('')}</div><span class="grow"></span>
    <select id="dper" style="width:auto" aria-label="Period">${DOC_PER.map(([k,l])=>`<option value="${k}" ${(S.params.per||'all')===k?'selected':''}>${l}</option>`).join('')}</select>
    <input class="search" id="dq" placeholder="Search number, client, site, LPO, item, serial no, person…" value="${h(S.params.q||'')}"></div>
-  ${selMode?`<div class="selbar card"><label class="check"><input type="checkbox" id="dsall" ${allOn?'checked':''}>Select all ${list.length}</label><span class="grow muted"><b>${sel.size}</b> selected</span>
-    <button class="btn sm" id="dx-one" ${sel.size?'':'disabled'}>One PDF</button><button class="btn sm primary" id="dx-zip" ${sel.size?'':'disabled'}>${I.pdf}Export ${sel.size||''} PDF${sel.size===1?'':'s'} (ZIP)</button></div>`:''}
-  <div class="card list ${selMode?'selmode':''}">${list.length?list.map(d=>selMode?`<label class="selrow ${sel.has(d.id)?'on':''}"><input type="checkbox" data-dsel="${h(d.id)}" ${sel.has(d.id)?'checked':''}>${docRow(d).replace('<button class="li" data-open=','<div class="li" data-noop=').replace(/<\/button>$/,'</div>')}</label>`:docRow(d)).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q||S.params.per&&S.params.per!=='all'?'Try a different search or period.':'Use the New button above to make one.'}</div>`}</div>`;
+  ${selMode?`<div class="selbar card"><label class="check"><input type="checkbox" id="dsall" ${allOn?'checked':''}>Select all ${list.length}</label><span class="grow muted">${sel.size?`<b>${sel.size}</b> selected`:'Tick documents to export their PDFs'}</span>${sel.size?'<button class="btn sm ghost" id="dx-clr">Clear</button>':''}
+    <button class="btn sm" id="dx-one" ${sel.size?'':'disabled'}>One PDF</button><button class="btn sm primary" id="dx-zip" ${sel.size?'':'disabled'}>${I.pdf}Export ${sel.size||''} PDF${sel.size===1?'':'s'}${sel.size?' (ZIP)':''}</button></div>`:''}
+  <div class="card list ${selMode?'selmode':''}">${list.length?list.map(d=>`<div class="selrow ${sel.has(d.id)?'on':''}"><label class="selcb" title="Select for export"><input type="checkbox" data-dsel="${h(d.id)}" ${sel.has(d.id)?'checked':''} aria-label="Select ${h(d.number)}"></label>${docRow(d)}</div>`).join(''):`<div class="empty"><b>No ${T.p.toLowerCase()} found</b>${q||S.params.per&&S.params.per!=='all'?'Try a different search or period.':'Use the New button above to make one.'}</div>`}</div>`;
 };
 VIEWS_AFTER.docs=()=>{
-  $$('[data-tab]').forEach(b=>b.onclick=()=>{S.dsel=[];go('docs',{tab:b.dataset.tab,...(S.params.sel?{sel:1}:{}),...(S.params.per?{per:S.params.per}:{})})});
+  $$('[data-tab]').forEach(b=>b.onclick=()=>{S.dsel=[];go('docs',{tab:b.dataset.tab,...(S.params.per?{per:S.params.per}:{})})});
   $('#dper')&&($('#dper').onchange=e=>{S.params.per=e.target.value;render()});
-  $('#dsel')&&($('#dsel').onclick=()=>{S.params.sel=S.params.sel?0:1;if(!S.params.sel)S.dsel=[];render()});
+  $('#dx-clr')&&($('#dx-clr').onclick=()=>{S.dsel=[];render()});
   const vis=()=>$$('[data-dsel]').map(c=>c.dataset.dsel);
   $('#dsall')&&($('#dsall').onchange=e=>{S.dsel=e.target.checked?vis():[];render()});
   $$('[data-dsel]').forEach(c=>c.onchange=()=>{const id=c.dataset.dsel;S.dsel=c.checked?[...new Set([...S.dsel,id])]:S.dsel.filter(x=>x!==id);render()});
