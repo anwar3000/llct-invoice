@@ -1,0 +1,184 @@
+{
+ "id": "quote-etisalat-smartparks-copy-20261127",
+ "note": "Copy of quotation LLT-Q-2026-0058 (26 Nov 2026) to Etisalat, made from the PDF the user attached.",
+ "clients": [
+  {
+   "name": "Etisalat",
+   "update": true,
+   "contact": "Durga Lakshmi",
+   "creditDays": 30,
+   "openingBalance": 0
+  }
+ ],
+ "docs": [
+  {
+   "type": "quotation",
+   "clientName": "Etisalat",
+   "subject": "CCTV Monitoring Solution for Smart Parks",
+   "copiedFrom": "LLT-Q-2026-0058",
+   "salesperson": "Muhammed Shafi",
+   "contactName": "Muhammed Shafi",
+   "contactMobile": "+971 55 238 2293",
+   "contactEmail": "shafi@llct.net",
+   "validDays": 30,
+   "discount": 0,
+   "taxRate": 5,
+   "notes": "",
+   "terms": "Validity: 30 days from the quotation date.\nScope: Only listed items and services are included. Additional work requires a separate approved quotation.\nPayment: 50% advance with LPO; 50% upon installation and commissioning.\nAvailability: If a quoted model is unavailable or discontinued, an alternative with equivalent or higher specifications will be supplied and installed as per site requirements.",
+   "items": [
+    {
+     "name": "iDS-2CD7A86G2-IZHS(Y)(/5G)",
+     "desc": "8MP DeepinView Moto Varifocal Bullet Camera\nHigh quality imaging with 8 MP resolution\nExcellent low-light performance via DarkFighter 2.0 technology\nClear imaging against strong back light due to 140 dB AWDR technology\nEfficient H.265+ compression technology to save bandwidth and storage\n5 streams to meet a wide variety of applications\nWater and dust resistant (IP67), vandal proof (IK10) and corrosion resistant (NEMA 4X, optional)\nCapture vehicles and humans of different speed clearly via ShotN technology\nHigh frame rate, up to 8MP@60fps and 2MP@120fps\nBuilt-in heater to ensure clear image under rainy or snowy weather\nBuilt-in G-sensor for vibration detection\nBuilt-in power meter for historical power statistics",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 2937.5,
+     "photo": ""
+    },
+    {
+     "name": "DS-1475ZJ-Y Vertical pole mount",
+     "desc": "",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 118.75,
+     "photo": ""
+    },
+    {
+     "name": "DS-7608NXI-G1/4P 8-ch 4 PoE NVR",
+     "desc": "Operates in extreme temperature ranges from -40°C to 70°C\nIntegrates algorithms: Face Recognition, Perimeter Protection, Motion Detection 2.0, AcuSeek and AcuSearch\nUp to 8-ch AcuSeek and AcuSearch function\nAdopt Hikvision AcuSense technology to minimize manual effort and security costs\nAccurate perimeter protection effectively reduces false alarms\nAutomatic cameras connection and configuration\nUp to 8-ch IP camera inputs\nUp to 3-ch@12 MP or 5-ch@8 MP or 10-ch@4 MP or 20-ch@1080p decoding capacity\nH.265+/H.265/H.264+/H.264 video formats\nUp to 80 Mbps incoming bandwidth\nUp to 20TB HDD",
+     "qty": 12,
+     "unit": "Nos",
+     "price": 812.5,
+     "photo": ""
+    },
+    {
+     "name": "HikCentral-P-AcuSeek-1Ch/Advanced",
+     "desc": "Video Surveillance: 1-ch Video Management\nFacial & Human Body Recognition: 1-ch face comparison, human attribute retrieval, Archive Search",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 562.5,
+     "photo": ""
+    },
+    {
+     "name": "iDS-67128NXI-S/AF(STD)(1×8T)",
+     "desc": "Fusion AI Station- Analytics\nIntelligent analytics based on deep learning algorithm\nUp to 128-ch IP cameras can be connected\nH.265+/H.265/H.264+/H.264 video formats\n4 RJ-45 10/100/1000 Mbps self-adaptive Ethernet interfaces\nFacial recognition for people not wearing hard hat\nPPE detection which including safety helmets and reflective vests\nFire and smoke detection\nBA function , falling down detection, people gathering detection, fast moving detection, physical conflict detection\nIndoor BA function, playing mobile phone, number of people exception, overstaying detection",
+     "qty": 2,
+     "unit": "Nos",
+     "price": 40000,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of Power Point (including civil work, containment, outdoor electrical cable, and other accessories), up to 150 meters",
+     "desc": "4C x 4mm Outdoor Electrical Cable (Brand: DUCAB)\n20A Breaker, Heavy Duty Industrial PDU and other electrical accessories (Brand: Schneider)\n25-32 mm Heavy Duty PVC Conduit with bend, coupler and other accessories (Brand: DECODUCT)\nRemoval and Reinstallation of Interlock with digging width and depth of 400x400 mm",
+     "qty": 14,
+     "unit": "Nos",
+     "price": 10812.5,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of 3 Meter Pole (including foundation)",
+     "desc": "3-3.5 m length and 2.5-3 inch Tube with 3-4mm Thickness Pole\n350 x 70 x 3 Access Door\n350 x 350 x 16 mm Base Plate\n16mm Anchor Bolt\nHot Dip Galvanized and Powder Coated\n600 x 600 x 600 mm Foundation (up to 1000mm depth)\nFinal design subject to customer's approval",
+     "qty": 15,
+     "unit": "Nos",
+     "price": 1812.5,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of 3 Meter Cantilever (including foundation)",
+     "desc": "3-4 m length and 2.5-3 inch Tube with 3-4mm Thickness Pole\n2-3 m length and 2.5-3 inch Tube with 3-4mm Thickness Arm\n350 x 70 x 3 Access Door for Pole\n350 x 350 x 16 mm Base Plate\n20mm Anchor Bolt\nHot Dip Galvanized and Powder Coated\n600 x 600 x 1000 mm Foundation (up to 1200mm depth)\nPole Protector (If required)\nFinal design subject to customer's approval",
+     "qty": 3,
+     "unit": "Nos",
+     "price": 2875,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of Camera Bracket",
+     "desc": "1-2 m length and 2-3 inch Tube with 3-4mm Thickness Camera Bracket\nHot Dip Galvanized and Powder Coated\nFinal design subject to customer's approval",
+     "qty": 1,
+     "unit": "Nos",
+     "price": 350,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of Outdoor/ Indoor Enclosure (including foundation)",
+     "desc": "Minimum of 600 x 400 x 250 mm with 2-3 mm Thickness Box\nGRP with IP65 Rated\nHeavy Duty Cooling Fans, Dual Air Filter, Earth Bar, Cable Manager, and other accessories\n500 x 500 x 500 mm Foundation (up to 800mm depth)\nFinal design subject to customer's approval",
+     "qty": 22,
+     "unit": "Nos",
+     "price": 1750,
+     "photo": ""
+    },
+    {
+     "name": "Installation of the Camera Cable (including civil work, containment, outdoor CAT6A cable, Patch Cords, Patch Panel, and other accessories), up to 90 meters",
+     "desc": "Outdoor CAT6A Cable, Outdoor Connectors and accessories (Brand: DME)\n25-32 mm Heavy Duty PVC Conduit with bend, coupler and other accessories (Brand: DECODUCT)\nRemoval and Reinstallation of Interlock with digging width and depth of 400x400 mm",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 4687.5,
+     "photo": ""
+    },
+    {
+     "name": "Installation and Configuration of the Smart Camera (including VMS and analytics server)",
+     "desc": "Installation and Configuration of the camera (including AI Analytics Functions)\nInstallation and Configuration of the VMS (including smart functions)\nInstallation and Configuration of the Analytics Server (including the integration of requested cameras)\nHikvision Professional Services (Man-days) during the configuration\nApply the AI Analytics use cases successfully and obtain Final customer Acceptance",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 437.5,
+     "photo": ""
+    },
+    {
+     "name": "One Year Maintenance (AMC)",
+     "desc": "Hardware and Software Maintenance (including firmware updates)\n24 x 7 x 365 Support and Maintenance SLA (as per the customer)\nQuarterly Health Check Visits\nNon-Comprehensive AMC",
+     "qty": 49,
+     "unit": "Nos",
+     "price": 275,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of Industrial Managed Switch 8 port PoE with 2 SFP ports including power supply (well-known brand)",
+     "desc": "",
+     "qty": 15,
+     "unit": "Nos",
+     "price": 2250,
+     "photo": ""
+    },
+    {
+     "name": "Installation of Outdoor Fiber Cable 6C SM (including civil work, containment, outdoor CAT6 cable, and other accessories), up to 200 meters",
+     "desc": "Outdoor Fiber Cable 6C SM, Outdoor Connectors and accessories (Brand: DME)\n25-32 mm Heavy Duty PVC Conduit with bend, coupler and other accessories (Brand: DECODUCT)\nRemoval and Reinstallation of Interlock with digging width and depth of 400x400 mm",
+     "qty": 6,
+     "unit": "Nos",
+     "price": 9812.5,
+     "photo": ""
+    },
+    {
+     "name": "Installation of Outdoor Fiber Cable 6C SM (including civil work, containment, outdoor CAT6 cable, and other accessories), up to 300 meters",
+     "desc": "Outdoor Fiber Cable 6C SM, Outdoor Connectors and accessories (Brand: DME)\n25-32 mm Heavy Duty PVC Conduit with bend, coupler and other accessories (Brand: DECODUCT)\nRemoval and Reinstallation of Interlock with digging width and depth of 400x400 mm",
+     "qty": 1,
+     "unit": "Nos",
+     "price": 14375,
+     "photo": ""
+    },
+    {
+     "name": "Supply and Installation of Outdoor/ Indoor Enclosure (including foundation) – with rack support",
+     "desc": "Minimum of 800 x 600 x 600 mm with 2-3 mm Thickness Box\nGRP with IP65 Rated and Rack Support\nHeavy Duty Cooling Fans, Dual Air Filter, Earth Bar, Cable Manager, and other accessories (if required)\n750 x 750 x 500 mm Foundation (up to 800mm depth)\nFinal design subject to customer's approval",
+     "qty": 11,
+     "unit": "Nos",
+     "price": 3250,
+     "photo": ""
+    },
+    {
+     "name": "Installation of Outdoor Fiber Cable 6C SM (including civil work, containment, and other accessories), up to 200 meters",
+     "desc": "Outdoor Fiber Cable 6C SM, Outdoor Connectors and accessories (Brand: DME)\n25-32 mm Heavy Duty PVC Conduit with bend, coupler and other accessories (Brand: DECODUCT)\nRemoval and Reinstallation of Interlock with digging width and depth of 400x400 mm",
+     "qty": 11,
+     "unit": "Nos",
+     "price": 9812.5,
+     "photo": ""
+    },
+    {
+     "name": "Installation Services",
+     "desc": "Fiber Cable Splicing Supply and Installation of CAT6 patch cables with accessories",
+     "qty": 11,
+     "unit": "Nos",
+     "price": 750,
+     "photo": ""
+    }
+   ]
+  }
+ ]
+}

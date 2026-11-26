@@ -2429,7 +2429,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-priced-20261126.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-copy-20261127.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -2489,8 +2489,10 @@ async function runSeeds(){
               await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:old.number})}
             continue}}
         const number=await reserveNumber(d0.type,date,d0.reportType);
-        const d={terms:S.cfg.terms[d0.type]||'',...d0,number,date,validUntil:d0.type==='quotation'?addDays(date,S.cfg.validDays):'',dueDate:d0.type==='invoice'?addDays(date,S.cfg.dueDays):'',ref:d0.ref||'',salesperson:S.me.name||'',
-          status:d0.type==='quotation'?'draft':'',attachments:[],createdBy:S.me.id,createdByName:S.me.name,contactName:S.me.name||'',contactMobile:d0.type==='delivery'?'':(pf.mobile||''),contactEmail:d0.type==='delivery'?(S.cfg.dnEmail||DEFAULT_CFG.dnEmail):(pf.email||''),createdAt:now,updatedAt:now};
+        // a seed may name its own salesperson / contact (e.g. a copy of a colleague's quotation) and validity in days
+        const vd=+d0.validDays||S.cfg.validDays;delete d0.validDays;
+        const d={terms:S.cfg.terms[d0.type]||'',...d0,number,date,validUntil:d0.type==='quotation'?addDays(date,vd):'',dueDate:d0.type==='invoice'?addDays(date,S.cfg.dueDays):'',ref:d0.ref||'',salesperson:d0.salesperson||S.me.name||'',
+          status:d0.type==='quotation'?'draft':'',attachments:[],createdBy:S.me.id,createdByName:S.me.name,contactName:d0.contactName||S.me.name||'',contactMobile:d0.contactMobile??(d0.type==='delivery'?'':(pf.mobile||'')),contactEmail:d0.contactEmail??(d0.type==='delivery'?(S.cfg.dnEmail||DEFAULT_CFG.dnEmail):(pf.email||'')),createdAt:now,updatedAt:now};
         await setDoc(doc(fdb,COL.docs,id),d);made.push(number);
         for(const i of d.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
           await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:+i.price||0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:number})}}
