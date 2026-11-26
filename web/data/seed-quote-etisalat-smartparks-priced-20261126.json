@@ -1,0 +1,11 @@
+{
+ "id": "quote-etisalat-smartparks-priced-20261126",
+ "note": "Priced copy of LLT-Q-2026-0058 (CCTV Monitoring Solution for Smart Parks): estimated cost + 25% markup. Items copied unchanged.",
+ "copies": [
+  {
+   "from": "LLT-Q-2026-0058",
+   "qtys": [49, 49, 12, 49, 2, 14, 15, 3, 1, 22, 49, 49, 49, 15, 6, 1, 11, 11, 11],
+   "prices": [2937.5, 118.75, 812.5, 562.5, 40000, 10812.5, 1812.5, 2875, 350, 1750, 4687.5, 437.5, 275, 2250, 9812.5, 14375, 3250, 9812.5, 750]
+  }
+ ]
+}

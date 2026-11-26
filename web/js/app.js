@@ -2429,7 +2429,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-priced-20261126.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -2494,10 +2494,23 @@ async function runSeeds(){
         await setDoc(doc(fdb,COL.docs,id),d);made.push(number);
         for(const i of d.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
           await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:+i.price||0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:number})}}
+      // "copies": a new document copied from an existing one (same items, word for word), with the rates filled in.
+      // The original is left untouched. Item count and quantities must match, so a rate can never land on the wrong line.
+      for(const C of seed.copies||[]){
+        const src=(await getDocsFromServer(collection(fdb,COL.docs))).docs.map(x=>({...x.data(),id:x.id})).find(x=>x.number===C.from);
+        if(!src)throw new Error(C.from+' not found');
+        const its=src.items||[];
+        if(its.length!==C.prices.length||(C.qtys&&C.qtys.some((q,i)=>+its[i].qty!==+q)))throw new Error(C.from+': items do not match the price list');
+        const date=today(),id=uid(),type=src.type||'quotation';const number=await reserveNumber(type,date,src.reportType);
+        const d={...src,items:its.map((it,i)=>({...it,price:+C.prices[i]})),number,date,validUntil:type==='quotation'?addDays(date,S.cfg.validDays):(src.validUntil||''),
+          dueDate:type==='invoice'?addDays(date,S.cfg.dueDays):(src.dueDate||''),status:type==='quotation'?'draft':(src.status||''),copiedFrom:src.number,attachments:[],
+          createdBy:S.me.id,createdByName:S.me.name,createdAt:now,updatedAt:now};
+        ['id','sentAt','sentTo','sentBy','delivery','history','acceptedAt','convertedTo'].forEach(k=>delete d[k]);
+        await setDoc(doc(fdb,COL.docs,id),d);made.push(number+' (copy of '+src.number+')')}
       await setDoc(doc(fdb,COL.config,'company'),{seeds:{...done,[seed.id]:now}},{merge:true});
       if(nc||np)toast(`Added ${nc} customer${nc===1?'':'s'} and ${np} product${np===1?'':'s'}`);
       if(made.length)setTimeout(()=>toast(made.join(', ')+' created. Open Documents to check it.'),2600);
-    }catch(e){console.warn('seed',url,e)}
+    }catch(e){console.warn('seed',url,e);if(/not found|do not match/.test(e.message||''))toast('Could not add the priced copy: '+e.message,true)}
   }
 }
 
