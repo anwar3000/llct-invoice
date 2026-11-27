@@ -1,0 +1,39 @@
+{
+ "id": "gmg-headoffice-nvd-sr-20261127",
+ "note": "Client GMG (Gulf Marketing Group) with site GMG Head Office; service report for Dahua NVD installation and configuration.",
+ "clients": [
+  {
+   "name": "GMG",
+   "update": true,
+   "matchSitesBy": "name",
+   "address": "GMG Building, Umm Hurair Road, Oud Metha\nBur Dubai, Dubai, United Arab Emirates",
+   "phone": "+971 4 350 4400",
+   "notes": "Gulf Marketing Group (GMG) – head office at GMG Building, Oud Metha",
+   "creditDays": 30,
+   "openingBalance": 0,
+   "places": [
+    {"name": "GMG Head Office", "address": "GMG Building, Umm Hurair Road, Oud Metha\nBur Dubai, Dubai, United Arab Emirates"}
+   ]
+  }
+ ],
+ "docs": [
+  {
+   "type": "delivery",
+   "reportType": "service",
+   "clientName": "GMG",
+   "siteName": "GMG Head Office",
+   "deliveryAddress": "GMG Head Office\nGMG Building, Umm Hurair Road, Oud Metha\nBur Dubai, Dubai, United Arab Emirates",
+   "subject": "Dahua NVD installation and configuration",
+   "complaint": "Supply, installation and configuration of a Dahua Network Video Decoder (NVD) for video display.",
+   "workDone": "Scope of Work – Dahua NVD Installation and Configuration\n1. Supply and installation of Dahua Network Video Decoder (NVD).\n2. Configuration and commissioning of the NVD device.\n3. Supply and installation of HDMI cables for video connectivity.\n4. Supply and installation of DVI-to-HDMI adapters for display interfacing.\n5. Testing and verification of video output and connectivity to ensure proper operation.",
+   "technician": "",
+   "timeIn": "",
+   "timeOut": "",
+   "items": [
+    {"name": "Dahua Network Video Decoder (NVD)", "desc": "Supplied, installed, configured and commissioned", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""},
+    {"name": "HDMI cable", "desc": "Supplied and installed for video connectivity", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""},
+    {"name": "DVI-to-HDMI adapter", "desc": "Supplied and installed for display interfacing", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""}
+   ]
+  }
+ ]
+}

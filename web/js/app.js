@@ -2429,7 +2429,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-copy-20261127.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-copy-20261127.json','data/seed-gmg-headoffice-nvd-sr-20261127.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
