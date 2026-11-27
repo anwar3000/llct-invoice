@@ -2429,7 +2429,7 @@ VIEWS_AFTER.settings=()=>{
 };
 
 /* ================= starter lists bundled with the app (added once, by an admin) ================= */
-const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-copy-20261127.json','data/seed-gmg-headoffice-nvd-sr-20261127.json'];
+const SEEDS=['data/seed-starter-20261023.json','data/seed-quote-cctv124-20261023.json','data/seed-lldubai-soa-20261023.json','data/seed-bfl-20261027.json','data/seed-bfl-sites-20261027.json','data/seed-bfl-branches-20261027.json','data/seed-dn-lfi-mudon-20261103.json','data/seed-dn5-lfi-mudon-serials-20261109.json','data/seed-quote-ai-12branch-20261106.json','data/seed-quote-ai-12branch-summary-20261106.json','data/seed-quote-arabian-center-o2-door-v2-20261106.json','data/seed-pricelist-hik-vds-20261117.json','data/seed-quote-etisalat-smartparks-copy-20261127.json','data/seed-gmg-headoffice-nvd-sr-20261127.json','data/seed-gmg-headoffice-nvd-sr-v2-20261127.json'];
 async function runSeeds(){
   for(const url of SEEDS){
     try{
@@ -2484,7 +2484,8 @@ async function runSeeds(){
         if(d0.replaceSubject){const old=(await getDocsFromServer(collection(fdb,COL.docs))).docs.map(x=>({...x.data(),id:x.id}))
             .find(x=>x.type===d0.type&&x.clientId===d0.clientId&&[].concat(d0.replaceSubject).includes(x.subject)&&!(x.delivery&&x.delivery.signedAt));
           delete d0.replaceSubject;
-          if(old){await setDoc(doc(fdb,COL.docs,old.id),{items:d0.items,subject:d0.subject,notes:d0.notes,...(d0.terms?{terms:d0.terms}:{}),...(d0.client?{client:d0.client}:{}),updatedAt:now},{merge:true});made.push(old.number+' (updated)');
+          if(old){const more={};['terms','client','deliveryAddress','siteName','complaint','workDone'].forEach(k=>{if(d0[k]!=null)more[k]=d0[k]});
+            await setDoc(doc(fdb,COL.docs,old.id),{items:d0.items,subject:d0.subject,...(d0.notes!=null?{notes:d0.notes}:{}),...more,updatedAt:now},{merge:true});made.push(old.number+' (updated)');
             for(const i of d0.items||[]){const k=String(i.name||'').trim().toLowerCase();if(!k||haveP.has(k))continue;haveP.add(k);
               await setDoc(doc(fdb,COL.products,uid()),{name:i.name,desc:i.desc||'',unit:i.unit||'pcs',price:0,photo:'',barcode:'',category:'',createdBy:S.me.id,createdAt:now,updatedAt:now,source:old.number})}
             continue}}

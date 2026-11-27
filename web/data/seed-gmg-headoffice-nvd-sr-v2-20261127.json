@@ -1,0 +1,25 @@
+{
+ "id": "gmg-headoffice-nvd-sr-v2-20261127",
+ "note": "GMG Head Office NVD service report: work carried out in the CCTV control room (updates the same unsigned report).",
+ "docs": [
+  {
+   "type": "delivery",
+   "reportType": "service",
+   "clientName": "GMG",
+   "replaceSubject": ["Dahua NVD installation and configuration", "Dahua NVD installation and configuration – CCTV control room"],
+   "siteName": "GMG Head Office – CCTV Control Room",
+   "deliveryAddress": "GMG Head Office – CCTV Control Room\nGMG Building, Umm Hurair Road, Oud Metha\nBur Dubai, Dubai, United Arab Emirates",
+   "subject": "Dahua NVD installation and configuration – CCTV control room",
+   "complaint": "Supply, installation and configuration of a Dahua Network Video Decoder (NVD) for video display in the CCTV control room at GMG Head Office.",
+   "workDone": "Work carried out at GMG Head Office – CCTV control room.\n\nScope of Work – Dahua NVD Installation and Configuration\n1. Supply and installation of Dahua Network Video Decoder (NVD).\n2. Configuration and commissioning of the NVD device.\n3. Supply and installation of HDMI cables for video connectivity.\n4. Supply and installation of DVI-to-HDMI adapters for display interfacing.\n5. Testing and verification of video output and connectivity to ensure proper operation.",
+   "technician": "",
+   "timeIn": "",
+   "timeOut": "",
+   "items": [
+    {"name": "Dahua Network Video Decoder (NVD)", "desc": "Supplied, installed, configured and commissioned in the CCTV control room", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""},
+    {"name": "HDMI cable", "desc": "Supplied and installed for video connectivity", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""},
+    {"name": "DVI-to-HDMI adapter", "desc": "Supplied and installed for display interfacing", "qty": 1, "unit": "pcs", "status": "Completed", "photo": ""}
+   ]
+  }
+ ]
+}
